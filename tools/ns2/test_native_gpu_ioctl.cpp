@@ -22,7 +22,7 @@ int main() {
     legacy[0x34]=0x00; legacy[0x35]=0x00; legacy[0x36]=0x03;
     legacy[0x50]=0x55;
     for (const auto [raw,size,sm,channel] :
-         {std::array<u32,4>{0xc0e04705,0xd0,0x807,0x1d},
+         {std::array<u32,4>{0xc0e04705,0xd0,0x808,0x1d},
           std::array<u32,4>{0xc0e84705,0xd8,0x808,0x1f}}) {
         std::array<u8, 0x110> input{},output{},inline_output{};
         input.fill(0xab);output.fill(0xcd);inline_output.fill(0xef);
@@ -38,6 +38,13 @@ int main() {
         assert(le32(output.data()+0x10+0x3c)==sm);
         assert(le32(output.data()+0x10+0x40)==sm);
         assert(le32(output.data()+0x10+0x28)==0x1000);
+        // Never publish NS1 Maxwell engine classes in native GPU replies.
+        assert(le32(output.data()+0x10+0x5c)==0xc797);
+        assert(le32(output.data()+0x10+0x60)==0xc7c0);
+        assert(le32(output.data()+0x10+0x64)==0xc56f);
+        assert(le32(output.data()+0x10+0x6c)==0xc7b5);
+        assert((le64(output.data()+0x10+0x50)&((1ULL<<8)|(1ULL<<22)))==
+               ((1ULL<<8)|(1ULL<<22)));
         assert(le32(output.data()+0x10+0xb4)==64);
         assert((le32(output.data()+0x10+0x76)&0xffffU)==channel);
         assert(std::memcmp(output.data()+0x10,inline_output.data(),size)==0);
