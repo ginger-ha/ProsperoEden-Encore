@@ -221,6 +221,13 @@ def main() -> int:
                 "native shader dispatch required" in qmd_header and
                 "QMD dependency underflow" in qmd_header,
                 "Upstream-derived QMD3 scheduler must isolate title state, reject unsafe dispatch and retain third release slot")
+        require("ProcessNativeComputeInlineQmd(" in puller and
+                "if (reg == 0x107)" in puller and
+                "if (method == 0x107)" in puller and
+                "AccelerateInlineToMemory(" in puller and
+                "std::copy_n(regs.begin() + 0xc8" in puller and
+                "ProcessNativeComputeQmd(pusher, 0xb0, 3, subchannel)" in puller,
+                "Native inline Compute QMD must upload coherent 256-byte descriptor before PCAS")
         require("ProcessNativeComputeReportSemaphore(" in puller and
                 "if (reg == 0x6c3)" in puller and
                 "if (method == 0x6c3)" in puller and
