@@ -124,3 +124,18 @@ may be created with its assigned ID, preserving bounded ownership and
 rejecting reused, stale or exhausted IDs. A destroyed image never makes its
 ID available to a new pool. Host C++ cases cover assigned IDs and default
 sequential synthetic fixtures.
+
+## Native VI2 compositor bridge (experimental, unproven on console)
+
+Commands 301/303/305 now open an actual VI2 session. Its documented
+client/display operations bind an existing VI-managed layer. Present (229)
+accepts only the owner process's live NVMap-backed 429 image with an active
+314/315 window alias, reviewed color layout and allocated syncpoint fence.
+It constructs a real GraphicBuffer and only reports success if Nvnflinger's
+QueueBuffer accepted it. A periodic event reclaims slots only after producer
+release fences have completed. The supervisor is retained as an owner for
+as long as a VI2 session can reference its allocations.
+
+Host compilation alone cannot establish Switch 2 game rendering. The Ampere
+shader backend and observed DK frame submission still require end-to-end
+validation. Unsupported VI2 opcodes remain explicit errors.

@@ -56,6 +56,29 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    # VI2 must connect real process-owned 429 image window aliases to the
+    # existing display compositor, not return synthetic present success.
+    for command, method in ((301,"InitializeDisplayContext"),
+                            (303,"FinalizeDisplayContext"),
+                            (305,"OpenDisplaySession")):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    for evidence in (
+        'class IVi2Session final : public ServiceFramework<IVi2Session>',
+        '{229,&IVi2Session::Present,"PresentClientBuffer"}',
+        'GetService<VI::IManagerRootService>("vi:m",true)',
+        'CreateManagedLayer(&layer,*c->display,m_aruid)',
+        'GetPresentImage(p[5])',
+        'GetLayerProducerHandle(',
+        'std::make_shared<android::GraphicBuffer>(',
+        'c->producer->AttachBuffer(&idx,buffer)',
+        'c->producer->QueueBuffer(idx,input,&output)',
+        'c->producer->GetReleasedBufferFence(',
+        'c->producer->DetachReleasedBuffer(',
+        'if(!image||!image->window_pool||!m_native_module)return {}',
+        'GetSyncpointManager().IsSyncpointAllocated(fence)',
+    ):
+        assert evidence in text, "VI2 compositor must preserve real queue/fence owner: " + evidence
+
     for command, method in (
         (911, "CreateVideoImagePool"), (912, "DestroyVideoImagePool"),
         (426, "MapVideoGpuImage"), (427, "UnmapVideoGpuImage"),
