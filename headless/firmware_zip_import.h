@@ -151,8 +151,14 @@ inline bool ExtractEntry(std::ifstream& zip, const Entry& file, const fs::path& 
     }
     if (deflate) inflateEnd(&inflater);
     output_file.close();
-    return ok && complete && written==file.expanded && crc==file.crc &&
-           file.compressed >= (deflate ? 0u : file.expanded);
+    const bool passed = ok && complete && written==file.expanded && crc==file.crc &&
+                        file.compressed >= (deflate ? 0u : file.expanded);
+    if (!passed) std::fprintf(stderr,
+        "EDEN_FIRMWARE_ZIP_DECODE_FAIL file=%s ok=%d complete=%d written=%llu expected=%u crc=%08lx expected_crc=%08x remaining=%llu\\n",
+        file.name.c_str(), int(ok), int(complete), static_cast<unsigned long long>(written),
+        file.expanded, static_cast<unsigned long>(crc), file.crc,
+        static_cast<unsigned long long>(remaining));
+    return passed;
 }
 inline bool Import(const fs::path& archive, const fs::path& target, std::string* reason=nullptr) {
     auto fail=[&](const char* why) {if (reason) *reason=why;return false;};
