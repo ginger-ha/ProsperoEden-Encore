@@ -15,3 +15,14 @@ Provenance: Djihads80/Eglantine nx2 and 0x2593/Eden-NS2, selectively adapted to 
 Host source tests guard source selection, ABI intent, event lifetime, NS1 service preservation and historical F07 inventory separation. A green native build proves compilation only. The recorded Donkey Kong Bananza console state is guest CPU bootstrap with persistent black screen; **first rendered game frame is still unproven**. No NS2 gameplay compatibility claim follows from these integrations.
 
 This one `[full-build]` candidate tests consolidated source buildability. Do not request separate PS5 installations for each fix.
+
+
+## Consolidated GPU-memory correctness and NS1 handoff
+
+- NS2 `SVC 0x80` is no longer a success-only admission stub: it validates the exact registered NS2 PID, address/size, GPU attribute mask and real guest page-table range before setting or clearing bit `0x20` with `KPageTableBase::SetMemoryAttribute`.
+- The shared maintained kernel headers expose `GpuAccessible` identically to the SVC dispatcher, kernel page table, and memory queries; NS1 SVC IDs and existing user permissions are unchanged.
+- The NS2 12 GiB guest profile is temporary: after kernel shutdown or an NS2-to-NS1 title transition, the original memory layout and global/custom setting selection are restored.
+- The host source gate checks real mutation, cross-unit header selection, invalid input statuses, and memory profile restoration. Full native compilation must still confirm ABI and linkage.
+- This candidate intentionally **does not** enable the experimental 4 KiB NVDRV GMMU path or native Ampere GPU worker, so a black-screen NS2 game remains possible.
+
+The validated initial native HLE/memory bootstrap build was run #41273218088 at revision 32433db9. This follow-up full-build marker requests a single newer native build including the fixed GPU attribute persistence and NS1 restoration, not a PS5 gameplay pass.
