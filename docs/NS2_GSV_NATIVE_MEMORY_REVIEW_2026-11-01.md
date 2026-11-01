@@ -141,3 +141,5 @@ shader backend and observed DK frame submission still require end-to-end
 validation. Unsupported VI2 opcodes remain explicit errors.
 
 **Eden Nvnflinger ABI:** the producer exposes DetachNextBuffer, not upstream GetReleasedBufferFence or DetachReleasedBuffer. VI2 retains each pinned GraphicBuffer until the producer returns a Free buffer and its GPU release fence completes. The compositor's supported RGBA8888 path is used; RGBA1010102 remains explicitly unsupported.
+
+The actual Eden SyncpointManager supplies IsSyncpointAllocated and HasSyncpointExpired, so VI2 release-fence polling now checks these real APIs before returning guest slots. The default-display endpoint (111/112), output-level negotiation (352) and supported display mode query (106) are also routed to validated native VI2 state.
