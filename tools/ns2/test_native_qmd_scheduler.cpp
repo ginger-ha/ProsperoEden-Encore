@@ -59,6 +59,43 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // Decode the exact QMD3 compute resource description before hooking
+    // an authenticated native pipeline. This does NOT run a shader.
+    {
+        auto d=EmptyGrid();
+        d[8]=0x120;
+        d[11]=1U<<30;
+        d[12]=3;d[13]=4;d[14]=5;
+        d[17]=0x200;
+        d[18]=(8U<<16)|0x30U;
+        d[19]=(2U<<16)|16U;
+        d[20]=1;
+        d[23]=0x80;
+        d[48]=0x34567000;
+        d[49]=1;
+        d[50]=0x40;
+        d[32]=0x12340000;
+        d[33]=5|(4U<<19);
+        const auto launch=Tegra::DecodeNativeComputeLaunch(d);
+        assert(launch.has_value());
+        assert(launch->code_base==0x134567000ULL);
+        assert(launch->program_address==0x134567120ULL);
+        assert((launch->grid==std::array<std::uint32_t,3>{3,4,5}));
+        assert((launch->block==std::array<std::uint32_t,3>{8,16,2}));
+        assert(launch->shared_bytes==0x200 && launch->local_pos_bytes==0x80);
+        assert(launch->local_crs_bytes==0x40 && launch->linked_tsc);
+        assert(launch->constant_buffers[0].enabled);
+        assert(launch->constant_buffers[0].gpu_address==0x512340000ULL);
+        assert(launch->constant_buffers[0].size==64);
+        assert(!launch->constant_buffers[1].enabled);
+        d[33]|=1U<<8;
+        assert(!Tegra::DecodeNativeComputeLaunch(d));
+        d[33]&=~(1U<<8);
+        d[12]=0;
+        assert(!Tegra::DecodeNativeComputeLaunch(d));
+        d[12]=3;d[18]=0x30;
+        assert(!Tegra::DecodeNativeComputeLaunch(d));
+    }
     // The three Ampere completion slots must all be delivered, not only
     // the two legacy slots. They are validated before any side effect.
     {
