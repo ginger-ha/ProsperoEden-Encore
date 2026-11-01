@@ -141,6 +141,12 @@ def stage_source(destination: Path, expected: dict[str, tuple[bytes, bytes]], *,
         current = target.read_bytes()
         if current == maintained_bytes:
             continue
+        # --check is a pure validator: never rewrite a staged source.
+        if check:
+            raise RuntimeError(
+                f"Active source check found non-maintained revision: {relative} "
+                f"current={sha(current)} active={sha(maintained_bytes)}"
+            )
         if current not in (old, new):
             # Only the exact previously observed pre-N76 cached A64 bytes
             # may be repaired; keep a content-addressed copy for diagnosis.
