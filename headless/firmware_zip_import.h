@@ -29,6 +29,8 @@ inline bool SafeName(std::string_view name) {
     if (name.empty() || name.size() > 240 || name[0] == '/' ||
         name.find('\\') != name.npos || name.find('\0') != name.npos ||
         name.find(':') != name.npos) return false;
+    if (name.back() == '/') name.remove_suffix(1);
+    if (name.empty()) return false;
     const fs::path path{name};
     for (const auto& part : path)
         if (part == "." || part == ".." || part.empty()) return false;
