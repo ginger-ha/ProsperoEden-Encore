@@ -308,6 +308,7 @@ fixture = r"""
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -340,6 +341,23 @@ int main() {
     const auto bytes = ExtractedBaseBytes(game, nullptr);
     assert(bytes && *bytes == 4 + 8 + 4096);
     assert(ExtractedLocalCover(game).empty());
+    // The selected ExeFS artwork may be an image stored as a .dat sidecar,
+    // e.g. icon_AmericanEnglish.dat in native Switch dumps.
+    {
+        std::ofstream icon(game / "base" / "exefs" / "icon_AmericanEnglish.dat",
+                           std::ios::binary);
+        icon.put(static_cast<char>(0xff));
+        icon.put(static_cast<char>(0xd8));
+        icon << std::string(160, 'J');
+    }
+    assert(ExtractedLocalCover(game) ==
+           (game / "base" / "exefs" / "icon_AmericanEnglish.dat").string());
+    fs::remove(game / "base" / "exefs" / "icon_AmericanEnglish.dat");
+    // Unrelated binary data must not be accepted solely because of its name.
+    std::ofstream(game / "base" / "exefs" / "icon_AmericanEnglish.dat") <<
+        std::string(160, 'Q');
+    assert(ExtractedLocalCover(game).empty());
+    fs::remove(game / "base" / "exefs" / "icon_AmericanEnglish.dat");
     std::ofstream(game / "cover.png") << std::string(160, 'p');
     assert(ExtractedLocalCover(game) == (game / "cover.png").string());
     fs::remove(game / "cover.png");
