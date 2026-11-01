@@ -111,6 +111,7 @@ jobs:
           python3 -B tools/check-eden-audit-register.py
           python3 -B tools/check-eden-audit-verification-matrix.py
           python3 -B tools/audit-eden-progress-state.py
+          python3 -B tools/check-ps5-vulkan-loading-stages-host.py
           python3 -B tools/check-eden-optimization-coverage.py
           python3 -B tools/ci/check-final-engine-owner-contracts.py
           python3 -B tools/check-native-quiet-shutdown-heap-host.py
