@@ -163,6 +163,14 @@ def main() -> int:
                 "TraceNs2WorkerResult(" in gpu_worker_source and
                 "EDEN_NS2_IPC owner=vi2" in supervisor_source,
                 "NS2 boot trace must record guest-visible GPU worker IPC results")
+        qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
+        require("class NativeQmdScheduler" in qmd_header and
+                "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
+                "std::unordered_map<Address, State> states;" in qmd_header and
+                "static inline std::unordered_map<Address, State>" not in qmd_header and
+                "native shader dispatch required" in qmd_header and
+                "QMD dependency underflow" in qmd_header,
+                "Upstream-derived QMD3 scheduler must isolate title state, reject unsafe dispatch and retain third release slot")
         require("EDEN_NS2_GPFIFO submit=" in nvdrv_source and
                 "EDEN_NS2_GPU_BIND count=" in puller and
                 "engine == 0xc7c0" in puller and
