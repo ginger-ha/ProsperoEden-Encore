@@ -28,6 +28,11 @@ native_source = (root/"vendor/encore-active/eden-core/src/core/memory_native_sta
 a32_source = (root/"vendor/encore-active/eden-core/src/core/memory_native_a32.cpp").read_text()
 assert 'memory_native_standard.cpp' in cmake and 'memory_native_a32.cpp' in cmake
 assert 'write_derived("${eden_native_memory_tu}"' not in cmake
+for unit in (native_source, a32_source):
+    # The 27d087f crash hit ZeroBlock -> WalkBlock before SetCurrentPageTable.
+    # Both runtime-selected implementations must fail closed, never deref null.
+    assert unit.count("if (current_page_table == nullptr ||") == 1
+    assert unit.count("!AddressSpaceContains(*current_page_table, addr, size)) {") == 1
 assert native_source.count(begin) == a32_source.count(begin) == 1
 maintained_methods = begin + native_source.split(begin,1)[1].split(end,1)[0]
 a32_methods = begin + a32_source.split(begin,1)[1].split(end,1)[0]
