@@ -17,3 +17,9 @@ The recent source changes do **not** change the proven `LocaleCaseCandidates` de
 `tools/check-release-case-index-dedup-host.py` (historical F07 optimization witness).
 
 This refreshes the historical source fingerprint while retaining the existing `new_source_issue_corrected` disposition and original proof. No PS5 frame-time, local avatar appearance, playable NS2 game, or first rendered Switch 2 image is proven.
+
+## Registered source-owner audit row
+
+| Source owner | Disposition | Evidence limit |
+|---|---|---|
+| `headless/prosperoeden/eden_services.cpp` | Source-reviewed 2026-11-01 | No FPS or console first-frame claim |

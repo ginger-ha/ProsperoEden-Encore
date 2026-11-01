@@ -13,3 +13,9 @@ The only new component is `Eden::ExtractedNpdm::ProbeAccess`:
 `tools/check-ns2-extracted-inputs-host.py` extracts this actual production header and compiles/runs NS1 ACID, NS2 extended ACID, invalid FAC and ACI0 identity fixtures. Its CI registration remains the historical U87 source proof.
 
 This is an audit receipt for a source change, not a speed improvement, PS5 native success, or an NS2 first-frame claim.
+
+## Registered source-owner audit row
+
+| Source owner | Disposition | Evidence limit |
+|---|---|---|
+| `headless/extracted_npdm_identity.h` | Source-reviewed 2026-11-01 | No FPS or console first-frame claim |

@@ -19,3 +19,9 @@ Previous F07 reviewed blob: `9c3ca3d1378eb901726652a1bbc5e28f74601851`.
 - `tools/check-firmware-matrix-host.py`: source-linked independent NS1/NS2 firmware/keys resolver, format and root symlink boundaries.
 
 This review **updates only the source blob identity** in the historical F07 ledger: contract U13 remains reviewed without a new optimization. No PS5 FPS, NS2 frame, or decrypted NS2 runtime claim is made. Re-review any subsequent source edit.
+
+## Registered source-owner audit row
+
+| Source owner | Disposition | Evidence limit |
+|---|---|---|
+| `headless/metadata_bridge.cpp` | Source-reviewed 2026-11-01 | No FPS or console first-frame claim |
