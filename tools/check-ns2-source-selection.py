@@ -154,6 +154,10 @@ def main() -> int:
                      f"EDEN_NS2_IPC owner={owner}" in source and
                      "calls.fetch_add(" in source),
                     f"Missing bounded NS2 boot trace for {owner}")
+        require("EDEN_NS2_GPU_WORKER_RESULT cmd=" in gpu_worker_source and
+                "TraceNs2WorkerResult(" in gpu_worker_source and
+                "EDEN_NS2_IPC owner=vi2" in supervisor_source,
+                "NS2 boot trace must record guest-visible GPU worker IPC results")
         require("EDEN_NS2_GPFIFO submit=" in nvdrv_source and
                 "EDEN_NS2_GPU_BIND count=" in puller and
                 "std::atomic<unsigned>" in puller,
