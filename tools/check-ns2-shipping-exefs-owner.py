@@ -42,5 +42,16 @@ am_file = (ROOT / "vendor/encore-active/ns2-runtime/am/core/hle/service/am/servi
 assert '{320, D<&IApplicationFunctions::GetScreenShotAndContinuousRecordingInitiallyEnabled>' in am_file
 assert "m_applet->screenshot_permission" in am_file
 assert "m_applet->game_play_recording_supported" in am_file
+assert 'if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)' in cmake
+assert 'set(EDEN_SHARED_NS2_NVDRV_CAPS ON)' in cmake
+nv = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv/core/hle/service/nvdrv/devices/nvhost_ctrl_gpu.cpp").read_text()
+assert "command.raw == 0xc0e04705U || command.raw == 0xc0e84705U" in nv
+assert "WriteNativeCharacteristicsIoctlReply(" in nv
+assert 'if(EDEN_NS2_NVDRV_EXPERIMENTAL)' in cmake
+# Shared shipping branch must not select the AS/GPU research replacements.
+nv_selector = cmake.split('option(EDEN_NS2_NVDRV_EXPERIMENTAL', 1)[1].split(
+    '# Switch 2 GPU TIPC service', 1)[0]
+assert 'if(EDEN_NS2_NVDRV_EXPERIMENTAL)' in nv_selector
+assert 'eden_ns2_as_idx' in nv_selector and 'eden_ns2_gpu_idx' in nv_selector
 assert 'Settings::SetNceEnabled(is_39bit && !metadata.UsesExtendedAcid())' in rom
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1")
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1")
