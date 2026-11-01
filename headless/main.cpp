@@ -2164,7 +2164,7 @@ int main(int argc, char** argv) {
                         system.Renderer().ReadRasterizer()->LoadDiskResources(
                             title_id, std::stop_token{},
                             [](VideoCore::LoadCallbackStage, size_t, size_t) {});
-                        std::printf("EDEN_VULKAN_SHADER_CACHE title=%016llX mode=bounded-prewarm8\n",
+                        std::printf("EDEN_VULKAN_SHADER_CACHE title=%016llX mode=bounded-prewarm32\n",
                                     static_cast<unsigned long long>(title_id));
                     }
                 }

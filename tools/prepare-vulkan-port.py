@@ -2768,7 +2768,7 @@ if shader_source.count(f07_warm_before_0) != 1:
     raise RuntimeError('F07 bounded cache prewarm anchor 0 moved')
 shader_source = shader_source.replace(f07_warm_before_0, f07_warm_after_0)
 f07_warm_before_1 = "    struct {\n        std::mutex mutex;\n        size_t total{};"
-f07_warm_after_1 = "#ifdef PS5_NATIVE\n    // Eight entries at most: restore some persisted pipelines without\n    // rebuilding an unbounded title cache at launch. This token controls only\n    // the disk READER; the persistent Vulkan compiler workers stay alive.\n    constexpr size_t kStartupPrewarmPipelines = 8;\n    std::stop_source startup_reader;\n#endif\n    struct {\n        std::mutex mutex;\n        size_t total{};"
+f07_warm_after_1 = "#ifdef PS5_NATIVE\n    // Restore a bounded prefix of a title\'s saved pipelines before gameplay.\n    // Games with fewer cached entries load only those entries. This policy\n    // applies to every title (NS1 and NS2) without any title ID exceptions.\n    // Keep the worker queue, draw order and GPU fences unchanged.\n    constexpr size_t kStartupPrewarmPipelines = 32;\n    std::stop_source startup_reader;\n#endif\n    struct {\n        std::mutex mutex;\n        size_t total{};"
 if shader_source.count(f07_warm_before_1) != 1:
     raise RuntimeError('F07 bounded cache prewarm anchor 1 moved')
 shader_source = shader_source.replace(f07_warm_before_1, f07_warm_after_1)
@@ -2783,7 +2783,7 @@ if shader_source.count(f07_warm_before_3) != 1:
     raise RuntimeError('F07 bounded cache prewarm anchor 3 moved')
 shader_source = shader_source.replace(f07_warm_before_3, f07_warm_after_3)
 f07_warm_before_4 = "    workers.WaitForRequests(stop_loading);\n\n    if (use_vulkan_pipeline_cache) {"
-f07_warm_after_4 = "#ifdef PS5_NATIVE\n    // A cancelled title-cache load must never stop the persistent shader\n    // compiler pool: StatefulThreadWorker::WaitForRequests(stop_token)\n    // requests stop on every worker when that token is cancelled.\n    // Only the disk reader observes cancellation. The queued <=8 jobs\n    // must complete before their borrowed stack state can be destroyed.\n    workers.WaitForRequests();\n    prewarm_drain.joined = true;\n#else\n    workers.WaitForRequests(stop_loading);\n#endif\n#ifdef PS5_NATIVE\n    LOG_INFO(Render_Vulkan, \"PS5 shader cache bounded prewarm built {}/{} entries\",\n             state.built, state.total);\n#endif\n\n    if (use_vulkan_pipeline_cache) {"
+f07_warm_after_4 = "#ifdef PS5_NATIVE\n    // A cancelled title-cache load must never stop the persistent shader\n    // compiler pool: StatefulThreadWorker::WaitForRequests(stop_token)\n    // requests stop on every worker when that token is cancelled.\n    // Only the disk reader observes cancellation. The bounded queued jobs\n    // must complete before their borrowed stack state can be destroyed.\n    workers.WaitForRequests();\n    prewarm_drain.joined = true;\n#else\n    workers.WaitForRequests(stop_loading);\n#endif\n#ifdef PS5_NATIVE\n    LOG_INFO(Render_Vulkan, \"PS5 shader cache bounded prewarm built {}/{} entries\",\n             state.built, state.total);\n#endif\n\n    if (use_vulkan_pipeline_cache) {"
 if shader_source.count(f07_warm_before_4) != 1:
     raise RuntimeError('F07 bounded cache prewarm anchor 4 moved')
 shader_source = shader_source.replace(f07_warm_before_4, f07_warm_after_4)
@@ -2814,8 +2814,8 @@ shader_source = shader_source.replace(f07_preseed_graphics_old, f07_preseed_grap
 
 # F07: report truly usable prewarmed Vulkan pipelines, not merely attempts.
 # No measurements are taken during draw/dispatch; one line at game startup.
-f07_prewarm_metrics_old_0 = "    constexpr size_t kStartupPrewarmPipelines = 8;\n    std::stop_source startup_reader;"
-f07_prewarm_metrics_new_0 = "    constexpr size_t kStartupPrewarmPipelines = 8;\n    const auto startup_prewarm_started = std::chrono::steady_clock::now();\n    std::stop_source startup_reader;"
+f07_prewarm_metrics_old_0 = "    constexpr size_t kStartupPrewarmPipelines = 32;\n    std::stop_source startup_reader;"
+f07_prewarm_metrics_new_0 = "    constexpr size_t kStartupPrewarmPipelines = 32;\n    const auto startup_prewarm_started = std::chrono::steady_clock::now();\n    std::stop_source startup_reader;"
 if shader_source.count(f07_prewarm_metrics_old_0) != 1:
     raise RuntimeError('F07 prewarm outcome metric anchor 0 changed')
 shader_source = shader_source.replace(f07_prewarm_metrics_old_0, f07_prewarm_metrics_new_0, 1)
@@ -2835,7 +2835,7 @@ if shader_source.count(f07_prewarm_metrics_old_3) != 1:
     raise RuntimeError('F07 prewarm outcome metric anchor 3 changed')
 shader_source = shader_source.replace(f07_prewarm_metrics_old_3, f07_prewarm_metrics_new_3, 1)
 f07_prewarm_metrics_old_4 = "    LOG_INFO(Render_Vulkan, \"PS5 shader cache bounded prewarm built {}/{} entries\",\n             state.built, state.total);"
-f07_prewarm_metrics_new_4 = "    // Completed attempts include failed native handles; track valid results.\n    // One startup summary, never a per-frame or per-draw instrumentation cost.\n    const auto startup_prewarm_ms = std::chrono::duration_cast<std::chrono::milliseconds>(\n        std::chrono::steady_clock::now() - startup_prewarm_started).count();\n    std::printf(\"EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld\\n\",\n                state.total, state.built, state.valid, state.built - state.valid,\n                static_cast<long long>(startup_prewarm_ms));"
+f07_prewarm_metrics_new_4 = "    // Completed attempts include failed native handles; track valid results.\n    // One startup summary, never a per-frame or per-draw instrumentation cost.\n    const auto startup_prewarm_ms = std::chrono::duration_cast<std::chrono::milliseconds>(\n        std::chrono::steady_clock::now() - startup_prewarm_started).count();\n    std::printf(\"EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld limit=%zu\\n\",\n                state.total, state.built, state.valid, state.built - state.valid,\n                static_cast<long long>(startup_prewarm_ms), kStartupPrewarmPipelines);"
 if shader_source.count(f07_prewarm_metrics_old_4) != 1:
     raise RuntimeError('F07 prewarm outcome metric anchor 4 changed')
 shader_source = shader_source.replace(f07_prewarm_metrics_old_4, f07_prewarm_metrics_new_4, 1)

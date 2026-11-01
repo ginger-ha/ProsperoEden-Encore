@@ -26,7 +26,7 @@ assert "return static_cast<bool>(pipeline);" in compute_h
 assert active.count("if (pipeline && pipeline->IsBound()) {") == 1
 assert active.count("if (pipeline && pipeline->CanExecuteDraw()) {") == 1
 assert active.count("++state.valid;") == 2
-assert "EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld" in active
+assert "EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld limit=%zu" in active
 assert active.index("    workers.WaitForRequests();\n    prewarm_drain.joined = true;\n#else\n    workers.WaitForRequests(stop_loading);") < active.index("EDEN_PS5_SHADER_PREWARM queued=")
 assert "f07_warm_after_4" in generator
 assert "    workers.WaitForRequests();" in generator

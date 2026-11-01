@@ -15,7 +15,7 @@ assert 'Settings::values.use_vulkan_driver_pipeline_cache = game;' in main
 assert '#ifdef EDEN_PS5_VULKAN\n                if (game && Settings::values.use_disk_shader_cache.GetValue())' in main
 assert 'lazy_cache.request_stop();' not in main
 assert 'LoadDiskResources(\n                            title_id, std::stop_token{},' in main
-assert 'mode=bounded-prewarm8' in main
+assert 'mode=bounded-prewarm32' in main
 assert 'EDEN_VULKAN_SHADER_CACHE title=' in main
 assert 'if shader_source.count(lazy_vulkan_cache_anchor) != 1:' in port
 assert 'if (stop_loading.stop_requested()) {' in port
@@ -32,7 +32,7 @@ assert 'workers.WaitForRequests' not in v
 for i in range(5):
     assert f'f07_warm_before_{i}' in port
     assert f'f07_warm_after_{i}' in port
-assert 'kStartupPrewarmPipelines = 8' in port
+assert 'kStartupPrewarmPipelines = 32' in port
 assert 'startup_reader.request_stop();' in port
 assert 'workers.WaitForRequests(stop_loading);' in port
 assert 'const std::stop_token reader_token{startup_reader.get_token()};' in port
