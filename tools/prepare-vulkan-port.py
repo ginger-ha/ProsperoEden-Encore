@@ -4632,6 +4632,53 @@ apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
     "    if (any_rescaled) {",
     "F07 bypass recursive alias rescale checks when every source is unscaled")
 
+# PS5: an alias copy may reject/throw before the Vulkan submission is
+# recorded. Publishing the destination revision first would suppress the next
+# retry and allow an old HUD image to appear current. Desktop remains intact.
+apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
+    "    image.modification_tick = most_recent_tick;\n"
+    "    if (any_modified) {\n"
+    "        image.flags |= ImageFlagBits::GpuModified;\n"
+    "    }\n"
+    "#ifdef PS5_NATIVE\n"
+    "    // Most alias refreshes have only one newer source.\n",
+    "#ifndef PS5_NATIVE\n"
+    "    // Desktop preserves the original eager revision publication.\n"
+    "    image.modification_tick = most_recent_tick;\n"
+    "    if (any_modified) {\n"
+    "        image.flags |= ImageFlagBits::GpuModified;\n"
+    "    }\n"
+    "#endif\n"
+    "#ifdef PS5_NATIVE\n"
+    "    // Most alias refreshes have only one newer source.\n",
+    "F07 alias revision publication after copy 1/2")
+
+apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
+    "        ScaleUp(aliased_image);\n"
+    "        CopyImage(image_id, aliased->id, aliased->copies);\n"
+    "    }\n"
+    "}\n"
+    "\n"
+    "template <class P>\n"
+    "void TextureCache<P>::PrepareImage(\n",
+    "        ScaleUp(aliased_image);\n"
+    "        CopyImage(image_id, aliased->id, aliased->copies);\n"
+    "    }\n"
+    "#ifdef PS5_NATIVE\n"
+    "    // Publish alias freshness only after all Vulkan copies were queued.\n"
+    "    // A rejected/throwing copy keeps the older revision so the next draw\n"
+    "    // retries instead of treating stale HUD pixels as synchronized.\n"
+    "    image.modification_tick = most_recent_tick;\n"
+    "    if (any_modified) {\n"
+    "        image.flags |= ImageFlagBits::GpuModified;\n"
+    "    }\n"
+    "#endif\n"
+    "}\n"
+    "\n"
+    "template <class P>\n"
+    "void TextureCache<P>::PrepareImage(\n",
+    "F07 alias revision publication after copy 2/2")
+
 # F07 P0.4: the pooled staging span may be rounded up to the next
 # power of two. Read only the bytes requested by MapSizeBytes(image) in the
 # accelerated upload; RefreshContents already validates handle and length.
