@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Validate actual Ampere lowering of texture-constant widths and packed
 // half predicates against reviewed EglantinePS5 compatibility cases.
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include "shader_recompiler/frontend/ampere/lower_to_maxwell.h"
@@ -61,6 +62,33 @@ int main() {
         const std::array<Instruction, 2> stray_clear{
             Instruction{{0x00007957, 0, 0, 0}}, Exit()};
         assert(!LowerToMaxwell(stray_clear));
+    }
+    // Geometry OUT supports reviewed register / immediate forms and the
+    // upstream CBUF + uniform selector encodings without inventing new stages.
+    {
+        const Instruction cbuf{{pred | 0xb24 | (3u << 24), 0, 1u << 14, 0}};
+        const std::array<Instruction, 2> code{cbuf, Exit()};
+        const auto lowered = LowerToMaxwell(code);
+        assert(lowered && lowered.source_size == 32);
+        assert(lowered.instructions.size() >= 2);
+        const bool emitted = std::any_of(lowered.instructions.begin(),
+            lowered.instructions.end(), [](std::uint64_t word) {
+                return (word & 0xfff0000000000000ULL) == 0xfbe0000000000000ULL;
+            });
+        assert(emitted);
+        auto bad = code;
+        bad[0].words[2] |= 0x10000; // Unreviewed CBUF geometry mode.
+        assert(!LowerToMaxwell(bad));
+    }
+    {
+        const Instruction uniform{{pred | 0xd24 | (3u << 24), 0, 0x08004000u, 0}};
+        const std::array<Instruction, 2> code{uniform, Exit()};
+        const auto lowered = LowerToMaxwell(code);
+        assert(lowered && lowered.source_size == 32);
+        assert(lowered.instructions.size() >= 2);
+        auto bad = code;
+        bad[0].words[2] &= ~0x08000000u; // Uniform stream flag mandatory.
+        assert(!LowerToMaxwell(bad));
     }
     // Packed half predicate compare is emitted as a Maxwell predicate-set,
     // but an unreviewed native mode cannot be translated as an arbitrary op.
