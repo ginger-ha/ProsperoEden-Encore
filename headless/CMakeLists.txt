@@ -2377,10 +2377,23 @@ endif()
 # Native Switch 2 GPU capabilities IOCTLs, experimental only; original
 # Maxwell IOCTL path remains active for all other request IDs.
 option(EDEN_NS2_NVDRV_EXPERIMENTAL
-    "Research only: NS2 native NVDRV GPU characteristics ioctl packets" OFF)
-if(EDEN_NS2_NVDRV_EXPERIMENTAL)
-    if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
-        message(FATAL_ERROR "NS2 native NVDRV requires experimental metadata")
+    "Research only: NS2 4K GPU address-space and channel adapters" OFF)
+# The native GPU-characteristics IOCTL owner is additive: it recognizes only
+# the new, exact NS2 request IDs and falls back to existing NS1 handlers.
+# Keep 4K GMMU/GPFIFO source replacements research-only until per-process
+# dispatch is validated on PS5; mixing page sizes would regress FC 27.
+set(EDEN_SHARED_NS2_NVDRV_CAPS OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_NVDRV_CAPS ON)
+endif()
+if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)
+    if(EDEN_NS2_NVDRV_EXPERIMENTAL)
+        if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
+            message(FATAL_ERROR "NS2 native NVDRV research requires experimental metadata")
+        endif()
+    endif()
+    if(NOT EDEN_REVIEWED_DUAL_NPDM)
+        message(FATAL_ERROR "Shared NS2 GPU capabilities need reviewed metadata")
     endif()
     set(EDEN_NS2_NVDRV_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/nvdrv")
     set(EDEN_NS2_NVDRV_SOURCE
@@ -2399,6 +2412,9 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL)
     list(REMOVE_ITEM eden_ns2_nvdrv_sources
         "hle/service/nvdrv/devices/nvhost_ctrl_gpu.cpp")
     list(APPEND eden_ns2_nvdrv_sources "${EDEN_NS2_NVDRV_SOURCE}")
+    set_property(TARGET core PROPERTY SOURCES "${eden_ns2_nvdrv_sources}")
+    target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_NVDRV_ROOT}")
+    if(EDEN_NS2_NVDRV_EXPERIMENTAL)
     # Replace the pinned Maxwell-era nvhost-as-gpu owner only in NS2 research.
     set(EDEN_NS2_NVDRV_AS_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/nvdrv_as")
     set(EDEN_NS2_NVDRV_AS_SOURCE
@@ -2433,6 +2449,7 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL)
     list(APPEND eden_ns2_nvdrv_sources "${EDEN_NS2_NVDRV_GPU_SOURCE}")
     set_property(TARGET core PROPERTY SOURCES "${eden_ns2_nvdrv_sources}")
     target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_NVDRV_GPU_ROOT}" "${EDEN_NS2_NVDRV_ROOT}" "${EDEN_NS2_NVDRV_AS_ROOT}")
+    endif()
 endif()
 
 # Switch 2 GPU TIPC service and bounded worker transport. No native GPU
