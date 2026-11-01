@@ -192,7 +192,8 @@ std::string NacpString(const char* bytes, std::size_t capacity) {
     const std::string value(bytes, end);
     return ValidSidecarText(value) ? value : std::string{};
 }
-ExtractedSidecarMetadata ExtractedLocalNacp(const std::filesystem::path& title) {
+ExtractedSidecarMetadata ExtractedLocalNacp(const std::filesystem::path& title,
+                                                  int language_choice) {
     namespace fs = std::filesystem;
     if (!Eden::IsSafeExtractedDirectory(title)) return {};
     // Order matches the existing extracted ExeFS/main layout. Never use
@@ -214,10 +215,27 @@ ExtractedSidecarMetadata ExtractedLocalNacp(const std::filesystem::path& title) 
         if (ec || size < 0x3000 || size > 0x20000) continue;
         std::ifstream input(candidate, std::ios::binary);
         if (!input) continue;
-        // NACP indices: French=3, CanadianFrench=9, AmericanEnglish=0,
-        // BritishEnglish=1. Empty entries fall back to the first valid title.
-        constexpr std::array<unsigned, 16> order{3,9,0,1,2,4,5,6,7,8,10,11,12,13,14,15};
-        for (const unsigned language : order) {
+        // Map launcher language catalog indices to the 16 uncompressed
+        // NACP slots; Polish/Thai use the compressed 18-language variant and
+        // correctly fall back to available uncompressed entries instead.
+        constexpr std::array<int, 18> to_nacp{
+            0,1,3,9,4,7,6,5,10,15,8,11,-1,2,12,14,13,-1
+        };
+        const int preferred = language_choice >= 0 &&
+            static_cast<std::size_t>(language_choice) < to_nacp.size()
+            ? to_nacp[static_cast<std::size_t>(language_choice)] : -1;
+        constexpr std::array<unsigned, 16> fallback{
+            0,1,3,9,2,4,5,6,7,8,10,11,12,13,14,15
+        };
+        // Preferred language first, then English, French and other populated
+        // entries. Never silently impose French on English-speaking users.
+        for (std::size_t attempt = 0; attempt < fallback.size() + 1; ++attempt) {
+            const unsigned language = attempt == 0 && preferred >= 0
+                ? static_cast<unsigned>(preferred)
+                : fallback[attempt == 0 ? 0 : attempt - 1];
+            if (language >= 16 || (attempt != 0 && preferred >= 0 &&
+                                   language == static_cast<unsigned>(preferred)))
+                continue;
             std::array<char, 0x300> record{};
             input.clear();
             input.seekg(static_cast<std::streamoff>(language * record.size()));
@@ -1981,7 +1999,7 @@ std::vector<pe::ui::Game> EdenServices::games(const std::atomic<bool>* cancel) {
             if (cancel && cancel->load(std::memory_order_acquire))
                 return {}; // extraction finished; skip ID/Nlib/add-on metadata
             game.title_id = ResolveTitleId(path, file);
-            const auto local_control = deconstructed ? ExtractedLocalNacp(entry.path())
+            const auto local_control = deconstructed ? ExtractedLocalNacp(entry.path(), language_choice)
                                                       : ExtractedSidecarMetadata{};
             if (const auto* known = Eden::Ns2Catalog::Find(game.title_id)) {
                 if (local_control.name.empty()) game.name = std::string(known->name);
