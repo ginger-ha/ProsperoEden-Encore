@@ -215,7 +215,7 @@ def main() -> int:
         # variables (including the two NVDRV overlay stages) instead of a
         # stale count from before kernel/audio/GPU-access integration.
         selected_owners = re.findall(
-            r'set_property\\(TARGET core PROPERTY SOURCES "\\$\\{([^}]+)\\}"\\)',
+            r'set_property\(TARGET core PROPERTY SOURCES "\$\{([^}]+)\}"\)',
             CMAKE[selection:])
         expected_owners = [
             "eden_ns2_exefs_sources", "eden_ns2_svc_sources",
