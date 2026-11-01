@@ -23,6 +23,10 @@ def main():
         'if (!layout) return NvResult::BadValue;',
         'vm.small_page_allocator.emplace(layout->small_begin, layout->small_end);',
         'vm.big_page_allocator.emplace(layout->big_begin, layout->big_end);',
+        'if (!vm.initialised || !gmmu || !m_native_process)',
+        'const std::scoped_lock lock{mutex, gpu_channel_device->channel_mutex};',
+        'if (!session || session->process != m_native_process)',
+        'if (channel.memory_manager && channel.memory_manager != gmmu.get())',
     )
     if not all(x in owner for x in markers):
         print("NS2 real GMMU layout owner not wired to validated helper", file=sys.stderr)
