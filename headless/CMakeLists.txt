@@ -2307,6 +2307,36 @@ if(EDEN_NS2_CPU6_EXPERIMENTAL)
     target_compile_definitions(dynarmic PRIVATE EDEN_NS2_CPU6_EXPERIMENTAL=1)
 endif()
 
+# Shared kernel heap admission for Switch 2: the 39-bit guest virtual heap
+# may span 16 GiB, but physical pages stay bounded by the selected guest memory
+# layout and the existing sparse PS5 allocator. This does NOT allocate 16 GiB.
+# Preserve all other Switch 1 kernel/SVC owners and behavior.
+set(EDEN_SHARED_NS2_KERNEL_HEAP OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_KERNEL_HEAP ON)
+endif()
+if(EDEN_SHARED_NS2_KERNEL_HEAP)
+    set(EDEN_NS2_KERNEL_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/kernel")
+    get_target_property(eden_ns2_kernel_sources core SOURCES)
+    foreach(eden_ns2_kernel_owner IN ITEMS
+            "hle/kernel/k_address_space_info.cpp"
+            "hle/kernel/svc/svc_physical_memory.cpp")
+        list(FIND eden_ns2_kernel_sources "${eden_ns2_kernel_owner}" eden_ns2_kernel_index)
+        if(eden_ns2_kernel_index EQUAL -1)
+            message(FATAL_ERROR "NS2 shared kernel owner changed: ${eden_ns2_kernel_owner}")
+        endif()
+        set(eden_ns2_kernel_overlay
+            "${EDEN_NS2_KERNEL_ROOT}/core/${eden_ns2_kernel_owner}")
+        if(NOT EXISTS "${eden_ns2_kernel_overlay}")
+            message(FATAL_ERROR "Missing reviewed NS2 kernel owner: ${eden_ns2_kernel_overlay}")
+        endif()
+        list(REMOVE_ITEM eden_ns2_kernel_sources "${eden_ns2_kernel_owner}")
+        list(APPEND eden_ns2_kernel_sources "${eden_ns2_kernel_overlay}")
+    endforeach()
+    set_property(TARGET core PROPERTY SOURCES "${eden_ns2_kernel_sources}")
+    message(STATUS "Encore shared NS1/NS2 kernel: extended virtual heap and per-layout heap admission")
+endif()
+
 # Research-only Switch 2 AM command 320. Keep the Encore-maintained application
 # metadata service as the source ancestor: title-version diagnostics must survive.
 option(EDEN_NS2_AM_EXPERIMENTAL

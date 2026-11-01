@@ -54,4 +54,20 @@ nv_selector = cmake.split('option(EDEN_NS2_NVDRV_EXPERIMENTAL', 1)[1].split(
 assert 'if(EDEN_NS2_NVDRV_EXPERIMENTAL)' in nv_selector
 assert 'eden_ns2_as_idx' in nv_selector and 'eden_ns2_gpu_idx' in nv_selector
 assert 'Settings::SetNceEnabled(is_39bit && !metadata.UsesExtendedAcid())' in rom
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1")
+# The shipping kernel must accept an NS2 12 GiB guest heap without changing
+# the Switch 1 layout-specific cap or replacing the complete SVC dispatcher.
+heap = cmake.split('# Shared kernel heap admission for Switch 2:', 1)[1].split(
+    '# Research-only Switch 2 AM command 320.', 1)[0]
+assert 'set(EDEN_SHARED_NS2_KERNEL_HEAP ON)' in heap
+assert 'EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM' in heap
+assert 'set_property(TARGET core PROPERTY SOURCES' in heap
+kernel_root = ROOT / 'vendor/encore-active/ns2-runtime/kernel/core/hle/kernel'
+addr = (kernel_root / 'k_address_space_info.cpp').read_text()
+svc = (kernel_root / 'svc/svc_physical_memory.cpp').read_text()
+assert '.size = 16_GiB' in addr and 'KAddressSpaceInfo::Type::Heap' in addr
+assert 'KSystemControl::Init::GetIntendedMemorySize()' in svc
+assert '(std::max)(MainMemorySizeMax,' in svc
+for owner in ('hle/kernel/k_address_space_info.cpp', 'hle/kernel/svc/svc_physical_memory.cpp'):
+    assert owner in heap
+assert 'EDEN_NS2_KERNEL_ROOT' in heap
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1")
