@@ -4478,9 +4478,9 @@
       "contract_id": "U87",
       "prior_status": "SOURCE",
       "proof_ref": "tools/check-ns2-extracted-inputs-host.py",
-      "reviewed_source_git_blob": "116e1d4bb7181c0f44e1910f5f8f1eb53ca14a61",
-      "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
-      "evidence": "Bounded read-only META/ACI0 NPDM Title ID fallback for extracted NS1/NS2 library identity. Exact U87 SOURCE contract and CI-invoked synthetic valid/invalid NPDM host witness. This is a source review, not a measured shader/JIT/HUD optimization, PS5 runtime compatibility proof or console FPS claim."
+      "reviewed_source_git_blob": "d740d94e1423600c1782e91792f1cbd803945dc0",
+      "source_review_document": "docs/NS2_NPDM_ACID_FAC_SOURCE_REVIEW_2026-11-01.md",
+      "evidence": "Bounded read-only META/ACI0 NPDM Title ID fallback for extracted NS1/NS2 library identity. Exact U87 SOURCE contract and CI-invoked synthetic valid/invalid NPDM host witness. This is a source review, not a measured shader/JIT/HUD optimization, PS5 runtime compatibility proof or console FPS claim. 2026-11-01 re-reviewed NS1/NS2 ACID 0x200/0x300 signature prefix and bounded FAC diagnostics; read-only, no guest permission grants. Actual header is compiled and probed by check-ns2-extracted-inputs-host.py. See docs/NS2_NPDM_ACID_FAC_SOURCE_REVIEW_2026-11-01.md. No PS5 or NS2-frame claim."
     },
     {
       "path": "headless/ns2_title_catalog.h",
