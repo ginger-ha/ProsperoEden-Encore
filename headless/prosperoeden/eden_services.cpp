@@ -158,6 +158,79 @@ std::optional<std::uint64_t> ExtractedBaseBytes(const std::filesystem::path& tit
 
 // Local user-supplied covers are a safe offline fallback for extracted titles
 // with no packaged Control NCA or Nlib match. No game-name-specific artwork.
+// Read user-supplied Control NACP without NCA keys or external title databases.
+// The legacy NACP language table has up to sixteen 0x300-byte records
+// (0x200-byte name + 0x100-byte developer). The compressed/extended variant
+// is intentionally not guessed. This is metadata-only, never guest authority.
+struct ExtractedSidecarMetadata {
+    std::string name;
+    std::string developer;
+};
+
+bool ValidSidecarText(std::string_view value) {
+    if (value.empty()) return false;
+    for (std::size_t i = 0; i < value.size();) {
+        const unsigned char c = static_cast<unsigned char>(value[i]);
+        if (c < 0x20 || c == 0x7f) return false;
+        if (c < 0x80) { ++i; continue; }
+        const std::size_t n = c >= 0xc2 && c <= 0xdf ? 2 :
+                              c >= 0xe0 && c <= 0xef ? 3 :
+                              c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+        if (!n || n > value.size() - i) return false;
+        for (std::size_t j = 1; j < n; ++j)
+            if ((static_cast<unsigned char>(value[i+j]) & 0xc0u) != 0x80u) return false;
+        const auto second = static_cast<unsigned char>(value[i+1]);
+        if ((c == 0xe0 && second < 0xa0) || (c == 0xed && second >= 0xa0) ||
+            (c == 0xf0 && second < 0x90) || (c == 0xf4 && second >= 0x90)) return false;
+        i += n;
+    }
+    return true;
+}
+std::string NacpString(const char* bytes, std::size_t capacity) {
+    const auto* end = static_cast<const char*>(std::memchr(bytes, '\0', capacity));
+    if (!end) return {};
+    const std::string value(bytes, end);
+    return ValidSidecarText(value) ? value : std::string{};
+}
+ExtractedSidecarMetadata ExtractedLocalNacp(const std::filesystem::path& title) {
+    namespace fs = std::filesystem;
+    if (!Eden::IsSafeExtractedDirectory(title)) return {};
+    // Order matches the existing extracted ExeFS/main layout. Never use
+    // update/DLC control data to relabel a base game.
+    for (const char* relative : {"control.nacp", "base/control.nacp",
+                                 "exefs/control.nacp", "base/exefs/control.nacp"}) {
+        fs::path parent = title;
+        bool safe = true;
+        for (const auto& part : fs::path(relative).parent_path()) {
+            parent /= part;
+            if (!Eden::IsSafeExtractedDirectory(parent)) { safe = false; break; }
+        }
+        if (!safe) continue;
+        const fs::path candidate = title / relative;
+        std::error_code ec;
+        const auto status = fs::symlink_status(candidate, ec);
+        if (ec || !fs::is_regular_file(status) || fs::is_symlink(status)) continue;
+        const auto size = fs::file_size(candidate, ec);
+        if (ec || size < 0x3000 || size > 0x20000) continue;
+        std::ifstream input(candidate, std::ios::binary);
+        if (!input) continue;
+        // NACP indices: French=3, CanadianFrench=9, AmericanEnglish=0,
+        // BritishEnglish=1. Empty entries fall back to the first valid title.
+        constexpr std::array<unsigned, 16> order{3,9,0,1,2,4,5,6,7,8,10,11,12,13,14,15};
+        for (const unsigned language : order) {
+            std::array<char, 0x300> record{};
+            input.clear();
+            input.seekg(static_cast<std::streamoff>(language * record.size()));
+            if (!input.read(record.data(), record.size())) continue;
+            auto name = NacpString(record.data(), 0x200);
+            if (name.empty() || name == "Application") continue;
+            auto developer = NacpString(record.data() + 0x200, 0x100);
+            return {std::move(name), std::move(developer)};
+        }
+    }
+    return {};
+}
+
 std::string ExtractedLocalCover(const std::filesystem::path& title) {
     namespace fs = std::filesystem;
     if (!Eden::IsSafeExtractedDirectory(title)) return {};
@@ -1908,14 +1981,25 @@ std::vector<pe::ui::Game> EdenServices::games(const std::atomic<bool>* cancel) {
             if (cancel && cancel->load(std::memory_order_acquire))
                 return {}; // extraction finished; skip ID/Nlib/add-on metadata
             game.title_id = ResolveTitleId(path, file);
+            const auto local_control = deconstructed ? ExtractedLocalNacp(entry.path())
+                                                      : ExtractedSidecarMetadata{};
             if (const auto* known = Eden::Ns2Catalog::Find(game.title_id)) {
-                game.name = std::string(known->name);
+                if (local_control.name.empty()) game.name = std::string(known->name);
                 SaveTitle(file, game.name);
                 if (!known->publisher.empty()) game.publisher = std::string(known->publisher);
                 if (!known->release_date.empty()) game.release_date = std::string(known->release_date);
                 if (!known->genre.empty()) game.categories = std::string(known->genre);
-                std::fprintf(stderr, "EDEN_NS2_TITLE_RESOLVED id=%016llX name=%s\n",
-                             static_cast<unsigned long long>(game.title_id), game.name.c_str());
+                std::fprintf(stderr, "EDEN_NS2_TITLE_RESOLVED id=%016llX name=%s source=%s\n",
+                             static_cast<unsigned long long>(game.title_id), game.name.c_str(),
+                             local_control.name.empty() ? "offline" : "local-nacp");
+            }
+            if (!local_control.name.empty()) {
+                game.name = local_control.name;
+                if (!local_control.developer.empty()) game.developer = local_control.developer;
+                SaveTitle(file, game.name);
+                std::fprintf(stderr, "EDEN_EXEFS_NACP title=%016llX local_name=1 developer=%d\n",
+                             static_cast<unsigned long long>(game.title_id),
+                             !local_control.developer.empty());
             }
             if (game.title_id != 0) {
                 const NlibEnrichment nlib = CachedNlibEnrichment(game.title_id, language_choice);
