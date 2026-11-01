@@ -56,7 +56,9 @@ int main(int argc,char** argv) {
         std::vector<VkQueueFamilyProperties> families(queues);
         vkGetPhysicalDeviceQueueFamilyProperties(physical,&queues,families.data());
         for (uint32_t i=0;i<queues;++i) {
-            if (families[i].queueCount && (families[i].queueFlags&VK_QUEUE_GRAPHICS_BIT)) {
+            if (families[i].queueCount &&
+                (families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) ==
+                    (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
                 selected=physical; queue=i; break;
             }
         }
@@ -310,9 +312,55 @@ int main(int argc,char** argv) {
         std::fprintf(stderr,"Host Compute pipeline result: %d\\n",int(compute_rc));
     Require(compute_rc==VK_SUCCESS && compute_pipeline!=VK_NULL_HANDLE,
             "Vulkan host rejected native synthetic Compute pipeline");
+    // Exercise the actual Vulkan submission boundary, not just pipeline
+    // construction. The generated shader intentionally has no descriptors,
+    // so this proves a real GPU queue executes Compute but NOT QMD3 resource
+    // binding, guest memory visibility, or PS5 renderer integration.
+    VkQueue compute_queue=VK_NULL_HANDLE;
+    vkGetDeviceQueue(device,queue,0,&compute_queue);
+    Require(compute_queue!=VK_NULL_HANDLE,"host Compute queue unavailable");
+    VkCommandPoolCreateInfo pool_info{};
+    pool_info.sType=VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.queueFamilyIndex=queue;
+    VkCommandPool command_pool=VK_NULL_HANDLE;
+    Require(vkCreateCommandPool(device,&pool_info,nullptr,&command_pool)==VK_SUCCESS,
+            "host Compute command pool creation failed");
+    VkCommandBufferAllocateInfo buffer_info{};
+    buffer_info.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    buffer_info.commandPool=command_pool;
+    buffer_info.level=VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    buffer_info.commandBufferCount=1;
+    VkCommandBuffer command=VK_NULL_HANDLE;
+    Require(vkAllocateCommandBuffers(device,&buffer_info,&command)==VK_SUCCESS,
+            "host Compute command buffer allocation failed");
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType=VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags=VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    Require(vkBeginCommandBuffer(command,&begin_info)==VK_SUCCESS,
+            "host Compute command buffer begin failed");
+    vkCmdBindPipeline(command,VK_PIPELINE_BIND_POINT_COMPUTE,compute_pipeline);
+    vkCmdDispatch(command,1,1,1);
+    Require(vkEndCommandBuffer(command)==VK_SUCCESS,
+            "host Compute command buffer end failed");
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkFence fence=VK_NULL_HANDLE;
+    Require(vkCreateFence(device,&fence_info,nullptr,&fence)==VK_SUCCESS,
+            "host Compute completion fence creation failed");
+    VkSubmitInfo submit_info{};
+    submit_info.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount=1;
+    submit_info.pCommandBuffers=&command;
+    Require(vkQueueSubmit(compute_queue,1,&submit_info,fence)==VK_SUCCESS,
+            "host Compute vkQueueSubmit failed");
+    Require(vkWaitForFences(device,1,&fence,VK_TRUE,10000000000ULL)==VK_SUCCESS,
+            "host Compute dispatch did not complete within ten seconds");
+    vkDestroyFence(device,fence,nullptr);
+    vkFreeCommandBuffers(device,command_pool,1,&command);
+    vkDestroyCommandPool(device,command_pool,nullptr);
     vkDestroyPipeline(device,compute_pipeline,nullptr);
     vkDestroyShaderModule(device,compute_module,nullptr);
-    std::puts("NS2 synthetic Ampere Compute Vulkan pipeline: PASS (host only; no dispatch)");
+    std::puts("NS2 synthetic Ampere Compute Vulkan dispatch: PASS (host only; no QMD3 resources)");
 
     vkDestroyPipelineLayout(device,layout,nullptr);
     vkDestroyRenderPass(device,render_pass,nullptr);
