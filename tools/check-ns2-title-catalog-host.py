@@ -11,6 +11,8 @@ assert '#include "ns2_title_catalog.h"' in services
 assert 'Eden::Ns2Catalog::Find(game.title_id)' in services
 assert 'FetchKnownNs2Front(title_id, cancel)' in services
 assert 'EDEN_NS2_TITLE_RESOLVED' in services
+assert 'base/exefs/icon.jpg' in services and 'exefs/icon.png' in services
+assert 'IsSafeExtractedDirectory(parent)' in services
 assert 'WriteJpegTga(*body, staged, true)' in services
 assert 'std::rename(staged.c_str(), target.c_str())' in services
 compiler=shutil.which("clang++") or shutil.which("g++")
