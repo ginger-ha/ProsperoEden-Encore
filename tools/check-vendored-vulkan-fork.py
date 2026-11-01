@@ -347,7 +347,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # This is NOT an exemption from vendor parity: an unexpected code change
     # outside these pinned blocks still fails the original full diff.
     n3m = normalized_expected[n56_name].read_text()
-    n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\\n'
+    n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n'
     assert n3m.count(n3m_flag) == 3, 'NS2 pipeline compile gates drifted'
     def n3m_hash(data):
         value = 0xcbf29ce484222325
@@ -366,11 +366,11 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     )
     pinned = []
     for start, digest in zip(marker_positions, marker_hashes):
-        end = n3m.index('#endif\\n', start) + len('#endif\\n')
+        end = n3m.index('#endif\n', start) + len('#endif\n')
         fragment = n3m[start:end]
         assert n3m_hash(fragment) == digest, 'Unreviewed NS2 renderer code drift'
         pinned.append(fragment)
-    assert '#else\\n    if (!RefreshStages(graphics_key.unique_hashes)) {\\n#endif\\n' in pinned[1], (
+    assert '#else\n    if (!RefreshStages(graphics_key.unique_hashes)) {\n#endif\n' in pinned[1], (
         'NS1 RefreshStages branch was not preserved')
     assert 'CaptureGraphicsTicket(maxwell3d)' in pinned[1] and (
         'CaptureNs2GraphicsShaderFromGpu(' in pinned[1]), 'NS2 dispatch must use GMMU'
@@ -378,7 +378,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         'IsGraphicsCurrent(maxwell3d, *ticket)' in pinned[2]), 'NS2 pipeline owner drift'
     n3m = n3m.replace(pinned[0], '', 1)
     n3m = n3m.replace(
-        pinned[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\\n', 1)
+        pinned[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\n', 1)
     n3m = n3m.replace(pinned[2], '', 1)
     assert n3m_flag not in n3m, 'Native shader research source remained in release baseline'
     n3m_file = temp / 'normalized-vendor-n3m' / n56_name
