@@ -93,4 +93,24 @@ assert 'Settings::MemoryLayout::Memory_12Gb' in load
 assert 'SetGlobal(false)' in load and 'SetValue(Settings::MemoryLayout::Memory_12Gb)' in load
 assert 'initialized_memory_layout != Settings::values.memory_layout_mode.GetValue()' in shared_core
 assert 'bool extended_memory_layout' not in shared_core
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1")
+# Real aud:u manager bridge is additive and shares maintained NS1 audio HLE.
+audio_root = ROOT / 'vendor/encore-active/ns2-runtime/audio/core/hle/service/audio'
+audio = (audio_root / 'audio.cpp').read_text()
+client = (audio_root / 'nx2_audio_user_client.h').read_text()
+audio_select = cmake.split('# Shared Switch 2 audio user service:', 1)[1].split(
+    '# Research-only Switch 2 AM command 320.', 1)[0]
+assert 'EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM' in audio_select
+assert 'set(EDEN_SHARED_NS2_AUDIO ON)' in audio_select
+assert 'list(REMOVE_ITEM eden_ns2_audio_sources "hle/service/audio/audio.cpp")' in audio_select
+assert 'set_property(TARGET core PROPERTY SOURCES' in audio_select
+assert 'target_include_directories(core BEFORE PRIVATE' in audio_select
+assert audio.count('RegisterNamedService("aud:u"') == 1
+for name in ('audout:u', 'audren:u', 'audin:u', 'audctl', 'hwopus'):
+    assert audio.count('RegisterNamedService("' + name + '"') == 1, name
+for command, method, manager in (
+    (1, 'GetAudioOutManager', 'IAudioOutManager'),
+    (2, 'GetAudioRendererManager', 'IAudioRendererManager')):
+    assert '{' + str(command) + ', &INx2AudioUserClient::' + method in client
+    assert 'rb.PushIpcInterface<' + manager + '>(ctx, system)' in client
+assert 'auto stub fallback' not in client.lower()
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1 audio_u=1")
