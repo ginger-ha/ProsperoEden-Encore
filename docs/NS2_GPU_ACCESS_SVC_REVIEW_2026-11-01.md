@@ -9,3 +9,10 @@ The adapter is intentionally not a GMMU mapping, shader translator, GPU command 
 Upstream idea: Djihads80/Eglantine nx2 (SVC 0x80), adapted by tightening process identity and range/flag validation rather than unconditional `args[0] = 0`.
 
 `tools/check-ns2-gpu-access-svc-host.py` compiles and runs constexpr alignment/mask/overflow/PID fixtures and checks the exact shipping source/CMake wiring. First native PS5 compile and console evidence still required.
+
+
+## Research GPU-worker consistency
+
+The opt-in native GPU session/worker now selects the **same real SVC 0x80 dispatcher** and the exact shared memory-attribute headers. `RegisterMemory` checks that every queried guest memory block carries `GpuAccessible` *in addition* to its required aligned-device-map state, reference-counted permissions and unlocked state. A missing bit is an explicit error, not a successful NVMap pin.
+
+The old research-only trace dispatcher is replaced for this research profile, but its bounded `EDEN_NS2_SVC_TRACE` instrumentation is retained. The shipping profile is unchanged by this GPU-worker selection: the 4 KiB GMMU and Ampere pipeline still need native proof.

@@ -26,6 +26,18 @@ assert 'static_cast<KMemoryAttribute>(attribute)' in src
 svc_enum = (base / "core/hle/kernel/svc_types.h").read_text()
 block_enum = (base / "core/hle/kernel/k_memory_block.h").read_text()
 assert 'GpuAccessible = (1 << 5)' in svc_enum
+# Native 4K worker research must run against the SAME persisted SVC 0x80
+# attribute. Never silently pin non-GPU guest pages or use trace-only SVC.
+worker = (vendor / "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker.cpp").read_text()
+assert 'True(info.m_attribute & Kernel::KMemoryAttribute::GpuAccessible)' in worker
+assert 'LockForMapDeviceAddressSpace(' in worker
+assert 'EDEN_NS2_GPU_ACCESS_RESEARCH_SOURCE' in recipe
+assert 'list(REMOVE_ITEM eden_ns2_research_kernel_sources "${EDEN_NS2_NATIVE_SVC_SOURCE}")' in recipe
+assert 'list(APPEND eden_ns2_research_kernel_sources "${EDEN_NS2_GPU_ACCESS_RESEARCH_SOURCE}")' in recipe
+assert 'NOT PS5_NATIVE OR NOT EDEN_NS2_EXEFS_EXPERIMENTAL' in recipe
+assert 'target_include_directories(core BEFORE PUBLIC "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}")' in recipe
+assert '#ifdef EDEN_NS2_SVC_TRACE' in src
+assert 'SvcTrace::Next(process.GetProcessId())' in src
 assert 'GpuAccessible = static_cast<u8>(Svc::MemoryAttribute::GpuAccessible)' in block_enum
 assert 'SetMask = Uncached | PermissionLocked | GpuAccessible' in block_enum
 assert 'target_include_directories(core BEFORE PUBLIC "${EDEN_NS2_GPU_ACCESS_ROOT}")' in recipe

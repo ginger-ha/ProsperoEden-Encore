@@ -2575,6 +2575,32 @@ if(EDEN_NS2_GPU_SESSION_EXPERIMENTAL)
     target_include_directories(core BEFORE PRIVATE
         "${EDEN_NS2_GPU_SESSION_ROOT}"
         "${PORT_ROOT}/vendor/encore-active/ns2-runtime/hle")
+    # Native GPU worker registration MUST consume the real SVC 0x80
+    # attribute. The older research SVC source only traced calls and did not
+    # update the guest's kernel memory blocks. Keep these selections coupled.
+    if(NOT PS5_NATIVE OR NOT EDEN_NS2_EXEFS_EXPERIMENTAL)
+        message(FATAL_ERROR "NS2 GPU worker needs a real native ExeFS process and GPU-access SVC")
+    endif()
+    set(EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT
+        "${PORT_ROOT}/vendor/encore-active/ns2-runtime/gpu_access_svc")
+    set(EDEN_NS2_GPU_ACCESS_RESEARCH_SOURCE
+        "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}/core/hle/kernel/svc.cpp")
+    if(NOT EXISTS "${EDEN_NS2_GPU_ACCESS_RESEARCH_SOURCE}" OR
+       NOT EXISTS "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}/core/hle/kernel/svc_types.h" OR
+       NOT EXISTS "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}/core/hle/kernel/k_memory_block.h")
+        message(FATAL_ERROR "NS2 research GPU-access kernel source/header missing")
+    endif()
+    get_target_property(eden_ns2_research_kernel_sources core SOURCES)
+    list(FIND eden_ns2_research_kernel_sources
+        "${EDEN_NS2_NATIVE_SVC_SOURCE}" eden_ns2_old_research_svc_idx)
+    if(eden_ns2_old_research_svc_idx EQUAL -1)
+        message(FATAL_ERROR "Research SVC owner changed before NS2 GPU worker selection")
+    endif()
+    list(REMOVE_ITEM eden_ns2_research_kernel_sources "${EDEN_NS2_NATIVE_SVC_SOURCE}")
+    list(APPEND eden_ns2_research_kernel_sources "${EDEN_NS2_GPU_ACCESS_RESEARCH_SOURCE}")
+    set_property(TARGET core PROPERTY SOURCES "${eden_ns2_research_kernel_sources}")
+    target_include_directories(core BEFORE PUBLIC "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}")
+    target_include_directories(video_core BEFORE PRIVATE "${EDEN_NS2_GPU_ACCESS_RESEARCH_ROOT}")
 endif()
 
 # Research-only SelfController -> GraphicsSupervisor -> metadata-only GPU IPC.
