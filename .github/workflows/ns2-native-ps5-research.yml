@@ -7,8 +7,9 @@ on:
       - main
     paths:
       # Main compiles only from an explicit [ns2-native-build] workflow edit.
-      # Consolidated boot-gap candidate: native Ampere class IDs + VI2 31/32
-      # vblank before the first submission; C7C0 execution remains unqualified.
+      # Consolidated research candidate: real Ampere class IDs, VI2 31/32
+      # vblank, per-process QMD3 dependencies/fence slots, and TU104 Compute
+      # MME-to-PCAS dispatch. Native Compute SPIR-V is still unimplemented.
       # Ordinary vendor/main pushes must not trigger repeated 4-hour PS5 jobs.
       - '.github/workflows/ns2-native-ps5-research.yml'
       # Workflow-only edits never cancel an already compiling native candidate.
