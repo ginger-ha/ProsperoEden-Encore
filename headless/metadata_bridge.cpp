@@ -626,17 +626,18 @@ static void AutoImportFirmwareArchives() {
     const fs::path root{Eden::AssetsDir()};
     if (!Eden::StorageDirectory(root)) return;
     struct Search { const char* relative; int family; };
-    constexpr std::array<Search, 12> locations{{
+    constexpr std::array<Search, 19> locations{{
         {"firmware/ns1", 1}, {"firmware/switch1", 1},
         {"firmware/ns2", 2}, {"firmware/switch2", 2},
+        {"firmware/ns1-extracted", 1}, {"firmware/ns2-extracted", 2},
         {"ns1/firmware", 1}, {"switch1/firmware", 1},
         {"ns2/firmware", 2}, {"switch2/firmware", 2},
-        {"switch1", 1}, {"switch2", 2},
-        {"keys", 0}, // ignored below, never search keys for firmware
-        {"firmware", 0}
+        {"switch1", 1}, {"switch2", 2}, {"ns1", 1}, {"ns2", 2},
+        {"firmware", 0}, {"firmware/firmware", 0},
+        {"", 0}, // top-level firmware.zip, ns1.zip, or ns2.zip
+        {"firmware/extracted", 0}, {"firmware/code", 0}
     }};
     for (const auto& location : locations) {
-        if (std::string_view(location.relative) == "keys") continue;
         const fs::path folder=root/location.relative;
         fs::path walk=root;
         bool safe=true;
@@ -709,8 +710,15 @@ static void AutoImportFirmwareArchives() {
                 ("encore-imported-"+stem);
             // Never overwrite another import or recursively process a sibling.
             if (fs::exists(destination,ec)) continue;
+            // Never create into a user-controlled symlinked firmware parent.
+            if (fs::exists(root/"firmware",ec) &&
+                !Eden::StorageDirectory(root/"firmware")) continue;
+            const fs::path family_root=root/"firmware"/(family==2?"ns2":"ns1");
+            if (fs::exists(family_root,ec) &&
+                !Eden::StorageDirectory(family_root)) continue;
+            ec.clear();
             fs::create_directories(destination.parent_path(),ec);
-            if (ec) continue;
+            if (ec || !Eden::StorageDirectory(destination.parent_path())) continue;
             std::string reason;
             std::fprintf(stderr,"EDEN_FIRMWARE_ZIP_BEGIN family=ns%d archive=%s\n",
                          family,archive.c_str());
