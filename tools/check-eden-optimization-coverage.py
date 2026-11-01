@@ -80,6 +80,8 @@ print("NS2_SHARED_AUDIO_F07_ISOLATION_PASS", f"new_release_sources={len(ns2_shar
 ns2_shared_gpu_access_owners = {
     "vendor/encore-active/ns2-runtime/gpu_access_svc/core/hle/kernel/svc.cpp",
     "vendor/encore-active/ns2-runtime/gpu_access_svc/core/hle/kernel/ns2_gpu_memory_attribute.h",
+    "vendor/encore-active/ns2-runtime/gpu_access_svc/core/hle/kernel/svc_types.h",
+    "vendor/encore-active/ns2-runtime/gpu_access_svc/core/hle/kernel/k_memory_block.h",
 }
 assert ns2_shared_gpu_access_owners <= all_owners, sorted(ns2_shared_gpu_access_owners - all_owners)
 assert not ns2_shared_gpu_access_owners & (research_owners | hygiene_owners | ns2_shared_release_owners | ns2_shared_audio_owners)

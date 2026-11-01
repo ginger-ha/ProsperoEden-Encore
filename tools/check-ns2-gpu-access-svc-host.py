@@ -20,6 +20,16 @@ assert 'Eden::NS2::SvcTrace::IsActive(process.GetProcessId())' in src
 assert 'Settings::values.memory_layout_mode.GetValue() == Settings::MemoryLayout::Memory_12Gb' in src
 assert 'process.Is64Bit()' in src
 assert 'process.GetPageTable().Contains(address, size)' in src
+assert 'process.GetPageTable().SetMemoryAttribute(' in src
+assert 'static_cast<KMemoryAttribute>(mask)' in src
+assert 'static_cast<KMemoryAttribute>(attribute)' in src
+svc_enum = (base / "core/hle/kernel/svc_types.h").read_text()
+block_enum = (base / "core/hle/kernel/k_memory_block.h").read_text()
+assert 'GpuAccessible = (1 << 5)' in svc_enum
+assert 'GpuAccessible = static_cast<u8>(Svc::MemoryAttribute::GpuAccessible)' in block_enum
+assert 'SetMask = Uncached | PermissionLocked | GpuAccessible' in block_enum
+assert 'target_include_directories(core BEFORE PUBLIC "${EDEN_NS2_GPU_ACCESS_ROOT}")' in recipe
+assert 'target_include_directories(video_core BEFORE PRIVATE "${EDEN_NS2_GPU_ACCESS_ROOT}")' in recipe
 assert 'if (imm == 0x80' in src
 assert 'case Eden::NS2::GpuAccess::Status::InvalidAddress:' in src
 assert 'case Eden::NS2::GpuAccess::Status::InvalidSize:' in src
@@ -41,6 +51,7 @@ using Eden::NS2::GpuAccess::Validate;
 using Eden::NS2::GpuAccess::Status;
 static_assert(Validate(0x1000, 0x1000, 0x20, 0x20) == Status::Success);
 static_assert(Validate(0x1000, 0x2000, 0x20, 0) == Status::Success);
+static_assert(Validate(0x1000, 0x1000, 0, 0) == Status::Success);
 static_assert(Validate(0x1001, 0x1000, 0x20, 0x20) == Status::InvalidAddress);
 static_assert(Validate(0x1000, 0, 0x20, 0x20) == Status::InvalidSize);
 static_assert(Validate(0x1000, 0x1001, 0x20, 0x20) == Status::InvalidSize);

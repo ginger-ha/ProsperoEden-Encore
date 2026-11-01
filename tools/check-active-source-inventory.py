@@ -94,6 +94,8 @@ print("ENCORE_SHARED_NS2_AUDIO_SOURCE_PASS", f"owners={len(shared_ns2_audio_owne
 shared_ns2_gpu_access_owners = {
     "ns2-runtime/gpu_access_svc/core/hle/kernel/svc.cpp",
     "ns2-runtime/gpu_access_svc/core/hle/kernel/ns2_gpu_memory_attribute.h",
+    "ns2-runtime/gpu_access_svc/core/hle/kernel/svc_types.h",
+    "ns2-runtime/gpu_access_svc/core/hle/kernel/k_memory_block.h",
 }
 assert shared_ns2_gpu_access_owners <= set(physical_all), sorted(shared_ns2_gpu_access_owners - set(physical_all))
 assert not shared_ns2_gpu_access_owners.intersection(set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners)
