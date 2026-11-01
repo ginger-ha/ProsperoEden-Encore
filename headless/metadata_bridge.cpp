@@ -645,7 +645,7 @@ const char* eden_startup_error() {
                 return {};
             }();
             if (!extracted_dump.empty())
-                std::fprintf(stderr, "EDEN_NS2_NCM_INVENTORY_DISCOVERED root=%s crypto_keys=none_imported status=research_only\\n",
+                std::fprintf(stderr, "EDEN_NS2_NCM_INVENTORY_DISCOVERED root=%s crypto_keys=none_imported status=research_only\n",
                              extracted_dump.c_str());
             Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys);
             FileSys::RealVfsFilesystem vfs;
