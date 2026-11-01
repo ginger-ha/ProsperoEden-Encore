@@ -637,13 +637,32 @@ endif()
                 '#include "' + str(root/"headless"/header) + '"',
                 '#include "' + header + '"')
         return source
+    # Only the two selected PS5 native TUs carry the reviewed 27d087f
+    # null-page-table crash guard. Reconstruct the exact historical source
+    # by removing *only* that known addition, then compare all remaining bytes.
+    # Guest bridge variants must remain byte-for-byte equivalent as before.
+    native_walk_old = "        if (!AddressSpaceContains(*current_page_table, addr, size)) {"
+    native_walk_guard = (
+        "        // An uninitialized process has no active guest page table.\n"
+        "        // Never dereference it during early NSO/ExeFS BSS clearing.\n"
+        "        // Propagate a failed walk; the loader must report an error, not SIGSEGV.\n"
+        "        if (current_page_table == nullptr ||\n"
+        "            !AddressSpaceContains(*current_page_table, addr, size)) {"
+    )
     for owner, historic in (
         ("eden-core/src/core/memory_native_standard.cpp", native_default),
         ("eden-core/src/core/memory_native_a32.cpp", native_a32),
         ("eden-core/guest-bridge/memory_ps5_standard.cpp", guest),
         ("eden-core/guest-bridge/memory_ps5_a32.cpp", a32_guest)):
         maintained = (root/"vendor/encore-active"/owner).read_text()
-        assert maintained == normalize_native_legacy(historic), (
+        baseline = normalize_native_legacy(historic)
+        if owner.startswith("eden-core/src/core/memory_native_"):
+            assert baseline.count(native_walk_old) == 1, (
+                "Historical native WalkBlock owner moved", owner)
+            assert maintained.count(native_walk_guard) == 1, (
+                "PS5 null-page-table crash guard missing or duplicated", owner)
+            baseline = baseline.replace(native_walk_old, native_walk_guard)
+        assert maintained == baseline, (
             "G13 X05 M12 historical source parity drift", owner)
     print("ENCORE_FOUR_NATIVE_GUEST_MEMORY_VARIANTS_PARITY_PASS")
 
