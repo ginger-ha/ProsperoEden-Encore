@@ -191,6 +191,7 @@ def main() -> int:
             '#include "video_core/native_shader_capture.h"' in puller and
             'Shader::Ampere::CaptureNativeComputeShader(' in puller and
             'VideoCommon::ReadNs2GpuShader' in puller and
+            'registry.AcquireComputeTranslationCache(' in puller and
             'registry.IsComputeCurrent(' in puller and
             'EDEN_NS2_COMPUTE_SHADER_CAPTURE' in puller and
             'backend=missing' in puller and
