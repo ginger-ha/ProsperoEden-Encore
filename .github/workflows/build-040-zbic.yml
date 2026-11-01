@@ -447,27 +447,9 @@ jobs:
         if: ${{ env.RESUME_STAGE_RUN_ID != '' }}
         run: python3 -B tools/ci/check-staged-app.py build/release/PPSA99008
 
-      - name: Assemble release files
-        run: python3 -B tools/ci/make-dist.py build/release/PPSA99008
-
-      # Crash evidence belongs to the same native release build, never to
-      # an independently packaged "all-on" test title. Keep symbol receipts
-      # alongside the release ELF, outside the installable PS5 app folder.
-      - name: Bind native release crash ELF to this staged application
-        if: ${{ env.RESUME_STAGE_RUN_ID == '' }}
-        run: |
-          set -euo pipefail
-          python3 -B tools/ci/write-crash-provenance.py \
-            --app build/release/PPSA99008 \
-            --native build/headless-native \
-            --output build/headless-native/crash-provenance.json \
-            --app-title PPSA99008
-          install -m 0644 build/headless-native/crash-provenance.json build/symbols/crash-provenance.json
-
-      - name: Verify release ZIP content paths
-        if: ${{ success() }}
-        run: python3 -B tools/ci/check-ftp-archive-root.py dist
-
+      # Publish a fully validated FTP install independently of optional FFPFSC
+      # image reproducibility. A bad disk image must fail closed, but must
+      # not hide the already compiled and validated installable PS5 folder.
       - name: Reject release folder wrappers or extra staged files
         if: ${{ success() }}
         run: |
@@ -508,6 +490,28 @@ jobs:
           assert json.loads((app/'sce_sys/param.json').read_text())['titleId'] == app.name
           print('RELEASE_FTP_ARCHIVE_ROOT_OK PPSA99008/eboot.bin')
           PY_FTP
+
+
+      - name: Assemble release files
+        run: python3 -B tools/ci/make-dist.py build/release/PPSA99008
+
+      # Crash evidence belongs to the same native release build, never to
+      # an independently packaged "all-on" test title. Keep symbol receipts
+      # alongside the release ELF, outside the installable PS5 app folder.
+      - name: Bind native release crash ELF to this staged application
+        if: ${{ env.RESUME_STAGE_RUN_ID == '' }}
+        run: |
+          set -euo pipefail
+          python3 -B tools/ci/write-crash-provenance.py \
+            --app build/release/PPSA99008 \
+            --native build/headless-native \
+            --output build/headless-native/crash-provenance.json \
+            --app-title PPSA99008
+          install -m 0644 build/headless-native/crash-provenance.json build/symbols/crash-provenance.json
+
+      - name: Verify release ZIP content paths
+        if: ${{ success() }}
+        run: python3 -B tools/ci/check-ftp-archive-root.py dist
 
       - name: Upload compiled release bundle
         if: ${{ success() }}
