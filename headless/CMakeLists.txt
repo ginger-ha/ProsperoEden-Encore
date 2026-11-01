@@ -2345,6 +2345,30 @@ if(EDEN_SHARED_NS2_KERNEL_HEAP)
     message(STATUS "Encore shared NS1/NS2 kernel: extended virtual heap and per-layout heap admission")
 endif()
 
+# Shared Switch 2 audio user service: additive aud:u only, keeping all
+# existing Switch 1 audio managers untouched.
+set(EDEN_SHARED_NS2_AUDIO OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_AUDIO ON)
+endif()
+if(EDEN_SHARED_NS2_AUDIO)
+    set(EDEN_NS2_AUDIO_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/audio")
+    set(EDEN_NS2_AUDIO_SOURCE "${EDEN_NS2_AUDIO_ROOT}/core/hle/service/audio/audio.cpp")
+    if(NOT EXISTS "${EDEN_NS2_AUDIO_SOURCE}" OR
+       NOT EXISTS "${EDEN_NS2_AUDIO_ROOT}/core/hle/service/audio/nx2_audio_user_client.h")
+        message(FATAL_ERROR "Missing maintained NS2 aud:u owners")
+    endif()
+    get_target_property(eden_ns2_audio_sources core SOURCES)
+    list(FIND eden_ns2_audio_sources "hle/service/audio/audio.cpp" eden_ns2_audio_idx)
+    if(eden_ns2_audio_idx EQUAL -1)
+        message(FATAL_ERROR "Pinned audio HLE owner changed: review NS2 aud:u selection")
+    endif()
+    list(REMOVE_ITEM eden_ns2_audio_sources "hle/service/audio/audio.cpp")
+    list(APPEND eden_ns2_audio_sources "${EDEN_NS2_AUDIO_SOURCE}")
+    set_property(TARGET core PROPERTY SOURCES "${eden_ns2_audio_sources}")
+    target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_AUDIO_ROOT}")
+endif()
+
 # Research-only Switch 2 AM command 320. Keep the Encore-maintained application
 # metadata service as the source ancestor: title-version diagnostics must survive.
 option(EDEN_NS2_AM_EXPERIMENTAL
