@@ -72,10 +72,14 @@ def main()->int:
         'std::make_shared<android::GraphicBuffer>(',
         'c->producer->AttachBuffer(&idx,buffer)',
         'c->producer->QueueBuffer(idx,input,&output)',
-        'c->producer->GetReleasedBufferFence(',
-        'c->producer->DetachReleasedBuffer(',
+        'c->producer->DetachNextBuffer(',
+        'c.release_fences[slot]=release_fence',
         'if(!image||!image->window_pool||!m_native_module)return {}',
         'GetSyncpointManager().IsSyncpointAllocated(fence)',
+        'c.retained[slot]=buffer',
+        'c.queued_modules[slot]=img->module',
+        'native->format=android::PixelFormat::Rgba8888;',
+        'pref[6]==1&&outw<=width&&outh<=height',
     ):
         assert evidence in text, "VI2 compositor must preserve real queue/fence owner: " + evidence
 

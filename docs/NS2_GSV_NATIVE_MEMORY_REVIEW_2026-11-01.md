@@ -139,3 +139,5 @@ as long as a VI2 session can reference its allocations.
 Host compilation alone cannot establish Switch 2 game rendering. The Ampere
 shader backend and observed DK frame submission still require end-to-end
 validation. Unsupported VI2 opcodes remain explicit errors.
+
+**Eden Nvnflinger ABI:** the producer exposes DetachNextBuffer, not upstream GetReleasedBufferFence or DetachReleasedBuffer. VI2 retains each pinned GraphicBuffer until the producer returns a Free buffer and its GPU release fence completes. The compositor's supported RGBA8888 path is used; RGBA1010102 remains explicitly unsupported.
