@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 #include "video_core/macro_turing.h"
+#include "video_core/native_ampere_macro_state.h"
 
 using I=Tegra::TuringMacroInterpreter;
 using W=std::uint32_t;
@@ -63,6 +64,26 @@ int main(){
     const auto refuse=[](W,W){return false;};
     result=macro.Execute(std::span<const W>(code),0,fifo,read,refuse);
     assert(!result.success && result.error=="unsupported emitted method");
+    // The actual guest upload protocol writes 3 consecutive 32-bit words
+    // for each native 96-bit instruction. Each channel owns its macro DRAM.
+    Tegra::NativeAmpereMacroState state;
+    assert(!state.SetCodePointer(0x1000));
+    assert(state.SetCodePointer(0));
+    for (auto w : code) assert(state.PushCode(w));
+    assert(!state.SetPositionPointer(0x80));
+    assert(state.SetPositionPointer(0));
+    assert(state.BindPosition(0));
+    emitted.clear();fifo={23};
+    result=state.Execute(0xe00,std::span<const W>{fifo},read,emit);
+    assert(result.success && result.consumed==1);
+    assert(emitted.size()==1 && emitted.front().first==0x270 &&
+           emitted.front().second==23);
+    assert(!state.Execute(0xe01,std::span<const W>{fifo},read,emit).success);
+    assert(!state.Execute(0xe02,std::span<const W>{fifo},read,emit).success);
+    std::vector<W> oversized(Tegra::NativeAmpereMacroState::MaxFifo+1,3);
+    auto too_many=state.Execute(0xe00,std::span<const W>{oversized},read,emit);
+    assert(!too_many.success &&
+           too_many.error=="native macro FIFO limit exceeded");
     // A truncated 96-bit program must not execute or read outside RAM.
     code={1};
     result=macro.Execute(std::span<const W>(code),0,fifo,read,emit);
