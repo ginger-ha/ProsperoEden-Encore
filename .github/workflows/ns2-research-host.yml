@@ -656,18 +656,24 @@ jobs:
               -o "build-ns2-a64/ampere-cfg-${cxx//+/}"
             "build-ns2-a64/ampere-cfg-${cxx//+/}"
           done
-      - name: Syntax-check actual Tegra GPU memory shader capture adapter (GCC)
+      - name: Syntax-check GMMU shader capture with and without session cache (GCC)
         shell: bash
         run: |
           set -euo pipefail
-          g++ -std=c++20 -fsyntax-only -Wno-unused-parameter \
-            -Ibuild-ns2-a64/fmt/include \
-            -Ivendor/encore-active/ns2-runtime/ampere \
-            -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
-            -Ivendor/encore-active/ns2-runtime/hle \
-            -Ivendor/sources/eden/src/dynarmic/src \
-            -Ivendor/sources/eden/src \
-            vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp
+          for mode in baseline bridge; do
+            args=()
+            if [[ "$mode" == bridge ]]; then
+              args+=(-DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)
+            fi
+            g++ -std=c++20 -fsyntax-only -Wno-unused-parameter "${args[@]}" \
+              -Ibuild-ns2-a64/fmt/include \
+              -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+              -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/sources/eden/src/dynarmic/src \
+              -Ivendor/sources/eden/src \
+              vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp
+          done
       - name: Compile and run Switch 1/2 content-format recognition fixtures
         shell: bash
         run: |
