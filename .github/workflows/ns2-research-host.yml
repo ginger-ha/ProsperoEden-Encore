@@ -297,6 +297,32 @@ jobs:
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
             vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.cpp
+      - name: Syntax-check research Ampere DMA GPU puller owner (Clang and GCC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -fsyntax-only -Werror -Wno-unused-parameter \
+              -Ibuild-ns2-a64/fmt/include \
+              -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+              -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/eden-header-hygiene/include \
+              -Ivendor/sources/eden/src/dynarmic/src \
+              -Ivendor/sources/eden/src \
+              vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp
+          done
+      - name: Compile/run native Ampere DMA channel ownership (Clang/GCC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -O2 -Wall -Wextra -Werror \
+              -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+              -Ivendor/encore-active/ns2-runtime/hle \
+              tools/ns2/test_native_ampere_channel.cpp \
+              -o "build-ns2-a64/native-channel-${cxx//+/}"
+            "build-ns2-a64/native-channel-${cxx//+/}"
+          done
       - name: Enforce per-FD native GPU channel isolation in real NVDRV owner
         run: python3 -B tools/check-ns2-native-gpfifo-fd-scope.py
       - name: Compile and run native GPFIFO process and fence host regressions

@@ -29,7 +29,7 @@ research_manifest = json.loads(
 )
 research_paths = research_manifest["paths"]
 assert research_manifest["schema_version"] == 1
-assert len(research_paths) == len(set(research_paths)) == 109
+assert len(research_paths) == len(set(research_paths)) == 111
 assert research_paths == sorted(research_paths)
 assert set(research_paths) <= set(physical_all), (
     "Missing pinned NS2 research source owners", sorted(set(research_paths) - set(physical_all))

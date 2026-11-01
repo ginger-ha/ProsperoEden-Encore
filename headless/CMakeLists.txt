@@ -2543,6 +2543,25 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)
     list(APPEND eden_ns2_nvdrv_sources "${EDEN_NS2_NVDRV_GPU_SOURCE}")
     set_property(TARGET core PROPERTY SOURCES "${eden_ns2_nvdrv_sources}")
     target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_NVDRV_GPU_ROOT}" "${EDEN_NS2_NVDRV_ROOT}" "${EDEN_NS2_NVDRV_AS_ROOT}")
+    # Research-only native DMA dispatch: upstream Ampere class 0xc7b5 uses
+    # the same DMA engine methods, authenticated by live process generation.
+    # Do not replace the shipping NS1 puller or alias Ampere 3D/compute.
+    set(EDEN_NS2_NATIVE_GPU_PULLER
+        "${PORT_ROOT}/vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp")
+    if(NOT EXISTS "${EDEN_NS2_NATIVE_GPU_PULLER}" OR
+       NOT EXISTS "${EDEN_NS2_NVDRV_GPU_ROOT}/core/hle/service/nvdrv/devices/native_gpu_channel_registry.h")
+        message(FATAL_ERROR "Missing native NS2 DMA channel ownership or puller")
+    endif()
+    get_target_property(eden_ns2_dispatch_sources video_core SOURCES)
+    list(FIND eden_ns2_dispatch_sources "engines/puller.cpp" eden_ns2_puller_idx)
+    if(eden_ns2_puller_idx EQUAL -1)
+        message(FATAL_ERROR "Pinned Maxwell puller changed; re-audit native DMA overlay")
+    endif()
+    list(REMOVE_ITEM eden_ns2_dispatch_sources "engines/puller.cpp")
+    list(APPEND eden_ns2_dispatch_sources "${EDEN_NS2_NATIVE_GPU_PULLER}")
+    set_property(TARGET video_core PROPERTY SOURCES "${eden_ns2_dispatch_sources}")
+    target_include_directories(video_core BEFORE PRIVATE
+        "${EDEN_NS2_NVDRV_GPU_ROOT}" "${EDEN_NS2_NVDRV_ROOT}")
     endif()
 endif()
 

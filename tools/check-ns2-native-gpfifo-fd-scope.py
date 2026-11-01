@@ -14,6 +14,9 @@ required_cpp = (
     "if (it == sessions.end()) return false;",
     "const auto* session = core.GetSession(it->second);",
     "NativeGpuProcessRegistry::Instance().Contains(session->process);",
+    "NativeGpuChannelRegistry::Instance().Bind(channel_state.get(), owner->process)",
+    "if (!opened || opened->process != owner->process)",
+    "NativeGpuChannelRegistry::Instance().Unbind(channel_state.get());",
     "NvResult nvhost_gpu::AllocateObjectContext(IoctlAllocObjCtx& params, DeviceFD fd)",
     "NvResult nvhost_gpu::SubmitGPFIFOImpl(IoctlSubmitGpfifo& params, Tegra::CommandList&& entries, DeviceFD fd)",
     "const bool native = UsesNativeAbi(fd);",
@@ -34,8 +37,8 @@ checks = [
     (source.count("return SubmitGPFIFOImpl(params, std::move(entries), fd);") == 2,
      "both GPFIFO submit paths propagate FD"),
     ("output, fd);" in source, "inline submit passes FD"),
-    ("for (const auto& [fd, session_id] : sessions)" not in source,
-     "no cross-process session scan"),
+    ("for (const auto& [other_fd, session_id] : sessions)" in source,
+     "native channel rejects mixed-process FDs before GPU queue work"),
 ]
 errors = [message for passed, message in checks if not passed]
 if errors:
