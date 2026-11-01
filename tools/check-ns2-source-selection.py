@@ -168,6 +168,15 @@ def main() -> int:
                 "engine == 0xc7c0" in puller and
                 "std::atomic<unsigned>" in puller,
                 "NS2 boot trace requires concrete GPFIFO and Ampere bind witnesses")
+        # Bind native compute as an authenticated class, but never dispatch
+        # a Maxwell QMD on an Ampere 0xAF PCAS command. This is a safety
+        # boundary, NOT a claim that QMD 3.0 shader execution is finished.
+        require("engine_id == static_cast<EngineID>(0xc7c0)" in puller and
+                "engine == static_cast<EngineID>(0xc7c0)" in puller and
+                "EDEN_NS2_COMPUTE_QMD_UNSUPPORTED" in puller and
+                "method_call.method == 0xaf" in puller and
+                "method == 0xaf" in puller,
+                "NS2 compute class must be owned by the native channel and reject legacy Maxwell PCAS")
         require("BindGraphicsEngine(" in puller and
                 "UnbindGraphicsSubchannel(" in puller and
                 "CaptureGraphicsTicket(" in engine_registry and
