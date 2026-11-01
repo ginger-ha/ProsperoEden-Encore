@@ -1,0 +1,36 @@
+name: Encore firmware import smoke (host only)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'headless/assets_dir.h'
+      - 'headless/firmware_zip_import.h'
+      - 'headless/metadata_bridge.cpp'
+      - 'tools/check-firmware-*.py'
+      - '.github/workflows/encore-firmware-import-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: encore-firmware-import-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout active firmware sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+      - name: Build and replay firmware layout, ZIP and auto-import contracts
+        run: |
+          set -euo pipefail
+          python3 -B tools/check-firmware-matrix-host.py
+          python3 -B tools/check-firmware-zip-native-host.py
+          python3 -B tools/check-firmware-auto-import-host.py
