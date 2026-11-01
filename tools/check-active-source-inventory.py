@@ -339,7 +339,7 @@ for role, count in unlinked_by_role.items():
         "unlinked headless role summary stale", role, count)
 assert f"| **Total non indexé** | **{sum(unlinked_by_role.values())}** |" in headless_doc
 
-assert "**176** chemins" in headless_doc
+assert "**177** chemins" in headless_doc
 assert f"**{headless_linked}** chemins déjà présents" in headless_doc
 assert f"**{len(headless_actual)-headless_linked}** chemins sans propriétaire exact" in headless_doc
 print("ENCORE_HEADLESS_SOURCE_CATALOG_PASS",
