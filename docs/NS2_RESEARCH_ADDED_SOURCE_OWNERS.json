@@ -65,6 +65,7 @@
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/maxwell_environment.h",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/maxwell_image.cpp",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/maxwell_image.h",
+    "ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_graphics_stage_policy.h",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/probe.cpp",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/probe.h",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/program_address_map.h",
