@@ -54,7 +54,21 @@ extracted_aoc_owners = {
 }
 assert extracted_aoc_owners <= all_owners, sorted(extracted_aoc_owners - all_owners)
 assert not extracted_aoc_owners & (research_owners | hygiene_owners)
-owners=all_owners-research_owners-hygiene_owners
+# New NS2 kernel/process owners are selected only by the one reviewed PS5
+# release profile. They postdate the frozen F07 518-source optimization audit
+# and must remain independently visible, not mislabeled as F07-complete.
+ns2_shared_release_owners = {
+    "vendor/encore-active/ns2-runtime/kernel/core/hle/kernel/k_address_space_info.cpp",
+    "vendor/encore-active/ns2-runtime/kernel/core/hle/kernel/svc/svc_physical_memory.cpp",
+    "vendor/encore-active/ns2-runtime/process/core/core.cpp",
+}
+assert ns2_shared_release_owners <= all_owners, sorted(ns2_shared_release_owners-all_owners)
+assert not ns2_shared_release_owners & (research_owners | hygiene_owners | extracted_aoc_owners)
+release_cmake = (ROOT / "headless/CMakeLists.txt").read_text()
+assert 'set(EDEN_SHARED_NS2_KERNEL_HEAP ON)' in release_cmake
+assert 'ns2-runtime/process/core/core.cpp' in release_cmake
+print("NS2_SHARED_RELEASE_F07_ISOLATION_PASS", f"new_release_sources={len(ns2_shared_release_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
