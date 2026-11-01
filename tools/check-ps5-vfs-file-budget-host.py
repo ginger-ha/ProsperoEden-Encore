@@ -22,7 +22,6 @@ assert original.count(start) == 1 and original.count(end) >= 1
 # intentionally identical to the maintained upstream implementation.
 assert adapted.replace(new, old) == original
 for key in (
-    "if(PS5_NATIVE)",
     'set(EDEN_VFS_PINNED "${PORT_ROOT}/vendor/sources/eden/src/core/file_sys/vfs/vfs_real.cpp")',
     'set(EDEN_VFS_LIMIT_OLD "constexpr size_t MaxOpenFiles = 8192;")',
     'set(EDEN_VFS_LIMIT_NEW "constexpr size_t MaxOpenFiles = 128;")',
