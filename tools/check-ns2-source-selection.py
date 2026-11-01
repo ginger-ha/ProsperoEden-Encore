@@ -154,6 +154,11 @@ def main() -> int:
                      f"EDEN_NS2_IPC owner={owner}" in source and
                      "calls.fetch_add(" in source),
                     f"Missing bounded NS2 boot trace for {owner}")
+        require("{31,&IVi2Session::VsyncEvent" in supervisor_source and
+                "{32,&IVi2Session::VsyncEvent" in supervisor_source and
+                "ScheduleLoopingEvent(" in supervisor_source and
+                "EDEN_NS2_VI2_VSYNC" in supervisor_source,
+                "Eglantine upstream boot gate: VI2 31/32 must signal 60Hz even before first Present")
         require("EDEN_NS2_GPU_WORKER_RESULT cmd=" in gpu_worker_source and
                 "TraceNs2WorkerResult(" in gpu_worker_source and
                 "EDEN_NS2_IPC owner=vi2" in supervisor_source,
