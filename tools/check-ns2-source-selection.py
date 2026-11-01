@@ -130,6 +130,25 @@ def main() -> int:
                 "generation" in registry_code and
                 "std::numeric_limits<std::uint64_t>::max()" in registry_code,
                 "NS2 shader ownership must use nonreusable session tickets")
+        # Native graphics must be selected by the exact 0xC797 channel bind,
+        # not merely by the title ID; raw Ampere must never enter Maxwell CFG.
+        engine_registry = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/native_gpu_channel_registry.h").read_text()
+        puller = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp").read_text()
+        active_vk = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
+        require("BindGraphicsEngine(" in puller and
+                "UnbindGraphicsSubchannel(" in puller and
+                "CaptureGraphicsTicket(" in engine_registry and
+                "IsGraphicsCurrent(" in engine_registry and
+                "channel_generation" in engine_registry,
+                "Native 3D rendering requires per-channel authenticated class identity")
+        require('#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL' in active_vk and
+                "CaptureGraphicsTicket(maxwell3d)" in active_vk and
+                "CaptureNs2GraphicsShaderFromGpu(" in active_vk and
+                "CreateNs2GraphicsShaderEnvironment(" in active_vk and
+                "IsGraphicsCurrent(maxwell3d, *ticket)" in active_vk and
+                "native_env->Image().diagnostic_cache_key" in active_vk and
+                "RefreshStages(graphics_key.unique_hashes)" in active_vk,
+                "NS2 shader capture must feed maintained Vulkan pipeline only when authenticated")
         require('target_include_directories(video_core BEFORE PRIVATE "${PORT_ROOT}/vendor/encore-active/ns2-runtime/hle")'
                     in bridge_gate,
                 "NS2 video_core must compile with the session registry overlay")

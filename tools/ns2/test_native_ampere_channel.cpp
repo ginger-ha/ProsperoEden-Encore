@@ -34,10 +34,12 @@ int main() {
     assert(!channel_registry.CaptureGraphicsTicket(&separate_engine));
     const auto active_engine = channel_registry.CaptureGraphicsTicket(&graphics_engine);
     assert(active_engine && active_engine->channel_generation == first_ticket->channel_generation);
+    assert(channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     channel_registry.UnbindGraphicsSubchannel(&native,&graphics_engine,2);
     assert(channel_registry.CaptureGraphicsTicket(&graphics_engine));
     channel_registry.UnbindGraphicsSubchannel(&native,&graphics_engine,5);
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
+    assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     assert(channel_registry.BindGraphicsEngine(&native,&graphics_engine,2));
     assert(!channel_registry.CaptureTicket(&legacy));
     assert(!channel_registry.CaptureTicket(nullptr));
@@ -50,6 +52,7 @@ int main() {
     assert(other_ticket && other_ticket->process==&other &&
            other_ticket->generation!=first_ticket->generation);
     process_registry.Unregister(&first);
+    assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
     assert(!channel_registry.IsNative(&native));
     assert(!channel_registry.CaptureTicket(&native));
@@ -68,6 +71,7 @@ int main() {
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
     assert(channel_registry.BindGraphicsEngine(&native,&graphics_engine,3));
     assert(channel_registry.CaptureGraphicsTicket(&graphics_engine));
+    assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     assert(!channel_registry.IsCurrent(&native,*first_ticket));
     channel_registry.Unbind(&native);
     assert(!channel_registry.CaptureTicket(&native));
