@@ -15,7 +15,7 @@ recipe = (root / "headless/CMakeLists.txt").read_text()
 assert recipe.count("set(EDEN_SHARED_NS2_GPU_ACCESS_SVC ON)") == 1
 assert 'PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM' in recipe
 assert 'list(REMOVE_ITEM eden_ns2_gpu_access_sources "hle/kernel/svc.cpp")' in recipe
-assert 'target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_GPU_ACCESS_ROOT}")' in recipe
+assert 'target_include_directories(core BEFORE PUBLIC "${EDEN_NS2_GPU_ACCESS_ROOT}")' in recipe
 assert 'Eden::NS2::SvcTrace::IsActive(process.GetProcessId())' in src
 assert 'Settings::values.memory_layout_mode.GetValue() == Settings::MemoryLayout::Memory_12Gb' in src
 assert 'process.Is64Bit()' in src
