@@ -175,6 +175,49 @@ int main() {
         assert(f.signal(0x88800,2).empty());
         assert(f.dispatched==1 && f.released.size()==3);
     }
+    // An already accepted compute dispatch must retain its original
+    // descriptor if the guest mutates or unmaps the QMD before a failed
+    // release is retried. Re-reading would complete the wrong transaction.
+    {
+        Fixture f;auto d=EmptyGrid();
+        d[12]=1;d[13]=1;d[14]=1;
+        SetRelease(d,24,0x1100,10,true);
+        SetRelease(d,28,0x2200,20);
+        f.descriptors[0x88000]=d;
+        f.transient_release_failures[0x2200]=1;
+        assert(f.signal(0x88000,3)=="unmapped QMD release");
+        assert(f.dispatched==1 && f.released.size()==1);
+        // The same QMD address now holds another program and semaphores.
+        auto replacement=d;
+        replacement[48]=0x9000;
+        SetRelease(replacement,24,0x3300,30,true);
+        SetRelease(replacement,28,0x4400,40);
+        f.descriptors[0x88000]=replacement;
+        assert(f.signal(0x88000,2).empty());
+        assert(f.dispatched==1 && f.released.size()==2);
+        assert(std::get<0>(f.released[0])==0x1100);
+        assert(std::get<0>(f.released[1])==0x2200);
+        assert(std::get<1>(f.released[1])==20);
+        // A fresh, distinct action 3 may legitimately consume the replacement.
+        assert(f.signal(0x88000,3).empty());
+        assert(f.dispatched==2 && f.released.size()==4);
+        assert(std::get<0>(f.released[2])==0x3300);
+        assert(std::get<0>(f.released[3])==0x4400);
+    }
+    // Descriptor backing may be unmapped after dispatch; a retry still
+    // finalizes from the admitted snapshot rather than reading freed pages.
+    {
+        Fixture f;auto d=EmptyGrid();
+        d[12]=1;d[13]=1;d[14]=1;
+        SetRelease(d,24,0x5100,1);
+        SetRelease(d,28,0x5200,2);
+        f.descriptors[0x89000]=d;
+        f.transient_release_failures[0x5200]=1;
+        assert(f.signal(0x89000,3)=="unmapped QMD release");
+        f.descriptors.erase(0x89000);
+        assert(f.signal(0x89000,2).empty());
+        assert(f.released.size()==2 && f.dispatched==1);
+    }
     // Empty grids need the same retry protection without a shader dispatch.
     {
         Fixture f;auto d=EmptyGrid();
