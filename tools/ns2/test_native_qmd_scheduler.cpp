@@ -88,6 +88,31 @@ int main() {
         assert(launch->constant_buffers[0].gpu_address==0x512340000ULL);
         assert(launch->constant_buffers[0].size==64);
         assert(!launch->constant_buffers[1].enabled);
+        // Native shader and only enabled constant-buffer ranges must be
+        // mapped BEFORE any future Vulkan pipeline/resource submission.
+        unsigned mapped_queries=0;
+        auto all_mapped=[&](std::uint64_t address,std::size_t bytes) {
+            ++mapped_queries;
+            return (address==launch->program_address && bytes==16) ||
+                   (address==launch->constant_buffers[0].gpu_address &&
+                    bytes==launch->constant_buffers[0].size);
+        };
+        assert(Tegra::NativeComputeLaunchMapped(*launch,all_mapped));
+        assert(mapped_queries==2);
+        mapped_queries=0;
+        assert(!Tegra::NativeComputeLaunchMapped(
+            *launch,[&](std::uint64_t address,std::size_t) {
+                ++mapped_queries;
+                return address!=launch->program_address;
+            }));
+        assert(mapped_queries==1);
+        mapped_queries=0;
+        assert(!Tegra::NativeComputeLaunchMapped(
+            *launch,[&](std::uint64_t address,std::size_t) {
+                ++mapped_queries;
+                return address!=launch->constant_buffers[0].gpu_address;
+            }));
+        assert(mapped_queries==2);
         d[33]|=1U<<8;
         assert(!Tegra::DecodeNativeComputeLaunch(d));
         d[33]&=~(1U<<8);
