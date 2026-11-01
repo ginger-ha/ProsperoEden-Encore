@@ -91,6 +91,7 @@ extern "C" int sceNetInit();
 #include "common/scope_exit.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "core/loader/loader.h"
 #include "core/cpu_manager.h"
 #include "core/frontend/emu_window.h"
 #include "core/frontend/graphics_context.h"
@@ -2013,8 +2014,28 @@ int main(int argc, char** argv) {
                     if (loaded == Core::SystemResultStatus::ErrorVideoCore) {
                         throw std::runtime_error("Graphics backend initialization failed. Try another backend in Settings; see stderr.log and eden_log.txt for driver details.");
                     }
-                    throw std::runtime_error("Loader status " + std::to_string(static_cast<unsigned>(loaded)) +
-                        ". Check this ROM, its keys and firmware; see stderr.log.");
+                    const unsigned core_status = static_cast<unsigned>(loaded);
+                    const unsigned loader_base =
+                        static_cast<unsigned>(Core::SystemResultStatus::ErrorLoader);
+                    if (core_status >= loader_base) {
+                        const auto loader_status = static_cast<Loader::ResultStatus>(
+                            core_status - loader_base);
+                        const std::string detail = Loader::GetResultStatusString(loader_status);
+                        std::fprintf(stderr,
+                            "EDEN_LOADER_FAILURE core_status=%u loader_status=%u reason=%s\n",
+                            core_status, core_status - loader_base, detail.c_str());
+                        if (loader_status == Loader::ResultStatus::ErrorBadFileAccessControl) {
+                            throw std::runtime_error("NPDM filesystem access-control metadata could not be read "
+                                "(Core 14 / Loader 7). This is not a missing NCA header key. "
+                                "The extracted game's main.npdm may use an unsupported ACID layout; "
+                                "see stderr.log.");
+                        }
+                        throw std::runtime_error("Loader error " + detail + " (Core " +
+                            std::to_string(core_status) + ", loader " +
+                            std::to_string(core_status - loader_base) + "). See stderr.log.");
+                    }
+                    throw std::runtime_error("Core initialization failed (" +
+                        std::to_string(core_status) + "). See stderr.log.");
                 }
 #ifdef PS5_NATIVE
                 if (game) {
