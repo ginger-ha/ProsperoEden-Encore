@@ -28,7 +28,7 @@ static std::vector<uint32_t> ReadSpirv(const char* file) {
     return words;
 }
 int main(int argc,char** argv) {
-    Require(argc==5,"expected direct, dispatcher, Fragment and merged modules");
+    Require(argc==6,"expected direct, dispatcher, Fragment, merged and Compute modules");
     VkApplicationInfo application{};
     application.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application.pApplicationName="NS2 synthetic shader module smoke test";
@@ -97,7 +97,7 @@ int main(int argc,char** argv) {
     VkPipelineLayout layout=VK_NULL_HANDLE;
     Require(vkCreatePipelineLayout(device,&layout_info,nullptr,&layout)==VK_SUCCESS,
             "synthetic shader pipeline layout creation failed");
-    for (int i=1;i<argc;++i) {
+    for (int i=1;i<argc-1;++i) {
         auto code=ReadSpirv(argv[i]);
         VkShaderModuleCreateInfo module_info{};
         module_info.sType=VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -290,6 +290,30 @@ int main(int argc,char** argv) {
     vkDestroyShaderModule(device, fragment_module, nullptr);
     vkDestroyShaderModule(device, vertex_module, nullptr);
     std::puts("NS2 synthetic Vertex/Fragment color pipeline: PASS (host only)");
+    // Validate a real host Vulkan Compute pipeline from emitted native
+    // Ampere->Maxwell->SPIR-V. This does not execute guest Compute or bind
+    // the PS5 renderer's descriptors, fences, and QMD scheduling.
+    const VkShaderModule compute_module=create_module(argv[5]);
+    VkPipelineShaderStageCreateInfo compute_stage{};
+    compute_stage.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    compute_stage.stage=VK_SHADER_STAGE_COMPUTE_BIT;
+    compute_stage.module=compute_module;
+    compute_stage.pName="main";
+    VkComputePipelineCreateInfo compute_info{};
+    compute_info.sType=VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    compute_info.stage=compute_stage;
+    compute_info.layout=layout;
+    VkPipeline compute_pipeline=VK_NULL_HANDLE;
+    const auto compute_rc=vkCreateComputePipelines(
+        device,VK_NULL_HANDLE,1,&compute_info,nullptr,&compute_pipeline);
+    if (compute_rc!=VK_SUCCESS)
+        std::fprintf(stderr,"Host Compute pipeline result: %d\\n",int(compute_rc));
+    Require(compute_rc==VK_SUCCESS && compute_pipeline!=VK_NULL_HANDLE,
+            "Vulkan host rejected native synthetic Compute pipeline");
+    vkDestroyPipeline(device,compute_pipeline,nullptr);
+    vkDestroyShaderModule(device,compute_module,nullptr);
+    std::puts("NS2 synthetic Ampere Compute Vulkan pipeline: PASS (host only; no dispatch)");
+
     vkDestroyPipelineLayout(device,layout,nullptr);
     vkDestroyRenderPass(device,render_pass,nullptr);
     vkDestroyDevice(device,nullptr);

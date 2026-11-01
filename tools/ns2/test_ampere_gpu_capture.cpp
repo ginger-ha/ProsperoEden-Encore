@@ -54,6 +54,23 @@ int main() {
             ok.image.TranslateNativeAddress(0).has_value(),
             "read mapped native program, detect EXIT and lower to Maxwell image");
     Require(mem.reads==3,"exact one 128-byte header and two native instruction reads");
+    // Compute starts at the real QMD program code, not at a fabricated
+    // graphics header. Only the actual mapped 16-byte instructions are read.
+    const auto compute=CaptureNativeComputeShader(mem.base+0x80,Read,&mem);
+    Require(compute.Ready() && compute.captured_native_bytes==32 &&
+            compute.image.native_stage==static_cast<u32>(Shader::Stage::Compute) &&
+            compute.image.diagnostic_cache_key!=ok.image.diagnostic_cache_key &&
+            compute.image.ReadMaxwellInstruction(0x50).has_value(),
+            "compute capture must use a separate headerless stage domain");
+    Require(mem.reads==5,
+            "compute capture must read only the two actual instructions");
+    mem.mapped_bytes=0x80+16;
+    const auto compute_fault=CaptureNativeComputeShader(mem.base+0x80,Read,&mem);
+    Require(compute_fault.status==NativeCaptureStatus::Unmapped &&
+            compute_fault.first_error_offset==16 &&
+            compute_fault.image.code.empty(),
+            "compute second instruction unmapped rejects with code-relative offset");
+    mem.mapped_bytes=mem.data.size();
     const auto reads_before_invalid_stage=mem.reads;
     Require(CaptureNativeGraphicsShader(
                 mem.base,static_cast<u32>(Shader::Stage::Compute),Read,&mem).status==

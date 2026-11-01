@@ -22,8 +22,9 @@ struct FakeMaxwellEnvironment final : Shader::Environment {
     ~FakeMaxwellEnvironment() override {
         if (destroyed) ++*destroyed;
     }
-    FakeMaxwellEnvironment() {
-        stage=Shader::Stage::VertexB;
+    explicit FakeMaxwellEnvironment(
+        Shader::Stage selected=Shader::Stage::VertexB) {
+        stage=selected;
         start_address=0x50;
         gp_passthrough_mask[0]=0xa5a5;
         is_proprietary_driver=true;
@@ -79,6 +80,20 @@ int main() {
         catch (const std::out_of_range&) { rejected=true; }
         Check(rejected,"scheduler, header and metadata cannot reach Maxwell decoder");
     }
+    auto compute_image=BuildMaxwellShaderImage(
+        hdr,native,static_cast<u32>(Shader::Stage::Compute));
+    auto compute_env=NativeMaxwellEnvironment::CreateComputeOwned(
+        std::make_unique<FakeMaxwellEnvironment>(Shader::Stage::Compute),
+        std::move(compute_image));
+    Check(compute_env && compute_env->StartAddress()==0x50 &&
+          compute_env->ShaderStage()==Shader::Stage::Compute &&
+          compute_env->ReadInstruction(0x50)==env->ReadInstruction(0x50) &&
+          compute_env->WorkgroupSize()==std::array<u32,3>{2,4,8},
+          "QMD Compute environment starts at synthetic Maxwell code, not SPH");
+    Check(!NativeMaxwellEnvironment::CreateComputeOwned(
+          std::make_unique<FakeMaxwellEnvironment>(),
+          BuildMaxwellShaderImage(hdr,native,static_cast<u32>(Shader::Stage::Compute))),
+          "graphics source cannot impersonate authenticated Compute QMD");
     Check(env->ReadCbufValue(2,7)==519 &&
           fake.cbuf_reads==1 &&
           env->IsTexturePixelFormatInteger(5) &&

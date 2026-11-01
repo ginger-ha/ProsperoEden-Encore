@@ -36,7 +36,10 @@ struct SyntheticSource final : Shader::Environment {
     u32 TextureBoundBuffer() const override { return 0; }
     u32 LocalMemorySize() const override { return 0; }
     u32 SharedMemorySize() const override { return 0; }
-    std::array<u32,3> WorkgroupSize() const override { return {}; }
+    std::array<u32,3> WorkgroupSize() const override {
+        return stage == Shader::Stage::Compute ?
+            std::array<u32,3>{2,4,8} : std::array<u32,3>{};
+    }
     bool HasHLEMacroState() const override { return false; }
     std::optional<Shader::ReplaceConstant> GetReplaceConstBuffer(u32,u32) override { return {}; }
     void Dump(u64,u64) override { std::abort(); }
@@ -94,6 +97,33 @@ int main(int argc,char** argv) {
     host.support_conditional_barrier=true;
     Shader::Profile profile{};
     profile.supported_spirv=0x00010500; // SPIR-V 1.5
+    // Emit an authentic Compute execution model from the same synthetic
+    // 128-bit Ampere instruction sequence, without a graphics SPH.
+    auto compute_image=BuildMaxwellShaderImage(
+        header,code,static_cast<u32>(Shader::Stage::Compute));
+    Require(compute_image.ValidForCompiler(),"compute native lowering invalid");
+    auto compute_env=NativeMaxwellEnvironment::CreateComputeOwned(
+        std::make_unique<SyntheticSource>(Shader::Stage::Compute),
+        std::move(compute_image));
+    Require(bool(compute_env) && compute_env->StartAddress()==0x50,
+            "compute translation environment rejected");
+    const auto compute=CompileReviewedNativeComputeSpirv(
+        *compute_env,host,profile,Shader::RuntimeInfo{});
+    Require(compute.ComputeMetadataReady() &&
+            !compute.PipelineMetadataReady() &&
+            compute.words.size()>5 && compute.words[0]==0x07230203U,
+            "Ampere Compute CFG/IR -> actual SPIR-V failed");
+    {
+        const auto output=std::string(argv[1])+"-compute.spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write Compute SPIR-V");
+        file.write(reinterpret_cast<const char*>(compute.words.data()),
+                   static_cast<std::streamsize>(compute.words.size()*sizeof(u32)));
+        file.close();
+        Require(bool(file),"could not flush Compute SPIR-V");
+        std::printf("SPIR-V emitted: %s (%zu words)\\n",
+                    output.c_str(),compute.words.size());
+    }
     std::vector<u32> baseline_direct;
     for (bool dispatcher:{false,true}) {
         const auto compiled=CompileReviewedNativeVertexSpirv(
@@ -223,6 +253,21 @@ int main(int argc,char** argv) {
             missing.words.empty() && guest.reads==0,
             "unregistered process must not access guest GPU memory");
     Require(registry.Register(&process),"failed creating NS2 session fixture");
+    // The explicit session-owned Compute API reads only code bytes, not a
+    // shader graphics header. Reject unrelated stages before GMMU access.
+    guest.reads=0;
+    const auto wrong_compute_stage=VideoCommon::CompileCapturedNs2ComputeSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::VertexB),
+        guest.address+0x80,ReadGuest,&guest,host,profile,Shader::RuntimeInfo{});
+    Require(wrong_compute_stage.status==NativeSpirvStatus::UnsupportedStage &&
+            wrong_compute_stage.words.empty() && guest.reads==0,
+            "QMD Compute compiler must reject graphics stages before GMMU read");
+    const auto session_compute=VideoCommon::CompileCapturedNs2ComputeSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::Compute),
+        guest.address+0x80,ReadGuest,&guest,host,profile,Shader::RuntimeInfo{});
+    Require(session_compute.ComputeMetadataReady() &&
+            session_compute.words==compute.words && guest.reads>0,
+            "QMD-owned compute capture did not compile identical SPIR-V");
     const auto token=registry.CaptureTicket(&process);
     Require(token.has_value(),"no live NS2 GPU ticket");
     const auto no_vertex_a=compile(Shader::Stage::VertexA);
