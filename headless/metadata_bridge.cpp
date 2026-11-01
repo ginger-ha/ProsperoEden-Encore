@@ -1,6 +1,7 @@
 #include "metadata_bridge.h"
 #include "game_files.h"
 #include "extracted_npdm_identity.h"
+#include "firmware_zip_import.h"
 #include "../vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc_paths.h"
 #include "assets_dir.h"
 #include "diagnostics.h"
@@ -617,9 +618,114 @@ int eden_save_export(uint64_t title_id, char* path, size_t capacity) {
     return EDEN_SAVE_DONE;
 }
 
+// Import user-provided ZIP firmware automatically from bounded, known roots.
+// An ambiguous archive is never assigned to NS2 solely because it is a ZIP.
+// Extraction occurs only once, atomically, without rewriting the source.
+static void AutoImportFirmwareArchives() {
+    namespace fs = std::filesystem;
+    const fs::path root{Eden::AssetsDir()};
+    if (!Eden::StorageDirectory(root)) return;
+    struct Search { const char* relative; int family; };
+    constexpr std::array<Search, 12> locations{{
+        {"firmware/ns1", 1}, {"firmware/switch1", 1},
+        {"firmware/ns2", 2}, {"firmware/switch2", 2},
+        {"ns1/firmware", 1}, {"switch1/firmware", 1},
+        {"ns2/firmware", 2}, {"switch2/firmware", 2},
+        {"switch1", 1}, {"switch2", 2},
+        {"keys", 0}, // ignored below, never search keys for firmware
+        {"firmware", 0}
+    }};
+    for (const auto& location : locations) {
+        if (std::string_view(location.relative) == "keys") continue;
+        const fs::path folder=root/location.relative;
+        fs::path walk=root;
+        bool safe=true;
+        for (const auto& part : folder.lexically_relative(root)) {
+            walk/=part;
+            if (!Eden::StorageDirectory(walk)) { safe=false;break; }
+        }
+        if (!safe) continue;
+        std::error_code ec;
+#if defined(__PROSPERO__)
+        const auto entries=Eden::ReadNativeDirectory(folder,ec);
+#else
+        std::vector<fs::directory_entry> entries;
+        for (fs::directory_iterator it{folder,fs::directory_options::skip_permission_denied,ec},end;
+             !ec && it!=end && entries.size()<128;it.increment(ec))
+            entries.push_back(*it);
+#endif
+        if (ec) continue;
+        unsigned attempts=0;
+        for (const auto& entry : entries) {
+            const auto archive=entry.path();
+            if (!Eden::StorageRegular(archive) || archive.extension()!=".zip" ||
+                ++attempts>8) continue;
+            int family=location.family;
+            if (!family) {
+                // Prefer an explicit archive label. For old firmware.zip dumps
+                // distinguish extracted 010... vs 040... module title IDs.
+                std::string name=archive.stem().string();
+                std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){
+                    return static_cast<char>(std::tolower(c));
+                });
+                if (name.find("ns2")!=std::string::npos ||
+                    name.find("switch2")!=std::string::npos) family=2;
+                else if (name.find("ns1")!=std::string::npos ||
+                         name.find("switch1")!=std::string::npos) family=1;
+                else {
+                    std::ifstream reader(archive,std::ios::binary);
+                    std::vector<Eden::FirmwareZip::Entry> members;
+                    if (!Eden::FirmwareZip::Index(reader,&members)) continue;
+                    bool ns1=false, ns2=false, nca=false;
+                    for (const auto& member : members) {
+                        const auto& path=member.name;
+                        if (path.find(".ns2jb-firmware-dump.json")!=std::string::npos)
+                            ns2=true;
+                        if (path.ends_with(".nca")) nca=true;
+                        if (path.find("010000000000")!=std::string::npos &&
+                            path.ends_with("/main.npdm")) ns1=true;
+                        if (path.find("040000000000")!=std::string::npos &&
+                            path.ends_with("/main.npdm")) ns2=true;
+                    }
+                    if (ns1==ns2) {
+                        // Flat legacy NCA-only archives default to Switch 1.
+                        if (nca && !ns1) family=1;
+                        else {
+                            std::fprintf(stderr,
+                                "EDEN_FIRMWARE_ZIP_AMBIGUOUS file=%s action=skip\n",
+                                archive.c_str());
+                            continue;
+                        }
+                    } else family=ns2?2:1;
+                }
+            }
+            std::string stem=archive.stem().string();
+            for (auto& ch : stem)
+                if (!std::isalnum(static_cast<unsigned char>(ch)) && ch!='-' && ch!='_')
+                    ch='_';
+            if (stem.size()>40) stem.resize(40);
+            if (stem.empty()) stem="firmware";
+            const fs::path destination=root/"firmware"/(family==2?"ns2":"ns1")/
+                ("encore-imported-"+stem);
+            // Never overwrite another import or recursively process a sibling.
+            if (fs::exists(destination,ec)) continue;
+            fs::create_directories(destination.parent_path(),ec);
+            if (ec) continue;
+            std::string reason;
+            std::fprintf(stderr,"EDEN_FIRMWARE_ZIP_BEGIN family=ns%d archive=%s\n",
+                         family,archive.c_str());
+            const bool success=Eden::FirmwareZip::Import(archive,destination,&reason);
+            std::fprintf(stderr,
+                "EDEN_FIRMWARE_ZIP_RESULT family=ns%d result=%s detail=%s\n",
+                family,success?"imported":"rejected",reason.c_str());
+        }
+    }
+}
+
 const char* eden_startup_error() {
     static const std::string error = []() -> std::string {
         try {
+            AutoImportFirmwareArchives();
             const std::string keys = Eden::AssetsPath("keys");
             const std::string firmware = Eden::AssetsPath("firmware");
             // Extracted NS2 system-code dumps have an independent NCM
