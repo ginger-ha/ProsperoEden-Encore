@@ -2,7 +2,7 @@
 
 **Branche :** `dev/ps5-sparse-jit`. **Date du relevé :** 30 octobre 2026.
 
-Ce registre complémentaire couvre les **177 chemins** de code, en-têtes et
+Ce registre complémentaire couvre les **178 chemins** de code, en-têtes et
 fragments `.c/.cc/.cpp/.h/.hpp/.inc/.cl` du dossier `headless/`.
 Il ne remplace pas `EDEN_ACTIVE_SOURCE_CATALOG.md` : les 326 fichiers
 de `vendor/encore-active` sont déjà inventoriés séparément.
@@ -13,8 +13,8 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **177** chemins sous `headless/`, dont **60** sources C/C++ et **117** en-têtes/fragments.
-- **96** chemins déjà présents dans le graphe moteur.
+- **178** chemins sous `headless/`, dont **60** sources C/C++ et **118** en-têtes/fragments.
+- **97** chemins déjà présents dans le graphe moteur.
 - **81** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
@@ -96,6 +96,7 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/experimental_performance.h` | en-tête/fragment | U23 | Chemin indexé, preuve dépend du graphe |
 | `headless/extracted_npdm_identity.h` | en-tête/fragment | U87 | Chemin indexé, preuve dépend du graphe |
 | `headless/fastmem_handler.cpp` | runtime/bridge | J07 | Chemin indexé, preuve dépend du graphe |
+| `headless/firmware_zip_import.h` | en-tête/fragment | U88 | Chemin indexé, preuve dépend du graphe |
 | `headless/filesystem_probe.h` | en-tête/fragment | U35 | Chemin indexé, preuve dépend du graphe |
 | `headless/frame_metrics.h` | en-tête/fragment | U86 | Chemin indexé, preuve dépend du graphe |
 | `headless/game_files.h` | en-tête/fragment | U82 | Chemin indexé, preuve dépend du graphe |
