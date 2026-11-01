@@ -187,6 +187,15 @@ def main() -> int:
                 "IsFullyMappedRange(addr, sizeof(data))" in puller and
                 "IsCurrent(channel, ticket)" in puller,
                 "Ampere QMD3 must run on authenticated process session with real mapped fence handling")
+        require(
+            '#include "video_core/native_shader_capture.h"' in puller and
+            'Shader::Ampere::CaptureNativeComputeShader(' in puller and
+            'VideoCommon::ReadNs2GpuShader' in puller and
+            'registry.IsComputeCurrent(' in puller and
+            'EDEN_NS2_COMPUTE_SHADER_CAPTURE' in puller and
+            'backend=missing' in puller and
+            'return false;\n            });' in puller,
+            "Native QMD3 must capture real mapped Ampere shader under GPU epoch without forging Vulkan execution")
         # The EglantinePS5 shader audit found dropped last-lane vertex
         # varyings and truncated NVN2 compute storage binding arrays. These
         # independently produce missing geometry/black or jumping textures.
