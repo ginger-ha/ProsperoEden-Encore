@@ -380,6 +380,11 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # must match the pinned vendor after only the existing N56 normalization.
     generated_n3m = actual[n56_name].read_text()
     assert generated_n3m.count(n3m_flag) == 3, 'NS2 generator gates missing'
+    native_compute_guard = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\n#if defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n    // An authenticated Ampere compute engine must never enter the legacy\n    // Maxwell ShaderCache::ComputeShader() path: those 128-bit instructions\n    // need the new QMD-scoped native SPIR-V pipeline and resource binding.\n    // Until the renderer owns that real pipeline and submits the dispatch,\n    // reject instead of compiling native bytes as Switch 1 Maxwell.\n    if (Service::Nvidia::Devices::NativeGpuChannelRegistry::Instance()\n            .CaptureComputeTicket(kepler_compute))\n        return nullptr;\n#endif\n\n"
+    assert n3m.count(native_compute_guard) == 1, (
+        'Native Compute cache admission gate missing from pinned vendor')
+    assert generated_n3m.count(native_compute_guard) == 1, (
+        'Native Compute cache admission gate missing from generator')
     assert generated_n3m == n3m, 'NS2 generated Vulkan source differs from pinned vendor'
 
     # N57's optional ASTC methods are owned by these SAME vendor Vulkan TUs.
