@@ -135,6 +135,29 @@ def main() -> int:
         engine_registry = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/native_gpu_channel_registry.h").read_text()
         puller = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp").read_text()
         active_vk = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
+        # Boot-stall triage is PS5-only and bounded. Future captured logs
+        # must distinguish missing GPU-session IPC, GPFIFO admission,
+        # Ampere class binding and VI2 commands instead of just guest_frame_handoff=0.
+        service_dir = ROOT / "vendor/encore-active/ns2-runtime/gpu_session/core/hle/service/am/service"
+        supervisor_source = (ROOT / "vendor/encore-active/ns2-runtime/graphics_supervisor/core/hle/service/am/service/graphics_supervisor.cpp").read_text()
+        gpu_session_source = (service_dir / "gpu_session.cpp").read_text()
+        gpu_worker_source = (service_dir / "gpu_worker.cpp").read_text()
+        nvdrv_source = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.cpp").read_text()
+        for owner, source in (("gpu_session", gpu_session_source),
+                              ("gpu_worker", gpu_worker_source),
+                              ("vi2", supervisor_source),
+                              ("graphics_supervisor", supervisor_source)):
+            require(f"EDEN_NS2_IPC owner={owner}" in source and
+                    "#ifdef PS5_NATIVE" in source and
+                    "requests.fetch_add(" in source or
+                    (owner in ("vi2", "graphics_supervisor") and
+                     f"EDEN_NS2_IPC owner={owner}" in source and
+                     "calls.fetch_add(" in source),
+                    f"Missing bounded NS2 boot trace for {owner}")
+        require("EDEN_NS2_GPFIFO submit=" in nvdrv_source and
+                "EDEN_NS2_GPU_BIND count=" in puller and
+                "std::atomic<unsigned>" in puller,
+                "NS2 boot trace requires concrete GPFIFO and Ampere bind witnesses")
         require("BindGraphicsEngine(" in puller and
                 "UnbindGraphicsSubchannel(" in puller and
                 "CaptureGraphicsTicket(" in engine_registry and
