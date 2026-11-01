@@ -38,6 +38,32 @@ def main()->int:
     assert 'table.QueryInfo(&info, &page, cursor)' in text
     assert 'NativeMemoryError(m_native_memory.Bind(' in text
     assert 'm_native_memory.Destroy(' in text
+    # GSV 111/112/114 must use real NVMap handle identity and kernel page locks,
+    # not acknowledge metadata-only resources that cannot become GPU images.
+    for source in (
+        'nvmap.CreateHandle(size, handle)',
+        'm_native_memory.Adopt(id, size)',
+        'auto handle = nvmap.GetHandle(packet[2])',
+        'handle.reset(); // FreeHandle',
+        'nvmap.FreeHandle(packet[2], false)',
+        'table.LockForMapDeviceAddressSpace(',
+        'handle->Alloc(',
+        'm_native_memory.Bind(id, address, size)',
+        'UnlockForDeviceAddressSpace(',
+        'm_native_module->GetContainer().CloseSession(',
+    ):
+        assert source in text, "Missing real GSV NVMap lifetime owner: " + source
+    assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    for snippet in (
+        'm_native_images.Create(backing, handle->size,',
+        'm_native_images.Destroy(packet[2])',
+        'handle->Duplicate(true)',
+        'FreeHandle(\n                image->backing, true)',
+        'for (const auto& [image_id, image] : m_native_images.Records())',
+    ):
+        assert snippet in text, "Missing native image NVMap ownership: " + snippet
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text

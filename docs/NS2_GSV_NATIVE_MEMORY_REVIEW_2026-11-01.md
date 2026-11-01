@@ -33,3 +33,36 @@ checks size/count arithmetic and returns 4096-byte alignment. Unrecognized
 formats or malformed word counts receive a kernel error, not a fabricated
 size. This allows native image resource **planning**, not image creation,
 Vulkan submission or first-frame presentation.
+
+## Real NVMap native-memory ownership — November 1 integration
+
+The research GSV now uses **real global NVMap handle IDs** instead of private
+metadata-only IDs for TIPC 111. Command 114 checks its strict nine-word
+packet, exact owned allocation size, guest mapped pages and (for flags=2)
+GpuAccessible pages, then locks the guest pages for device mapping and calls
+NVMap::Handle::Alloc with an owned NVDRV session. Partial failures roll back
+the page-table lock. Command 112 rejects busy/pinned handles, drops temporary
+shared_ptr ownership *before* FreeHandle, and releases the mapped page-table
+lock only after NVMap confirms final ownership. Supervisor destruction drains
+its remaining unborrowed allocations before closing the NVDRV session.
+
+The GPU worker previously held a temporary shared_ptr across FreeHandle,
+causing NVMap to report can_unlock=false even for a released resource. That
+reference was corrected in the same vendor lot, before the GSV backend.
+
+This is **actual backing ownership**, not a Vulkan VkImage, Ampere shader
+execution or VI2 present path. Command 429 remains unsupported until the
+native image registry and renderer can consume a correctly retained backing.
+No Switch 1 release source has been replaced by this change.
+
+## Native image registry 429/430 (research only)
+
+Commands **429** and **430** are now routed through a bounded 1024-image
+registry. Creating an image requires the known 16-word block-linear layout,
+a fully allocated and bound NVMap backing handle large enough for its
+calculated size, and an actual NVMap internal duplicate. Destroying the image
+releases that internal duplicate and its unique logical image ID. Unreleased
+images retain the backing until supervisor teardown drains those references.
+This is the same resource-lifetime dependency used by the upstream GSV; the
+PS5 Vulkan/VI2 image consumer, Ampere lowering and final screen presentation
+remain to be integrated and proven on console. Unsupported formats fail.

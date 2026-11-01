@@ -2,7 +2,7 @@
   "schema_version": 1,
   "base_vendor_commit": "2281ef2780179febb927662c3ce4a83b09f252a6",
   "research_vendor_commit": "209052223111a27fc1c93a07f6af96e61221bb2c",
-  "review_state": "NS2 research source additions including two opt-in Vulkan sparse ABI headers; never historical F07 optimization proofs or NS2 gameplay qualification",
+  "review_state": "NS2 research source additions including two opt-in Vulkan sparse ABI headers; never historical F07 optimization proofs or NS2 gameplay qualification; native 4K GMMU VA bounds helper added with O0/O2 UBSan preflight, not F07 shipping",
   "paths": [
     "eden-core/include/common/cpu_features.h",
     "eden-core/include/encore/guest_counter_policy.h",
@@ -104,6 +104,7 @@
     "ns2-runtime/nvdrv/core/hle/service/nvdrv/devices/native_characteristics_ioctl.h",
     "ns2-runtime/nvdrv/core/hle/service/nvdrv/devices/native_gpu_characteristics.h",
     "ns2-runtime/nvdrv/core/hle/service/nvdrv/devices/nvhost_ctrl_gpu.cpp",
+    "ns2-runtime/nvdrv_as/core/hle/service/nvdrv/devices/native_gpu_va_layout.h",
     "ns2-runtime/nvdrv_as/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp",
     "ns2-runtime/nvdrv_as/core/hle/service/nvdrv/devices/nvhost_as_gpu.h",
     "ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.cpp",

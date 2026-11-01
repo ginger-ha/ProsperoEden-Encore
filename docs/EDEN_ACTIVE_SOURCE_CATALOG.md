@@ -7,7 +7,7 @@ source OpenCL (`.c`, `.cpp`, `.h`, `.hpp`, `.inc`, `.cl` et variantes voisines)
 présent sous `vendor/encore-active`. Il est généré depuis l'arbre réel
 et contrôlé par `tools/check-active-source-inventory.py`.
 
-- **337 fichiers** de code et d'en-têtes enregistrés (hors 107 sources NS2 expérimentales, suivies séparément).
+- **337 fichiers** de code et d'en-têtes enregistrés (hors 108 sources NS2 expérimentales, suivies séparément).
 - **335 fichiers** possèdent une correspondance exacte avec le registre des fonctions (dont les propriétaires AOC F46–F49).
 - **2 fichiers** n'ont pas d'ID de graphe historique : les deux en-têtes partagés suivis par `tools/install-eden-header-hygiene.py` et contrôlés octet par octet avec le snapshot Eden immuable.
 - Cet inventaire ne prouve pas le comportement sur console.

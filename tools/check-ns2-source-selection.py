@@ -147,8 +147,13 @@ def main() -> int:
                 "CompileReviewedNativeVertexSpirv(" in bridge_source.read_text() and
                 "Shader::Stage::VertexB" in bridge_source.read_text(),
                 "Real VertexB-only SPIR-V bridge owner is missing")
-        require('EDEN_NS2_METADATA_EXPERIMENTAL=ON' in CMAKE,
-                "ExeFS must require metadata opt-in")
+        require(
+            'if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)' in CMAKE and
+            'set(EDEN_SHARED_NS2_EXEFS ON)' in CMAKE and
+            'if(NOT EDEN_REVIEWED_DUAL_NPDM)' in CMAKE and
+            'if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)'
+                in CMAKE,
+            "ExeFS must require reviewed dual NPDM for research or shared release")
         require('EDEN_NS2_METADATA_EXPERIMENTAL OR EDEN_NS2_EXEFS_EXPERIMENTAL' in CMAKE,
                 "Final release must reject experimental selectors")
         selection = CMAKE.index("# Experimental ExeFS bridge must be selected AFTER")
