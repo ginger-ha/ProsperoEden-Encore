@@ -159,13 +159,24 @@ inline bool Import(const fs::path& archive, const fs::path& target, std::string*
     const auto status=fs::symlink_status(archive,ec);
     if (ec || !fs::is_regular_file(status) || fs::is_symlink(status))
         return fail("archive is missing or is a symlink");
-    if (fs::exists(target,ec)) return fail("import already exists; preserving user files");
+    const auto target_status=fs::symlink_status(target,ec);
+    if (!ec && target_status.type()!=fs::file_type::not_found)
+        return fail("import already exists; preserving user files");
+    ec.clear();
     std::ifstream zip(archive,std::ios::binary);
     if (!zip) return fail("archive cannot be opened");
     std::vector<Entry> files;
     if (!Index(zip,&files)) return fail("ZIP index or entry policy rejected");
+    const bool firmware_content=std::any_of(files.begin(),files.end(),[](const Entry& item) {
+        return item.name.ends_with(".nca") || item.name.ends_with("/main.npdm") ||
+               item.name.ends_with("firmware-dump-named.json");
+    });
+    if (!firmware_content) return fail("ZIP does not contain recognizable firmware content");
     const fs::path stage=target.string()+".incomplete";
-    if (fs::exists(stage,ec)) return fail("stale partial import; will not overwrite");
+    const auto stage_status=fs::symlink_status(stage,ec);
+    if (!ec && stage_status.type()!=fs::file_type::not_found)
+        return fail("stale partial import; will not overwrite");
+    ec.clear();
     if (!fs::create_directories(stage,ec) || ec) return fail("cannot prepare staging directory");
     bool ok=true;
     for (const auto& file : files) {
