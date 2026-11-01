@@ -29,7 +29,8 @@ assert 'shader_source = shader_source.replace(f07_prewarm_total_old, f07_prewarm
 
 assert method.count("if (state.total == kStartupPrewarmPipelines)")==2
 assert method.count("startup_reader.request_stop();")==2
-assert "constexpr size_t kStartupPrewarmPipelines = 8;" in method
+assert "constexpr size_t kStartupPrewarmPipelines = 32;" in method
+assert "kFc27TitleId" not in method and "kFc27PrewarmPipelines" not in method
 assert "std::stop_source startup_reader;" in method
 assert "const std::stop_token reader_token{startup_reader.get_token()};" in method
 assert "VideoCommon::LoadPipelines(reader_token" in method
@@ -40,7 +41,7 @@ assert "StatefulThreadWorker::WaitForRequests(stop_token)" in method
 assert "    workers.WaitForRequests();" in gen
 assert "    workers.WaitForRequests(stop_loading);" in gen
 assert "workers.WaitForRequests(reader_token)" not in method
-assert 'mode=bounded-prewarm8' in main
+assert 'mode=bounded-prewarm32' in main
 assert 'lazy_cache.request_stop();' not in main
 assert "for (auto& thread : threads) {" in worker
 assert "thread.request_stop();" in worker
@@ -58,7 +59,7 @@ cpp=r"""
 #include <stop_token>
 #include <functional>
 #include <vector>
-constexpr std::size_t kStartupPrewarmPipelines = 8;
+constexpr std::size_t kStartupPrewarmPipelines = 32;
 struct Worker {
     bool alive=true;
     size_t done=0;
@@ -81,7 +82,7 @@ std::size_t Run(std::size_t persisted, Worker& workers, bool init_only=false,
         if(queued == kStartupPrewarmPipelines)
             startup_reader.request_stop();
     }
-    // Mimic cancellation after at most eight jobs were admitted.
+    // Mimic cancellation after at most 32 jobs were admitted.
     // Only the cache reader stops. The shader builder must remain alive.
     std::stop_source title;
     if(cancel_title) title.request_stop();
@@ -91,7 +92,7 @@ std::size_t Run(std::size_t persisted, Worker& workers, bool init_only=false,
     return queued;
 }
 int main(){
-    for(auto persisted:{0u,1u,7u,8u,9u,128u,50000u}){
+    for(auto persisted:{0u,1u,7u,8u,9u,31u,32u,33u,128u,50000u}){
         Worker workers;
         auto count=Run(persisted,workers);
         assert(count==(persisted<kStartupPrewarmPipelines?persisted:kStartupPrewarmPipelines));
@@ -223,4 +224,4 @@ with tempfile.TemporaryDirectory(prefix="eden-f07-prewarm-exception-") as d:
         subprocess.run([str(exe)],check=True,timeout=15)
 print("F07_PREWARM_EXCEPTION_JOIN_PASS read_error=1 callback_error=1 join_once=1 O0=1 O2=1")
 
-print("F07_BOUND_PREWARM_HOST_PASS cap=8 reader_only_cancel=1 workers_persist=1 O0=1 O2=1")
+print("F07_BOUND_PREWARM_HOST_PASS cap=32 reader_only_cancel=1 workers_persist=1 O0=1 O2=1")
