@@ -110,7 +110,7 @@ native_compute_guard = """#if defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL
 """
 assert reconstructed.count(native_compute_guard) == 1, (
     'U91 authenticated native Compute guard moved outside reviewed block')
-compute_anchor = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\\n"
+compute_anchor = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\n"
 assert reconstructed.count(compute_anchor + native_compute_guard) == 1, (
     'U91 Compute guard no longer precedes legacy Maxwell cache admission')
 reconstructed = reconstructed.replace(native_compute_guard, '', 1)
