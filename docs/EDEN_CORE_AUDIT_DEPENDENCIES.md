@@ -953,6 +953,7 @@ function/contract tokens are checked by CI for existence only; the
 | U84 | P1 | U83 | headless/ncz.h | inline std::optional<Layout> ParseLayout(; class BlockPlaintext final | SOURCE | tools/check-ncz.py | NCZ section parser and decompression reader; host samples do not certify all files on device | 🟡 Source étudiée |
 | U85 | P1 | U83 | headless/ncz_vfs.h | FileSys::VirtualFile Open(; void SetUnpackFolder( | SOURCE | tools/check-encore-ncz-sources.py | NCZ VFS declarations paired with native implementation and selection; no gameplay qualification | 🟡 Source étudiée |
 | U86 | P1 | U01,V04 | headless/frame_metrics.h | ResetForTitle; OnSourceComposite; OnRealQueued; OnGeneratedQueued; OnSwapchainPresentReturned; Sample | SOURCE | tools/check-feature-r01-native-frame-metrics-host.py | Exact native Vulkan renderer/presenter source hooks and C++ UBSan concurrency, 30-to-60 submitted/present API rates; not guest simulation FPS, actual scanout or input-to-photon | 🟡 Source étudiée |
+| U87 | P1 | U82 | headless/extracted_npdm_identity.h | inline std::uint64_t TitleId( | SOURCE | tools/check-ns2-extracted-inputs-host.py | Bounded read-only META/ACI0 title identity for extracted NS1/NS2 library metadata; no firmware or native boot qualification | 🟡 Source étudiée |
 <!-- AUDIT_ROWS_END -->
 
 
