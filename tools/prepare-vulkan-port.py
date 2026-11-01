@@ -4640,8 +4640,7 @@ apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
     "    if (any_modified) {\n"
     "        image.flags |= ImageFlagBits::GpuModified;\n"
     "    }\n"
-    "#ifdef PS5_NATIVE\n"
-    "    // Most alias refreshes have only one newer source.\n",
+    "#ifdef PS5_NATIVE\n",
     "#ifndef PS5_NATIVE\n"
     "    // Desktop preserves the original eager revision publication.\n"
     "    image.modification_tick = most_recent_tick;\n"
@@ -4649,8 +4648,7 @@ apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
     "        image.flags |= ImageFlagBits::GpuModified;\n"
     "    }\n"
     "#endif\n"
-    "#ifdef PS5_NATIVE\n"
-    "    // Most alias refreshes have only one newer source.\n",
+    "#ifdef PS5_NATIVE\n",
     "F07 alias revision publication after copy 1/2")
 
 apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
