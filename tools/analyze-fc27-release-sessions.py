@@ -66,6 +66,56 @@ def collect(text: str) -> list[dict]:
     return sessions
 
 
+
+
+def steady_state(session: dict, warmup_seconds: float = 180.0,
+                 min_late50: int = 5) -> dict:
+    """Rank sustained-playback bursts without mixing launches or missing counters.
+
+    Elapsed time is the sum of renderer five-second windows; it is not the
+    guest match clock. A session may include loading/menus after warmup.
+    Cache waits sum work on multiple threads, not blocked frame wall time.
+    """
+    elapsed = 0.0
+    rows = []
+    unpaired = 0
+    for frame_id, frame in sorted(session["frames"].items()):
+        elapsed += frame["seconds"]
+        if elapsed <= warmup_seconds:
+            continue
+        pressure = session["pressure"].get(frame_id)
+        if pressure is None or "cache_wait_ms" not in pressure:
+            unpaired += 1
+            continue
+        rows.append({
+            "frame": frame_id, "end_s": round(elapsed, 1),
+            "fps": round(frame["fps"], 3),
+            "late50": int(frame["late50"]),
+            "late100": int(frame["late100"]),
+            "worst_ms": round(frame["worst_ms"], 3),
+            "cache_blocked": (int(pressure["cache_blocked"])
+                              if "cache_blocked" in pressure else None),
+            "cache_wait_ms_multi_thread": round(pressure["cache_wait_ms"], 3),
+        })
+    bursts = [r for r in rows if r["late50"] >= min_late50]
+    return {
+        "warmup_excluded_s": warmup_seconds,
+        "late50_burst_threshold": min_late50,
+        "paired_windows": len(rows),
+        "unpaired_windows": unpaired,
+        "burst_windows": len(bursts),
+        "burst_late50": sum(r["late50"] for r in bursts),
+        "steady_late50": sum(r["late50"] for r in rows),
+        "zero_late50_windows": sum(r["late50"] == 0 for r in rows),
+        "bursts": sorted(bursts, key=lambda r: (-r["late50"], -r["worst_ms"]))[:12],
+        "cache_wait_interpretation":
+            "Multi-thread 5-second cumulative contention, not per-frame "
+            "stall ownership or proof of causality.",
+        "hud_freshness": "NOT_MEASURED",
+        "guest_progress": "NOT_MEASURED",
+    }
+
+
 def summarize(session: dict, ordinal: int) -> dict:
     frames, pressure = session["frames"], session["pressure"]
     keys = sorted(frames.keys() & pressure.keys())
@@ -84,6 +134,7 @@ def summarize(session: dict, ordinal: int) -> dict:
         "paired_windows": len(keys),
         "unpaired_frames": len(frames) - len(keys),
         "unpaired_pressure": len(pressure) - len(keys),
+        "steady_state": steady_state(session),
         "seconds_observed": round(sum(frame["seconds"] for frame, _ in pairs), 3),
         "median_reported_fps": round(statistics.median(frame["fps"] for frame, _ in pairs), 3),
         "minimum_window_fps": round(min(frame["fps"] for frame, _ in pairs), 3),
@@ -145,6 +196,20 @@ def self_test() -> None:
     assert output[0]["status"] == "RELEASE_FRAME_PRESSURE_ONLY"
     assert "jit_compile_duration" in output[0]["unmeasured_release_fields"]
     assert analyze(session(first, [0, 1, 2], [0, 0, 0]))[0]["cache_wait_late50_pearson"] is None
+    demo = collect(session(first, [0, 5, 10], [0, 4, 8]))[0]
+    stable = steady_state(demo, warmup_seconds=5.0, min_late50=3)
+    assert stable["paired_windows"] == 2 and stable["burst_windows"] == 2
+    assert stable["burst_late50"] == stable["steady_late50"] == 12
+    assert stable["bursts"][0]["frame"] == 450
+    assert stable["bursts"][0]["cache_wait_ms_multi_thread"] == 10
+    assert stable["hud_freshness"] == "NOT_MEASURED"
+    incomplete = session(first, [0, 5, 10], [0, 4, 8]).replace(
+        "EDEN_FRAME_PRESSURE frame=450 cache_wait_ms=10",
+        "EDEN_FRAME_PRESSURE frame=450 detail=not_measured")
+    incomplete_report = steady_state(collect(incomplete)[0], 5.0, 3)
+    assert incomplete_report["unpaired_windows"] == 1
+    assert incomplete_report["paired_windows"] == 1
+
     assert analyze(session(first, [1, 2, 3], [1, 2, 3], detailed=True))[0]["status"] == "DETAILED_GPU_PRESENT"
     mixed = session(first, [0, 5, 10], [0, 4, 8]) + "\n"
     mixed += "EDEN_VULKAN_FRAME frames=150 seconds=5 fps=30 worst_ms=100 total=150 late50=1 late100=0"

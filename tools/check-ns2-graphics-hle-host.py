@@ -56,6 +56,32 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    for command, method in (
+        (911, "CreateVideoImagePool"), (912, "DestroyVideoImagePool"),
+        (426, "MapVideoGpuImage"), (427, "UnmapVideoGpuImage"),
+        (428, "QueryVideoGpuImage"),
+    ):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    for snippet in (
+        'CalculateNativeVideoImageLayout(preference, count)',
+        'm_video_pools.Add(static_cast<u32>(m_next_image_id),',
+        'm_native_memory.Get(backing)',
+        'session && session->process == m_process',
+        'handle->Duplicate(true)',
+        'nvmap.PinHandle(backing, false)',
+        'm_video_pools.Lookup(packet[2])',
+        'FindRegisteredGpuAddressSpace(packet[4])',
+        'as->MapNativeImage(image->backing, image->offset,',
+        'it->second.address_space->UnmapNative4K(',
+        'm_video_mappings.erase(it)',
+        'it->second.address_space == as',
+        'const auto as = FindRegisteredGpuAddressSpace(packet[3]);',
+        'nvmap.UnpinHandle(pool->backing)',
+        'm_video_pools.Remove(pool->first_id)',
+        'for (const auto& [key, mapping] : m_video_mappings)',
+    ):
+        assert snippet in text, "Missing real NS2 video pool/GMMU ownership: " + snippet
+
     assert '{423, &IGraphicsSupervisor::BindNativeGpuMemory' in text
     for snippet in (
         'GraphicsSupervisorProtocol::DecodeNativeParentBind(packet)',
@@ -71,11 +97,16 @@ def main()->int:
     ):
         assert snippet in text, "Missing real parent GSV 423 lifecycle: " + snippet
 
+    for command in (314,315):
+        assert '{'+str(command)+', &IGraphicsSupervisor::ConfigureNativeWindowImagePool' in text
+    assert 'm_native_images.ConfigureWindowPool(packet[2], create)' in text
+    assert '!image->window_pool' in text
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (
-        'm_native_images.Create(backing, handle->size,',
+        'm_native_images.Create(',
         'm_native_images.Destroy(packet[2])',
+        'static_cast<u32>(m_next_image_id)',
         'handle->Duplicate(true)',
         'FreeHandle(\n                image->backing, true)',
         'for (const auto& [image_id, image] : m_native_images.Records())',

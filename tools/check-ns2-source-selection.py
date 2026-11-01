@@ -372,6 +372,10 @@ def main() -> int:
                 "m_shared->address_spaces.Registered(id)" in session_owner and
                 "m_module->VerifyFD(" in session_owner and
                 "as->OwnsNativeProcess(m_process)" in session_owner and
+                "m_opened_gpu_as[id] = as;" in session_owner and
+                "GetDevice<Nvidia::Devices::nvdevice>" in session_owner and
+                "as.get() == live.get()" in session_owner and
+                "m_opened_gpu_as" in session_header and
                 "bool nvhost_as_gpu::OwnsNativeProcess(Kernel::KProcess* process)" in native_as_owner and
                 "m_native_process == process && vm.initialised && gmmu" in native_as_owner,
                 "Native GSV address-space resolver must enforce live FD and process-scoped GMMU")
@@ -440,6 +444,17 @@ def main() -> int:
                 "nvmap.UnpinHandle(it->first)" in native_as_cpp and
                 "needed.insert(range.handle)" in native_as_cpp,
                 "Native 4KiB NVDRV address-space owner must be isolated and bounded")
+        # The 426/427/428 video mapping owner needs an actual bounded,
+        # process-owned NVMap-to-GMMU mapper; no legacy MapBufferEx shortcut.
+        require("NvResult MapNativeImage(u32 handle_id, u64 source, u64 size, u64& address)" in native_as_h and
+                "NvResult nvhost_as_gpu::MapNativeImage(" in native_as_cpp and
+                "container.GetSession(handle->session_id)" in native_as_cpp and
+                "vm.small_page_allocator->Allocate(pages)" in native_as_cpp and
+                "vm.small_page_allocator->Free(allocated, pages)" in native_as_cpp and
+                "gmmu->Map(gpu_address, pinned + source, size" in native_as_cpp and
+                "mapping_map.emplace(gpu_address, Mapping(" in native_as_cpp and
+                "NvResult nvhost_as_gpu::UnmapNative4K(" in native_as_cpp,
+                "NS2 native GPU images must own real 4K VA, NVMap pins and GMMU mapping")
         require("EDEN_NS2_NVDRV_AS_SOURCE" in CMAKE[nvdrv_selection:release_gate],
                 "Native AS owner is not gated under research-only NVDRV switch")
         channel_root = ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices"

@@ -818,12 +818,79 @@ int main(){
             images.Get(*first_image)->preference[1] == 1 &&
             images.Count() == 2,
             "GSV 429 owns distinct image IDs linked to genuine NVMap backing");
+    require(images.ConfigureWindowPool(*first_image, true) &&
+            images.Get(*first_image)->window_pool &&
+            !images.ConfigureWindowPool(*first_image, true) &&
+            !images.Destroy(*first_image) &&
+            images.ConfigureWindowPool(*first_image, false) &&
+            !images.Get(*first_image)->window_pool,
+            "GSV 314/315 require explicit window alias retirement");
+    require(!images.ConfigureWindowPool(0xffffffffU, true),
+            "GSV native window alias rejects unowned image IDs");
     require(!images.Destroy(0) && !images.Destroy(0xffffffffU) &&
             images.Destroy(*first_image) &&
             !images.Get(*first_image).has_value() &&
             !images.Destroy(*first_image) && images.Count() == 1 &&
             images.Destroy(*second_image) && images.Records().empty(),
             "GSV 430 rejects stale images and retires independent references");
+
+    // Native video pools (911) are distinct from 429 native image handles.
+    // Both kinds must reject foreign backing before any GPU VA allocation.
+    std::array<u32,16> video{};
+    video[0] = 0;
+    video[1] = 5;
+    video[2] = (63u << 16) | 127u; // 128 x 64, RGBA
+    const auto video_layout = CalculateNativeVideoImageLayout(video, 2);
+    require(video_layout && video_layout->image_bytes == 65536 &&
+            video_layout->image_stride == 65536 &&
+            video_layout->total_bytes == 131072,
+            "GSV video pool 911 computes upstream RGBA image byte and stride");
+    NativeVideoPoolLedger pools;
+    require(!pools.Add(0x80000000u, 2, 0, 131072, video[2], *video_layout) &&
+            !pools.Add(0x80000000u, 2, 20, 65536, video[2], *video_layout) &&
+            pools.ImageCount() == 0,
+            "GSV 911 rejects nonexistent or undersized NVMap backing");
+    require(pools.Add(0x80000000u, 2, 20, 131072, video[2], *video_layout) &&
+            pools.ImageCount() == 2,
+            "GSV 911 allocates a bounded image ID range");
+    const auto second_video = pools.Lookup(0x80000001u);
+    require(second_video && second_video->backing == 20 &&
+            second_video->offset == 65536 &&
+            second_video->size == 65536 &&
+            second_video->packed_dimensions == video[2],
+            "GSV 426/428 resolve image backing, offset, size and dimensions");
+    require(!pools.Add(0x80000001u, 2, 20, 131072, video[2], *video_layout) &&
+            !pools.Lookup(0x80000002u) &&
+            pools.Remove(0x80000000u) && pools.ImageCount() == 0 &&
+            !pools.Remove(0x80000000u),
+            "GSV 911/912 reject overlapping and stale image pools");
+    const NativeVideoImageLayout unaddressable{
+        0x1fffff000ULL, 0x1000U, 0xfffff000U, 0x100U, false, 0};
+    require(!pools.Add(0x80000010u, 3, 20, 0x200000000ULL,
+                       video[2], unaddressable),
+            "GSV 428 refuses pool images with unrepresentable 32-bit offsets");
+    video[1] = 1; // NV12 4:2:0, even dimensions
+    const auto nv12 = CalculateNativeVideoImageLayout(video, 2);
+    require(nv12 && nv12->nv12 && nv12->image_bytes == 24576 &&
+            nv12->total_bytes == 49152 && nv12->chroma_offset == 16384,
+            "GSV native NV12 two-plane pitch/chroma layout");
+    video[2] = (63u << 16) | 126u; // odd width
+    require(!CalculateNativeVideoImageLayout(video, 2),
+            "GSV native NV12 rejects odd pixel dimensions");
+    video[2] = (63u << 16) | 127u;
+    video[3] = 1;
+    require(!CalculateNativeVideoImageLayout(video, 2),
+            "GSV video image pools reject unreviewed format flags");
+
+    NativeImageLedger coordinated;
+    const auto requested = coordinated.Create(16, 0x10000,
+                                             *image_requirements, preferences, 42);
+    const auto automatic = coordinated.Create(16, 0x10000,
+                                              *image_requirements, preferences);
+    require(requested && *requested == 42 && automatic && *automatic == 43 &&
+            !coordinated.Create(16, 0x10000, *image_requirements, preferences, 42) &&
+            !coordinated.Create(16, 0x10000, *image_requirements, preferences, 41),
+            "GSV native and video pool IDs never reuse or alias guest handles");
 
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
