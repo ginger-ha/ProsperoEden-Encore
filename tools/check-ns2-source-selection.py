@@ -442,7 +442,10 @@ def main() -> int:
                 '"hle/service/nvdrv/devices/nvhost_gpu.cpp" eden_ns2_gpu_idx' in CMAKE and
                 'list(APPEND eden_ns2_nvdrv_sources "${EDEN_NS2_NVDRV_GPU_SOURCE}")' in CMAKE and
                 "EDEN_NS2_NVDRV_GPU_SOURCE" in CMAKE[nvdrv_selection:release_gate] and
-                "UsesNativeAbi() const;" in native_channel_h and
+                "UsesNativeAbi(DeviceFD fd) const;" in native_channel_h and
+                "const auto it = sessions.find(fd);" in native_channel_cpp and
+                "UsesNativeAbi(fd)" in native_channel_cpp and
+                "UsesNativeAbi()" not in native_channel_cpp and
                 "NativeGpuProcessRegistry::Instance().Contains(session->process)" in native_channel_cpp and
                 "if (native && !native_plan)" in native_channel_cpp and
                 "BuildIncrementCommandList(params.fence, native_completion)" in native_channel_cpp and
