@@ -149,6 +149,40 @@ int main() {
         assert(f.signal(0x99900,2).empty());
         assert(f.released.size()==1 && f.dispatched==0);
     }
+    // A reloaded launch cannot reset already accepted semaphores while a
+    // completion transaction still needs a retry.
+    {
+        Fixture f;auto d=EmptyGrid();
+        d[12]=1;d[13]=1;d[14]=1;
+        SetRelease(d,24,0x1111,1,true);
+        SetRelease(d,28,0x2222,2);
+        f.descriptors[0xa2000]=d;
+        f.transient_release_failures[0x2222]=1;
+        assert(f.signal(0xa2000,3)=="unmapped QMD release");
+        assert(f.released.size()==1 && f.dispatched==1);
+        assert(f.signal(0xa2000,3)=="QMD reload during pending release");
+        assert(f.released.size()==1 && f.dispatched==1);
+        assert(f.signal(0xa2000,2).empty());
+        assert(f.released.size()==2 && f.dispatched==1);
+        // Once finished, a new, genuine action 3 may reuse the QMD VA.
+        assert(f.signal(0xa2000,3).empty());
+        assert(f.released.size()==4 && f.dispatched==2);
+    }
+    // Bad dependent actions are rejected BEFORE submitting a shader or
+    // publishing a release, rather than after irreversible guest writes.
+    {
+        Fixture f;auto d=EmptyGrid();
+        d[12]=1;d[13]=1;d[14]=1;
+        d[16]=1|(7u<<1); // unsupported primary dependent action
+        SetRelease(d,24,0xabc0,9);
+        f.descriptors[0xb2000]=d;
+        assert(f.signal(0xb2000,3)=="unsupported dependent QMD action");
+        assert(f.released.empty() && f.dispatched==0);
+        d[16]=1|(4u<<1)|(1u<<5); // second dependent is unsupported
+        f.descriptors[0xb3000]=d;
+        assert(f.signal(0xb3000,3)=="second dependent QMD unsupported");
+        assert(f.released.empty() && f.dispatched==0);
+    }
     // Malformed QMDs fail before any guest semaphore is released.
     {
         Fixture f;auto d=EmptyGrid();d[18]=0x20;
