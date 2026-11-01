@@ -7,12 +7,20 @@ endif()
 set(PORT_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 set(PORT_BUILD_DIR "${CMAKE_BINARY_DIR}/headless")
 
-# Isolated NS2 experiment: carry upstream NPDM/ACID handling without touching
-# the immutable Eden vendor snapshot or the default Switch 1 execution path.
-# This option must stay OFF for production until a complete console qualification.
+# One shared NPDM owner for NS1 and NS2: keep the independently tested
+# 2048-bit and 3072-bit ACID readers in the shipping PS5 application.
+# The runtime stays a SINGLE release; this does not activate NS2 GPUs/HOS
+# services. A separate opt-in research flag is preserved for nonrelease tests.
 option(EDEN_NS2_METADATA_EXPERIMENTAL
-    "Experimental Switch 2 NPDM / ACID parsing (not full NS2 emulation)" OFF)
+    "Research use of the reviewed NS1/NS2 NPDM parser (not full NS2 emulation)" OFF)
+set(EDEN_REVIEWED_DUAL_NPDM OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE)
+    set(EDEN_REVIEWED_DUAL_NPDM ON)
+endif()
 if(EDEN_NS2_METADATA_EXPERIMENTAL)
+    set(EDEN_REVIEWED_DUAL_NPDM ON)
+endif()
+if(EDEN_REVIEWED_DUAL_NPDM)
     set(EDEN_NS2_METADATA_OVERLAY "${PORT_ROOT}/vendor/encore-active/ns2-experimental/src")
     set(EDEN_NS2_CORE_HELPERS "${PORT_ROOT}/vendor/encore-active/ns2-helpers/include")
     if(NOT EXISTS "${EDEN_NS2_METADATA_OVERLAY}/core/file_sys/program_metadata.cpp"
