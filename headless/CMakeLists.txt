@@ -84,34 +84,6 @@ function(write_derived path content)
     file(WRITE "${path}.in" "${content}")
     configure_file("${path}.in" "${path}" COPYONLY)
 endfunction()
-
-# PS5-only VFS file budget, backported from EglantinePS5 516a6bb.
-# Large loose ExeFS/RomFS trees can exhaust native file and pthread
-# resources before the first frame. Preserve the original LRU and reopen
-# implementation; only lower the native cap. Never mutate pinned Eden
-# sources or change the host/other-platform core.
-if(PS5_NATIVE)
-    set(EDEN_VFS_PINNED "${PORT_ROOT}/vendor/sources/eden/src/core/file_sys/vfs/vfs_real.cpp")
-    file(READ "${EDEN_VFS_PINNED}" eden_vfs_real)
-    set(EDEN_VFS_LIMIT_OLD "constexpr size_t MaxOpenFiles = 8192;")
-    set(EDEN_VFS_LIMIT_NEW "constexpr size_t MaxOpenFiles = 128;")
-    string(FIND "${eden_vfs_real}" "${EDEN_VFS_LIMIT_OLD}" eden_vfs_anchor)
-    if(eden_vfs_anchor EQUAL -1)
-        message(FATAL_ERROR "Pinned Eden VFS file budget changed; re-audit PS5 native resource cap")
-    endif()
-    string(REPLACE "${EDEN_VFS_LIMIT_OLD}" "${EDEN_VFS_LIMIT_NEW}"
-        eden_vfs_bounded "${eden_vfs_real}")
-    write_derived("${PORT_BUILD_DIR}/vfs_real_ps5.cpp" "${eden_vfs_bounded}")
-    get_target_property(eden_vfs_core_sources core SOURCES)
-    list(FIND eden_vfs_core_sources "file_sys/vfs/vfs_real.cpp" eden_vfs_owner)
-    if(eden_vfs_owner EQUAL -1)
-        message(FATAL_ERROR "Pinned Eden VFS source ownership moved")
-    endif()
-    list(REMOVE_ITEM eden_vfs_core_sources "file_sys/vfs/vfs_real.cpp")
-    list(APPEND eden_vfs_core_sources "${PORT_BUILD_DIR}/vfs_real_ps5.cpp")
-    set_property(TARGET core PROPERTY SOURCES "${eden_vfs_core_sources}")
-endif()
-
 # R437: the shipping BufferCache backport is adapted in a single maintained header.
 # This only copies tracked bytes into the native include overlay.
 if(PS5_NATIVE)
