@@ -44,6 +44,15 @@ write = section(texture,
 assert "if (image.modification_tick == modification_tick)" in alias
 assert "std::ranges::sort(aliased_images" in alias
 assert "CopyImage(image_id, aliased->id, aliased->copies);" in alias
+# A failed alias copy must not commit a newer destination tick or GPU-dirty flag.
+commit_anchor = "#ifdef PS5_NATIVE\n    // Publish alias freshness only after all Vulkan copies were queued."
+assert commit_anchor in alias
+assert alias.rindex("image.modification_tick = most_recent_tick;") > alias.rindex(
+    "CopyImage(image_id, aliased->id, aliased->copies);")
+assert "F07 alias revision publication after copy 1/2" in (
+    ROOT / "tools/prepare-vulkan-port.py").read_text()
+assert "F07 alias revision publication after copy 2/2" in (
+    ROOT / "tools/prepare-vulkan-port.py").read_text()
 assert "image.flags |= ImageFlagBits::CpuModified;" in write
 assert "UntrackImage(image, image_id);" in write
 
@@ -57,6 +66,7 @@ fixture = r"""
 #include <cstring>
 #include <numeric>
 #include <ranges>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 using u32 = std::uint32_t;
@@ -113,11 +123,14 @@ template<class P> struct TextureCache {
     std::vector<Image> slot_images{3};
     u64 modification_tick{};
     unsigned copies{}, untracks{};
+    int fail_copy_before{-1};
     std::vector<ImageId> order;
     bool ImageCanRescale(Image&) {return true;}
     void ScaleUp(Image&) {}
     void ScaleDown(Image&) {}
     void CopyImage(ImageId dst_id, ImageId src_id, std::vector<ImageCopy> spans) {
+        if (fail_copy_before == 0) throw std::runtime_error("injected GPU copy failure");
+        if (fail_copy_before > 0) --fail_copy_before;
         assert(dst_id < slot_images.size() && src_id < slot_images.size());
         auto& dst = slot_images[dst_id].bytes;
         const auto& src = slot_images[src_id].bytes;
@@ -248,6 +261,40 @@ int main() {
     for(std::size_t i=64;i<96;++i) assert(dst.bytes[i]==0x3C);
     for(std::size_t i=96;i<128;++i) assert(dst.bytes[i]==0xA5);
 
+    // Failure after the first successful GPU copy: destination revision
+    // remains old, so the next draw retries both aliases in tick order.
+    TextureCache<int> rollback;
+    auto& stale = rollback.slot_images[0];
+    auto& source1 = rollback.slot_images[1];
+    auto& source2 = rollback.slot_images[2];
+    stale.modification_tick = 1;
+    source1.modification_tick = 10;
+    source2.modification_tick = 13;
+    source1.flags |= ImageFlagBits::GpuModified;
+    source2.flags |= ImageFlagBits::GpuModified;
+    rollback.modification_tick = 13;
+    stale.bytes.fill(0);
+    source1.bytes.fill(0xA1);
+    source2.bytes.fill(0xB2);
+    stale.aliased_images = {{2,{{64,0,32}}},{1,{{0,0,64}}}};
+    rollback.fail_copy_before = 1;
+    bool copy_failed = false;
+    try {
+        rollback.SynchronizeAliases(0);
+    } catch (const std::runtime_error&) {
+        copy_failed = true;
+    }
+    assert(copy_failed);
+    assert(rollback.copies == 1 && stale.modification_tick == 1);
+    assert(!True(stale.flags & ImageFlagBits::GpuModified));
+    rollback.fail_copy_before = -1;
+    rollback.SynchronizeAliases(0);
+    assert(rollback.copies == 3 && stale.modification_tick == 13);
+    assert((rollback.order == std::vector<ImageId>{1,1,2}));
+    assert(True(stale.flags & ImageFlagBits::GpuModified));
+    for (unsigned i=0;i<64;++i) assert(stale.bytes[i]==0xA1);
+    for (unsigned i=64;i<96;++i) assert(stale.bytes[i]==0xB2);
+
     first.flags |= ImageFlagBits::Tracked;
     tc.WriteMemory(first.cpu_addr+8,16);
     assert(True(first.flags & ImageFlagBits::CpuModified));
@@ -259,7 +306,7 @@ int main() {
     assert(tc.untracks==1);
     assert(!True(second.flags & ImageFlagBits::CpuModified));
     std::puts("F04_NATIVE_DMA_ALIAS_CONTENT_PASS ordered_aliases=2 updated_aliases=1 "
-              "byte_regions=3 cpu_invalidations=1 "
+              "byte_regions=3 cpu_invalidations=1 alias_copy_failure_retry=1 "
               "scope=source_extracted_host_mock_gpu_bytes");
 }
 """
