@@ -663,6 +663,8 @@ jobs:
           g++ -std=c++20 -fsyntax-only -Wno-unused-parameter \
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/ampere \
+            -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+            -Ivendor/encore-active/ns2-runtime/hle \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
             vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp
