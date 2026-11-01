@@ -12,11 +12,18 @@ ROOT = Path(__file__).resolve().parents[1]
 blit = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_blit_screen.cpp").read_text()
 header = (ROOT / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_blit_screen.h").read_text()
 generator = (ROOT / "tools/prepare-vulkan-port.py").read_text()
+adapt = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_window_adapt_pass.cpp").read_text()
 fast = (ROOT / ".github/workflows/encore-core-fast-gate.yml").read_text()
 full = (ROOT / ".github/workflows/encore-core-preflight.yml").read_text()
 command = "python3 -B tools/check-ps5-f07-present-layer-growth-host.py"
 assert command in fast and command in full
 assert "std::list<Layer> layers{};" in header
+# Retaining inactive owners is safe because only the first active configs
+# are dereferenced and recorded by the composition pass.
+assert "const size_t layer_count = configs.size();" in adapt
+assert "auto layer_it = layers.begin();" in adapt
+assert "for (size_t i = 0; i < layer_count; i++) {" in adapt
+assert "layer_it->ConfigureDraw(" in adapt
 assert "VkExtent2D layer_window_size{};" in header
 assert "F07 C04 append-only presentation layers without device idle" in generator
 assert blit.count("    if (!rebuild_layers && !retire_excess_layers &&") == 1
