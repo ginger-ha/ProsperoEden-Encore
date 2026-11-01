@@ -794,10 +794,10 @@
     {
       "path": "headless/prosperoeden/host/preview_main.cpp",
       "disposition": "reviewed_without_new_code_edit",
-      "reviewed_source_git_blob": "e62c5d2b656016b6dfc0675b88c8379c039f7c72",
+      "reviewed_source_git_blob": "e1576cbf8a41a34fdd58e387062316fb95a40350",
       "review_scope": "host-only-test",
       "source_review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
-      "evidence": "Preview Stage render/press/screenshot scripting, including timed waits, host-only. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence. 30 Oct 2026 host-only preview re-review: PE_PREVIEW_BRANDED_HOME waits for seven asynchronously decoded original game-cover GL textures (up to 20 s) and pumps frames before capture, and rejects an incomplete screenshot. No shipping code path, guest rendering, memory or Vulkan runtime modified. This is screenshot-test infrastructure only."
+      "evidence": "Preview Stage render/press/screenshot scripting, including timed waits, host-only. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence. 30 Oct 2026 host-only preview re-review: PE_PREVIEW_BRANDED_HOME waits for seven asynchronously decoded original game-cover GL textures (up to 20 s) and pumps frames before capture, and rejects an incomplete screenshot. No shipping code path, guest rendering, memory or Vulkan runtime modified. This is screenshot-test infrastructure only. 1 Nov 2026 host-only re-review: PE_PREVIEW_LIBRARY_FALLBACK selects fixture 11 with ten D-pad Right events rather than R1 twice (R1 now changes the main tab). No changed renderer, GPU, JIT or input runtime, and no relaxed pixel/zoom assertions; host preview workflow is the proof, not console FPS."
     },
     {
       "path": "headless/prosperoeden/pe/audio/mixer.cpp",

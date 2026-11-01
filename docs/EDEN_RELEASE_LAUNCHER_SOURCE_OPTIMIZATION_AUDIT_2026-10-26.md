@@ -77,3 +77,11 @@ Cette première passe est un **audit de couverture du code**. Les saccades du je
 ## 2026-10-30 — standalone repository URL-only revalidation
 
 The new official repository is `niakw/ProsperoEden-Encore`. The single change to `headless/prosperoeden/pe/ui/browse.cpp` replaces the old GitHub URL shown in the launcher About screen. Verification compared complete file contents against the previously reviewed Git blob `96afbbbae783279625e88c18e39ec1115f2b4730` and proved that replacing exactly `github.com/niakw/Prospero.Eden-Encore` with `github.com/niakw/ProsperoEden-Encore` reproduces the current source byte-for-byte (Git blob `1f48fc883e2930704275b16e9333e33b1793d517`). **No other C++ logic, performance path or graphics/PS5 runtime change occurred.** The coverage ledger has been repinned to the new blob, retaining the exact-source invariant.
+
+
+## Nouvelle vérification du preview OpenGL (2026-11-01)
+
+- Source : `headless/prosperoeden/host/preview_main.cpp`, blob Git `e1576cbf8a41a34fdd58e387062316fb95a40350` (précédent `e62c5d2b656016b6dfc0675b88c8379c039f7c72`).
+- Changement revu : le scénario hôte `PE_PREVIEW_LIBRARY_FALLBACK` sélectionne la onzième jaquette par dix appuis directionnels `Right` au lieu de deux `R1`, qui changent maintenant l'onglet principal.
+- Portée : **test de prévisualisation hôte uniquement**. Aucun chemin PS5 native, shader, GPU, threading ou JIT modifié ; aucune baisse des exigences de vérification pixel, cadrage, zoom ou texture.
+- Qualification attendue : contrôler les tests de preview et la couverture d'optimisation F07 ; cette revue de source ne prétend pas mesurer ni améliorer les performances FC27 ou NS2 sur console.
