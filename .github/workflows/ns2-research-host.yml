@@ -225,6 +225,7 @@ jobs:
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/gpu_session \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
             vendor/encore-active/ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.cpp
@@ -232,6 +233,7 @@ jobs:
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/gpu_session \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/encore-active/ns2-runtime/nvdrv_as \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
@@ -240,6 +242,7 @@ jobs:
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/gpu_session \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
             vendor/encore-active/ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker_shared.cpp
@@ -256,6 +259,7 @@ jobs:
               -Ivendor/encore-active/ns2-runtime/graphics_supervisor \
               -Ivendor/encore-active/ns2-runtime/gpu_session \
               -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
               -Ivendor/sources/eden/src/dynarmic/src \
               -Ivendor/sources/eden/src \
               "${source}"
@@ -286,6 +290,7 @@ jobs:
             -Ivendor/encore-active/ns2-runtime/nvdrv_as \
             -Ivendor/encore-active/ns2-runtime/nvdrv \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/encore-active/eden-header-hygiene/include \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
@@ -298,6 +303,7 @@ jobs:
           set -euo pipefail
           g++ -std=c++20 -O2 -Wall -Wextra \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             tools/ns2/test_native_gpu_submission.cpp \
             -o build-ns2-a64/native-gpfifo-test
           build-ns2-a64/native-gpfifo-test
@@ -311,6 +317,7 @@ jobs:
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/nvdrv_as \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/encore-active/eden-header-hygiene/include \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
@@ -555,6 +562,7 @@ jobs:
           for cxx in clang++ g++; do
             "${cxx}" -std=c++20 -O2 -Wall -Wextra -Werror -pthread \
               -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
               tools/ns2/test_native_gpu_process_registry.cpp \
               -o "build-ns2-a64/ns2-registry-${cxx//+/}"
             "build-ns2-a64/ns2-registry-${cxx//+/}"
@@ -568,6 +576,7 @@ jobs:
               -Ibuild-ns2-a64/fmt/include \
               -Ivendor/encore-active/ns2-runtime/ampere \
               -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
               -Ivendor/sources/eden/src \
               vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.cpp
           done
