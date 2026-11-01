@@ -59,6 +59,19 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // Native 0xC7C0 SET_REPORT_SEMAPHORE_D reductions are performed after
+    // a real GPU fence, not by reusing the Switch 1 semaphore decoder.
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,0)==10);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,1)==4);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,2)==6);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,3)==0);
+    assert(Tegra::NativeComputeSemaphoreReduction(2,4,3)==3);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,4)==4);
+    assert(Tegra::NativeComputeSemaphoreReduction(2,4,4)==1);
+    assert(Tegra::NativeComputeSemaphoreReduction(0,4,4)==4);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,5)==4);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,6)==6);
+    assert(Tegra::NativeComputeSemaphoreReduction(6,4,7)==2);
     // Decode the exact QMD3 compute resource description before hooking
     // an authenticated native pipeline. This does NOT run a shader.
     {
