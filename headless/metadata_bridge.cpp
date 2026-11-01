@@ -759,6 +759,23 @@ const char* eden_startup_error() {
                              extracted_dump.c_str());
             std::fprintf(stderr, "EDEN_STORAGE_NS1 firmware=%s keys_dir=%s\n",
                          firmware.c_str(), keys.c_str());
+            const auto ns1_format = Eden::DetectFirmwareFormat(firmware);
+            // Decoded system-program images may be inventoried without the
+            // decryption material required by NCA. This is NOT a guest
+            // system-service validation and must not return "setup ready".
+            if (ns1_format == Eden::FirmwareFormat::Extracted)
+                return "NS1 extracted system-program dump detected in " + firmware +
+                       ". Read-only inventory needs no NCA keys; execution of "
+                       "extracted system services remains unqualified.";
+            if (ns1_format == Eden::FirmwareFormat::Zip)
+                return "NS1 ZIP firmware detected in " + firmware +
+                       ". Native import was rejected or incomplete; check "
+                       "EDEN_FIRMWARE_ZIP_RESULT diagnostics and free space.";
+            if (ns1_format == Eden::FirmwareFormat::None &&
+                ns2_format != Eden::FirmwareFormat::None)
+                return "NS2 firmware detected at " + ns2_firmware +
+                       " without an NS1 installation. The NS2 format is "
+                       "recognized; native NS2 HOS services remain experimental.";
             Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys);
             FileSys::RealVfsFilesystem vfs;
             const auto prod = vfs.OpenFile(std::string{keys} + "/prod.keys", FileSys::OpenMode::Read);
