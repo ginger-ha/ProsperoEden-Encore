@@ -138,7 +138,7 @@ def main() -> int:
                 "CaptureNativeGraphicsShader(" in pipeline_source.read_text() and
                 "CompileCapturedNs2VertexSpirvFromReader(" in pipeline_source.read_text() and
                 "ReadNs2GpuShader, &memory" in pipeline_source.read_text() and
-                "CompileReviewedNativeVertexSpirv(" in pipeline_source.read_text() and
+                "CompileReviewedNativeGraphicsSpirv(" in pipeline_source.read_text() and
                 "registry.CaptureTicket(process)" in pipeline_source.read_text() and
                 pipeline_source.read_text().count("registry.IsCurrent(*session)") == 2 and
                 "NativeSpirvStatus::InactiveSession" in pipeline_source.read_text(),
