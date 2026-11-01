@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "../../vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h"
 
 static void Require(bool ok, const char* detail) {
     if (!ok) { std::fprintf(stderr,"NS2 Vulkan module test: %s\n",detail); std::exit(1); }
@@ -351,10 +352,74 @@ int main(int argc,char** argv) {
     submit_info.sType=VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount=1;
     submit_info.pCommandBuffers=&command;
-    Require(vkQueueSubmit(compute_queue,1,&submit_info,fence)==VK_SUCCESS,
-            "host Compute vkQueueSubmit failed");
-    Require(vkWaitForFences(device,1,&fence,VK_TRUE,10000000000ULL)==VK_SUCCESS,
-            "host Compute dispatch did not complete within ten seconds");
+    // Feed the real native QMD3 scheduler a launch descriptor rather than
+    // invoking the host queue independently of Ampere PCAS. Keep the test
+    // entirely isolated from the production PS5 renderer's guest resources.
+    Tegra::NativeQmdScheduler scheduler{};
+    Tegra::NativeQmdScheduler::Descriptor qmd{};
+    qmd[4]=0;                       // Ready, no dependencies.
+    qmd[8]=0x80;                    // Bounded shader entry offset.
+    qmd[12]=1;                      // Grid X.
+    qmd[13]=1;                      // Grid Y.
+    qmd[14]=1;                      // Grid Z.
+    qmd[18]=0x30U | (1U<<16);       // QMD 3.0, block X=1.
+    qmd[19]=1U | (1U<<16);          // Block Y=1, block Z=1.
+    qmd[24]=0x1000;                 // Synthetic release destination.
+    qmd[25]=(1U<<23)|(1U<<30);     // Enabled, supported 32-bit write.
+    qmd[26]=0x12abcdef;            // Original frozen semaphore payload.
+    const auto read=[&](std::uint64_t address,auto& words) {
+        Require(address==0x20000,"unexpected native QMD address");
+        words=qmd;
+        return true;
+    };
+    unsigned dispatches=0, reads=0, releases=0;
+    bool fence_completed=false, reject_first_release=true;
+    const auto tracked_read=[&](std::uint64_t address,auto& words) {
+        ++reads;
+        return read(address,words);
+    };
+    const auto dispatch=[&](const auto& descriptor) -> bool {
+        const auto launch=Tegra::DecodeNativeComputeLaunch(descriptor);
+        Require(launch.has_value() && launch->grid[0]==1 &&
+                launch->grid[1]==1 && launch->grid[2]==1 &&
+                launch->block[0]==1 && launch->block[1]==1 &&
+                launch->block[2]==1,
+                "QMD3 dispatch dimensions were not decoded correctly");
+        ++dispatches;
+        if (vkQueueSubmit(compute_queue,1,&submit_info,fence)!=VK_SUCCESS)
+            return false;
+        fence_completed=vkWaitForFences(
+            device,1,&fence,VK_TRUE,10000000000ULL)==VK_SUCCESS;
+        return fence_completed;
+    };
+    const auto release=[&](std::uint64_t address,std::uint32_t value,
+                           std::uint32_t flags) -> bool {
+        Require(fence_completed,"QMD semaphore released before Compute fence");
+        Require(address==0x1000 && value==0x12abcdef &&
+                (flags&(1U<<23))!=0,"native QMD release descriptor changed");
+        ++releases;
+        if (reject_first_release) {
+            reject_first_release=false;
+            return false;
+        }
+        return true;
+    };
+    const auto first=scheduler.Signal(0x20000,3U,tracked_read,release,dispatch);
+    Require(first=="unmapped QMD release" && dispatches==1 &&
+            releases==1 && fence_completed,
+            "QMD3 did not preserve accepted dispatch on failed semaphore");
+    // A guest can overwrite or unmap the original QMD after GPU submission.
+    // Replaying PCAS action 2 must use the frozen descriptor: no guest read,
+    // no second compute submission, and no forged new release payload.
+    qmd[26]=0xbadbeef;
+    const unsigned reads_after_submit=reads;
+    const auto second=scheduler.Signal(0x20000,2U,tracked_read,release,dispatch);
+    Require(second.empty() && dispatches==1 && releases==2 &&
+            reads==reads_after_submit,
+            "QMD3 retry resubmitted shader or reread guest memory");
+    const auto third=scheduler.Signal(0x20000,2U,tracked_read,release,dispatch);
+    Require(third.empty() && dispatches==1 && releases==2,
+            "completed QMD3 was executed twice");
     vkDestroyFence(device,fence,nullptr);
     vkFreeCommandBuffers(device,command_pool,1,&command);
     vkDestroyCommandPool(device,command_pool,nullptr);
