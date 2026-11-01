@@ -26,6 +26,19 @@ assert 'static_cast<KMemoryAttribute>(attribute)' in src
 svc_enum = (base / "core/hle/kernel/svc_types.h").read_text()
 block_enum = (base / "core/hle/kernel/k_memory_block.h").read_text()
 assert 'GpuAccessible = (1 << 5)' in svc_enum
+# Prevent the NS2 public header from hiding maintained Eden backport enums.
+# svc_info.cpp in the PS5 native build uses these values (the upstream base
+# header lacks them). Only the GPU 0x20 bit may differ from the selected
+# baseline header.
+installed_svc = (vendor / "eden-backports/src/core/hle/kernel/svc_types.h").read_text()
+baseline_attribute = '    PermissionLocked = (1 << 4),'
+assert installed_svc.count(baseline_attribute) == 1
+expected_svc = installed_svc.replace(
+    baseline_attribute,
+    baseline_attribute + '\n'
+    + '    GpuAccessible = (1 << 5), // NS2 SVC 0x80; preserve maintained NS1 source ABI')
+assert svc_enum == expected_svc
+assert 'Unknown37 = 37' in svc_enum and 'Unknown38 = 38' in svc_enum
 # Native 4K worker research must run against the SAME persisted SVC 0x80
 # attribute. Never silently pin non-GPU guest pages or use trace-only SVC.
 worker = (vendor / "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker.cpp").read_text()
