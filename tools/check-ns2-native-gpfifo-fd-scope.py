@@ -14,6 +14,9 @@ bind_source = native_puller.split("void Puller::ProcessBindMethod(", 1)[1].split
     "void Puller::ProcessFenceActionMethod(", 1)[0]
 ampere_3d_bind = bind_source.split(
     "if (engine_id == static_cast<EngineID>(0xc797)) {", 1)[1].split(
+    "if (engine_id == static_cast<EngineID>(0xc7c0)) {", 1)[0]
+ampere_compute_bind = bind_source.split(
+    "if (engine_id == static_cast<EngineID>(0xc7c0)) {", 1)[1].split(
     "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[0]
 ampere_dma_bind = bind_source.split(
     "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[1].split(
@@ -64,6 +67,11 @@ checks = [
     (ampere_3d_bind.count(binding_write) == 1 and
      ampere_3d_bind.index(binding_write) > ampere_3d_bind.index("if (native_3d_failed || native_macro_method)"),
      "native 3D bind commits only after channel authorization and valid MME state"),
+    (ampere_compute_bind.count(binding_write) == 1 and
+     ampere_compute_bind.index(binding_write) > ampere_compute_bind.index("IsNative(") and
+     "EngineTypes::KeplerCompute" in ampere_compute_bind and
+     "retire_native_3d();" in ampere_compute_bind,
+     "native compute class binds only after channel authorization and revokes previous 3D owner"),
     (ampere_dma_bind.count(binding_write) == 1 and
      ampere_dma_bind.index(binding_write) > ampere_dma_bind.index("IsNative("),
      "native DMA bind commits only after channel authorization"),
