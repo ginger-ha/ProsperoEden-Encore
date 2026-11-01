@@ -60,6 +60,49 @@ assert dynamic_branch.count("pipeline_cache.CurrentGraphicsPipeline()")==1
 assert dynamic_branch.index("#ifdef PS5_NATIVE") < dynamic_branch.index("#else")
 assert "    UpdateDynamicStates();" in draw
 assert draw.index("    std::scoped_lock l{texture_cache.mutex};") < draw.index("    UpdateDynamicStates();")
+# Raw blit must not record unused guest state under the texture mutex.
+# The real BlitColor implementation supplies its own pipeline/viewport/scissor
+# and Scheduler invalidation re-dirties guest state for the next real draw.
+assert "void Scheduler::InvalidateState()" in sched
+assert "state_tracker.InvalidateCommandBufferState();" in sched
+assert "cmdbuf.SetViewport(0, viewport);" in blit
+assert "cmdbuf.SetScissor(0, scissor);" in blit
+assert "    // Avoid wasted state setup while texture_cache.mutex is held." in gen
+raw_draw_state = draw.split("    texture_cache.UpdateRenderTargets(false);\n\n", 1)[1].split(
+    "\n\n    query_cache.NotifySegment(true);", 1)[0]
+assert raw_draw_state.count("UpdateDynamicStates();") == 1
+assert raw_draw_state.index("#ifdef PS5_NATIVE") < raw_draw_state.index("#else")
+assert raw_draw_state.index("#else") < raw_draw_state.index("UpdateDynamicStates();")
+assert raw_draw_state.endswith("#endif")
+# Compile the exact extracted pre-blit state decision in both configurations.
+# This verifies the PS5 elision and preservation of the desktop call.
+state_cpp = r"""
+#include <cassert>
+static int dynamic_updates = 0;
+void UpdateDynamicStates() { ++dynamic_updates; }
+void RawBlitState() {
+""" + raw_draw_state + r"""
+}
+int main() {
+    RawBlitState();
+#ifdef PS5_NATIVE
+    assert(dynamic_updates == 0);
+#else
+    assert(dynamic_updates == 1);
+#endif
+}
+"""
+with tempfile.TemporaryDirectory(prefix="ps5-raw-blit-state-") as td:
+    source = Path(td) / "state.cpp"
+    source.write_text(state_cpp)
+    for opt in ("-O0", "-O2"):
+        for native in (True, False):
+            exe = Path(td) / ("state-" + opt[2:] + ("-ps5" if native else "-desktop"))
+            subprocess.run(["c++", "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=undefined", "-fno-sanitize-recover=all", opt,
+                            *(["-DPS5_NATIVE=1"] if native else []),
+                            str(source), "-o", str(exe)], check=True, capture_output=True, text=True)
+            subprocess.run([str(exe)], check=True, capture_output=True, text=True)
 
 
 update = fragment(sched, "bool Scheduler::UpdateGraphicsPipeline(GraphicsPipeline* pipeline, bool optimized) {",
