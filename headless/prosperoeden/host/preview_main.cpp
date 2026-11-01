@@ -231,8 +231,12 @@ void pictures(Stage &s)
         s.wait(2.0f);
         s.press({Key::up, Key::cross});
         s.wait(1.0f);
-        s.press({Key::r1, Key::r1});
-        s.wait(0.3f);
+        // R1 switches the main tab, not the Library page. Select the
+        // eleventh fixture with the same D-pad path as the retail-scan test;
+        // otherwise the fallback screenshots can capture another screen.
+        s.press({Key::right, Key::right, Key::right, Key::right, Key::right,
+                 Key::right, Key::right, Key::right, Key::right, Key::right});
+        s.wait(0.4f);
         const auto sample = s.services.games();
         const auto case_scan = s.services.box_art(sample.at(10).title_id);
         if (!case_scan.front.empty() || !case_scan.back.empty()) {
