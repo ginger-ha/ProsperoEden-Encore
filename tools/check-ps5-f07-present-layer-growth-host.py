@@ -19,16 +19,19 @@ assert command in fast and command in full
 assert "std::list<Layer> layers{};" in header
 assert "VkExtent2D layer_window_size{};" in header
 assert "F07 C04 append-only presentation layers without device idle" in generator
-assert blit.count("    if (!rebuild_layers && layers.size() < framebuffers.size()) {") == 1
+assert blit.count("    if (!rebuild_layers && !retire_excess_layers &&") == 1
 assert blit.index("    if (resource_update_required) {\n        WaitIdle(device);") < blit.index(
-    "    if (!rebuild_layers && layers.size() < framebuffers.size()) {"
+    "    if (!rebuild_layers && !retire_excess_layers &&"
 )
 start = blit.index("    // Presentation layers live in std::list:")
 start = blit.rfind("#ifdef PS5_NATIVE", 0, start)
 end = blit.index("\n    window_adapt->Draw(", start)
 block = blit[start:end]
 assert block.count("layers.emplace_back(device, memory_allocator, scheduler, device_memory, image_count,") == 3
-assert "if (!rebuild_layers && layers.size() < framebuffers.size())" in block
+assert "if (!rebuild_layers && !retire_excess_layers &&" in block
+assert "constexpr size_t kMaxRetainedLayers = 8;" in block
+assert "layers.size() > kMaxRetainedLayers && layers.size() > framebuffers.size()" in block
+assert "else if (rebuild_layers || retire_excess_layers)" in block
 assert "output_sensitive && output_size_changed" in block
 assert "layer_window_size = window_size;" in block
 assert "if (!layers.empty())" not in block
@@ -105,17 +108,25 @@ int main() {
     assert(b.idle_calls==0 && Layer::made==4 && Layer::destroyed==1);
 #endif
     b.Apply(1,false);
-    assert(b.layers.size()==1);
 #ifdef PS5_NATIVE
-    assert(b.idle_calls==1 && Layer::made==4 && Layer::destroyed==3);
+    // Shrinking the active draw count must not destroy cached layer owners.
+    assert(b.layers.size()==3 && b.idle_calls==0);
+    assert(Layer::made==3 && Layer::destroyed==0);
+    b.Apply(3,false);
+    assert(b.layers.size()==3 && b.idle_calls==0);
+    assert(Layer::made==3 && Layer::destroyed==0);
+    assert(&b.layers.front()==first);
+    b.Apply(1,false);
+    assert(b.layers.size()==3 && b.idle_calls==0);
 #else
+    assert(b.layers.size()==1);
     assert(b.idle_calls==0 && Layer::made==5 && Layer::destroyed==4);
 #endif
     b.Apply(1,true);
 #ifdef PS5_NATIVE
     // Caller already waited before a settings/descriptor-layout change.
     // Rebuild exactly once even with unchanged frame count, not twice-idle.
-    assert(b.idle_calls==1 && Layer::made==5 && Layer::destroyed==4);
+    assert(b.idle_calls==0 && b.layers.size()==1 && Layer::made==4 && Layer::destroyed==3);
 #else
     assert(b.idle_calls==0 && Layer::made==5 && Layer::destroyed==4);
 #endif
@@ -146,6 +157,17 @@ int main() {
     const Layer* const plain_first=&plain.layers.front();
     plain.Apply(3,false,1920,1080);
     assert(plain.idle_calls==0 && &plain.layers.front()==plain_first);
+    // Keep at most eight *spare* layer owners. Over-budget shrink must
+    // block until queued readers are complete, then rebuild exact actives.
+    Screen budget;
+    budget.Apply(9,false);
+    assert(budget.layers.size()==9 && budget.idle_calls==0);
+    budget.Apply(8,false);
+    assert(budget.layers.size()==8 && budget.idle_calls==1);
+    budget.Apply(2,false);
+    assert(budget.layers.size()==8 && budget.idle_calls==1);
+    budget.Apply(8,false);
+    assert(budget.layers.size()==8 && budget.idle_calls==1);
 #endif
     std::puts("F07_C04_LAYER_GROWTH_PASS");
 }
