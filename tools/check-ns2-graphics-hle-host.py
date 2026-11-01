@@ -41,6 +41,7 @@ def main()->int:
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text
+    assert 'Kernel::KMemoryState::FlagMapped' in text
     compiler=shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         print("C++20 compiler missing",file=sys.stderr)
