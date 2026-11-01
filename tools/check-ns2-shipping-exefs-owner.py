@@ -70,4 +70,24 @@ assert '(std::max)(MainMemorySizeMax,' in svc
 for owner in ('hle/kernel/k_address_space_info.cpp', 'hle/kernel/svc/svc_physical_memory.cpp'):
     assert owner in heap
 assert 'EDEN_NS2_KERNEL_ROOT' in heap
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1")
+# A 12 GiB guest kernel cannot work if the memory layout is selected only
+# later by the ExeFS loader (after InitializeKernel). Use the maintained
+# native Core::System as the source ancestor, preserving NS1 optimizations.
+native_core = (ROOT / 'vendor/encore-active/eden-core/src/core/core_native.cpp').read_text()
+shared_core = (ROOT / 'vendor/encore-active/ns2-runtime/process/core/core.cpp').read_text()
+selector = cmake.split('# The Core::System overlay is a fully maintained', 1)[1].split(
+    '# RomFS builder parents', 1)[0]
+assert 'EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM' in selector
+assert 'ns2-runtime/process/core/core.cpp' in selector
+assert '#include "diagnostics.h"' in native_core and shared_core.startswith('#include "diagnostics.h"')
+assert 'IsSwitch2ExtractedProgram(' in shared_core
+assert 'metadata.Load(npdm) == Loader::ResultStatus::Success' in shared_core
+assert 'metadata.IsSwitch2()' in shared_core
+load = shared_core.split('SystemResultStatus Load(', 1)[1].split(
+    'if (params.applet_type == Service::AM::AppletType::Application)', 1)[0]
+assert load.index('IsSwitch2ExtractedProgram(') < load.index('InitializeKernel(system);')
+assert 'Settings::MemoryLayout::Memory_12Gb' in load
+assert 'SetGlobal(false)' in load and 'SetValue(Settings::MemoryLayout::Memory_12Gb)' in load
+assert 'initialized_memory_layout != Settings::values.memory_layout_mode.GetValue()' in shared_core
+assert 'bool extended_memory_layout' not in shared_core
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1")

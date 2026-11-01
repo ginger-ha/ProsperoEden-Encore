@@ -834,6 +834,14 @@ if(PS5_NATIVE)
 else()
     set(EDEN_MAINTAINED_CORE_SYSTEM "${EDEN_MAINTAINED_CORE_SYSTEM_ROOT}/core_standard.cpp")
 endif()
+# After selecting Encore's native Core::System owner, replace it with the
+# reviewed derivative for extracted NS2 games in the SINGLE final PS5 binary.
+# NS1 keeps its configured memory layout; the native diagnostics and all
+# existing fastmem/synchronization behavior are retained in this derivative.
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_MAINTAINED_CORE_SYSTEM
+        "${PORT_ROOT}/vendor/encore-active/ns2-runtime/process/core/core.cpp")
+endif()
 if(NOT EXISTS "${EDEN_MAINTAINED_CORE_SYSTEM}")
     message(FATAL_ERROR "Missing maintained Core::System source")
 endif()

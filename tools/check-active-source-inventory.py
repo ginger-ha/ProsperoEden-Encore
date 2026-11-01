@@ -66,6 +66,7 @@ print("ENCORE_EXTRACTED_AOC_OWNER_PASS", f"new_shipping={len(extracted_aoc_owner
 shared_ns2_kernel_owners = {
     "ns2-runtime/kernel/core/hle/kernel/k_address_space_info.cpp",
     "ns2-runtime/kernel/core/hle/kernel/svc/svc_physical_memory.cpp",
+    "ns2-runtime/process/core/core.cpp",
 }
 assert shared_ns2_kernel_owners <= set(physical_all), (
     "Missing shipping NS2 kernel overlays", sorted(shared_ns2_kernel_owners - set(physical_all))
@@ -75,7 +76,9 @@ kernel_select = (root / "headless/CMakeLists.txt").read_text()
 assert 'set(EDEN_SHARED_NS2_KERNEL_HEAP ON)' in kernel_select
 assert 'EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM' in kernel_select
 for relative in shared_ns2_kernel_owners:
-    assert relative.removeprefix("ns2-runtime/kernel/core/") in kernel_select
+    if relative.startswith("ns2-runtime/kernel/core/"):
+        assert relative.removeprefix("ns2-runtime/kernel/core/") in kernel_select
+assert 'ns2-runtime/process/core/core.cpp' in kernel_select
 print("ENCORE_SHARED_NS2_KERNEL_SOURCE_PASS", f"new_shipping={len(shared_ns2_kernel_owners)}")
 physical = [p for p in physical_all
             if p not in set(research_paths) | shared_ns2_kernel_owners]
