@@ -342,6 +342,7 @@ jobs:
           for cxx in clang++ g++; do
             "$cxx" -std=c++20 -O2 -Wall -Wextra -Werror -DFMT_HEADER_ONLY \
               -Ibuild-ns2-a64/fmt/include \
+              -Ivendor/encore-active/ns2-runtime/shader_resource/include \
               -Ivendor/sources/eden/src \
               tools/ns2/test_shader_generic31.cpp \
               -o "build-ns2-a64/generic31-${cxx//+/}"

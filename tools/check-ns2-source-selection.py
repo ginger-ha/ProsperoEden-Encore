@@ -176,8 +176,15 @@ def main() -> int:
         # The EglantinePS5 shader audit found dropped last-lane vertex
         # varyings and truncated NVN2 compute storage binding arrays. These
         # independently produce missing geometry/black or jumping textures.
-        attribute_owner = (ROOT / "vendor/sources/eden/src/shader_recompiler/frontend/ir/attribute.h").read_text()
-        buffers_owner = (ROOT / "vendor/sources/eden/src/video_core/buffer_cache/buffer_cache_base.h").read_text()
+        attribute_owner = (ROOT / "vendor/encore-active/ns2-runtime/shader_resource/include/shader_recompiler/frontend/ir/attribute.h").read_text()
+        buffers_owner = (ROOT / "vendor/encore-active/ns2-runtime/shader_resource/include/video_core/buffer_cache/buffer_cache_base.h").read_text()
+        pinned_attribute = (ROOT / "vendor/sources/eden/src/shader_recompiler/frontend/ir/attribute.h").read_text()
+        pinned_buffers = (ROOT / "vendor/sources/eden/src/video_core/buffer_cache/buffer_cache_base.h").read_text()
+        require("attribute <= Attribute::Generic31X" in pinned_attribute and
+                "NUM_STORAGE_BUFFERS = 16" in pinned_buffers and
+                "target_include_directories(shader_recompiler BEFORE PRIVATE \"${EDEN_NS2_SHADER_RESOURCE_ROOT}\")" in CMAKE and
+                "target_include_directories(video_core BEFORE PRIVATE \"${EDEN_NS2_SHADER_RESOURCE_ROOT}\")" in CMAKE,
+                "Pristine Eden baseline and opt-in research-only graphics headers are mandatory")
         lower_owner = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text()
         require("attribute <= Attribute::Generic31W" in attribute_owner and
                 "NUM_STORAGE_BUFFERS = 32" in buffers_owner and

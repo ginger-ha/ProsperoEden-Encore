@@ -10,7 +10,9 @@ The goals are (1) first **real guest image on PS5**, and (2) correct sky, terrai
 4. Additional relevant derived comparison: `https://github.com/Wael3rd/Eglantine-MKW`, release `mkw-2026-10-30-pre` and `NX2_VRAM.md`. Useful for dynamic VRAM budget and ASTC BC3, but neither PC results nor its driver assumptions automatically apply to PS5.
 5. EglantinePS5's pinned `Djihads80/Eglantine` submodule is a *different* source snapshot from the zortos293 `nx2` branch; compare both rather than using its latest-branch label interchangeably.
 
-## Current source changes (integrated on the vendor main)
+## Current source changes (integrated as opt-in NS2 shader headers and vendor research owners)
+
+**Source ownership:** original `vendor/sources/eden/src` remains immutable. Generic31 and the 32 storage bindings are copied into `vendor/encore-active/ns2-runtime/shader_resource/include` and selected only by the `EDEN_NS2_AMPERE_PROBE_EXPERIMENTAL` research CMake switch. This avoids modifying the pinned baseline and preserves the NS1 release.
 
 | Component | Actual prior gap | Current change | Confidence / qualification |
 |---|---|---|---|

@@ -2684,6 +2684,16 @@ if(EDEN_NS2_AMPERE_PROBE_EXPERIMENTAL)
     if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
         message(FATAL_ERROR "NS2 Ampere ISA probe requires research metadata mode")
     endif()
+    # Never modify or intercept Eden's pinned upstream source tree.
+    # NS2 shader varyings and storage slots are research-only header owners.
+    set(EDEN_NS2_SHADER_RESOURCE_ROOT
+        "${PORT_ROOT}/vendor/encore-active/ns2-runtime/shader_resource/include")
+    if(NOT EXISTS "${EDEN_NS2_SHADER_RESOURCE_ROOT}/shader_recompiler/frontend/ir/attribute.h" OR
+       NOT EXISTS "${EDEN_NS2_SHADER_RESOURCE_ROOT}/video_core/buffer_cache/buffer_cache_base.h")
+        message(FATAL_ERROR "Missing NS2 opt-in shader/texture resource headers")
+    endif()
+    target_include_directories(shader_recompiler BEFORE PRIVATE "${EDEN_NS2_SHADER_RESOURCE_ROOT}")
+    target_include_directories(video_core BEFORE PRIVATE "${EDEN_NS2_SHADER_RESOURCE_ROOT}")
     set(EDEN_NS2_AMPERE_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/ampere")
     set(EDEN_NS2_AMPERE_PROBE
         "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/frontend/ampere/probe.cpp")

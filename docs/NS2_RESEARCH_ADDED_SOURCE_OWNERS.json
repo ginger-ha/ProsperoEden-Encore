@@ -118,6 +118,8 @@
     "ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.h",
     "ns2-runtime/process/core/hle/service/os/process.cpp",
     "ns2-runtime/self_controller/core/hle/service/am/service/self_controller.cpp",
-    "ns2-runtime/self_controller/core/hle/service/am/service/self_controller.h"
+    "ns2-runtime/self_controller/core/hle/service/am/service/self_controller.h",
+    "ns2-runtime/shader_resource/include/shader_recompiler/frontend/ir/attribute.h",
+    "ns2-runtime/shader_resource/include/video_core/buffer_cache/buffer_cache_base.h"
   ]
 }
