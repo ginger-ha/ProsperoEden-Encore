@@ -662,7 +662,11 @@ def main() -> int:
                 (ampere_root / "ir_bridge.h").is_file() and
                 'Shader::Maxwell::Flow::CFG cfg{env, flow_pool, address, exits_to_dispatcher}' in ir_bridge and
                 'Shader::Maxwell::TranslateProgram(inst_pool, block_pool, env, cfg, host_info)' in ir_bridge and
-                'start_address = image.first_instruction_address - sizeof(Shader::ProgramHeader)' in maxwell_env and
+                'start_address = stage == Shader::Stage::Compute' in maxwell_env and
+                '? image.first_instruction_address' in maxwell_env and
+                ': image.first_instruction_address - sizeof(Shader::ProgramHeader)' in maxwell_env and
+                'TranslateReviewedComputeIR(' in ir_bridge and
+                'Shader::Maxwell::Flow::CFG cfg{env, flow_pool, env.StartAddress()}' in ir_bridge and
                 'EDEN_NS2_AMPERE_PROBE_EXPERIMENTAL OR' in CMAKE[release_gate:],
                 "Native Maxwell graphics IR bridge must remain explicit, offset-correct and release-gated")
         require('option(EDEN_NS2_AMPERE_PROBE_EXPERIMENTAL' in CMAKE and
