@@ -193,6 +193,13 @@ def main() -> int:
                 "case 0xb82: { // LDC U8/S8/U16/S16/U32/U64" in lower_owner and
                 "if (width > 5 ||" in lower_owner,
                 "NX2 shader/texture ABI requires full attribute vector, 32 storage slots, and reviewed half/narrow constant lowering")
+        native_negative = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/translation_cache.cpp").read_text()
+        native_negative_header = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/translation_cache.h").read_text()
+        require("if (!copy.Ready()) ++stats.negative_hits" in native_negative and
+                "if (!image.Ready()) ++stats.rejected;" in native_negative and
+                "std::equal(e.native.begin(), e.native.end(), native.begin())" in native_negative and
+                "u64 negative_hits{};" in native_negative_header,
+                "NS2 negative shader cache must verify full bytes, bound entries and retain rejected status")
         require("class NativeQmdScheduler" in qmd_header and
                 "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
                 "std::unordered_map<Address, State> states;" in qmd_header and
