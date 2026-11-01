@@ -4483,6 +4483,16 @@
       "evidence": "Bounded read-only META/ACI0 NPDM Title ID fallback for extracted NS1/NS2 library identity. Exact U87 SOURCE contract and CI-invoked synthetic valid/invalid NPDM host witness. This is a source review, not a measured shader/JIT/HUD optimization, PS5 runtime compatibility proof or console FPS claim."
     },
     {
+      "path": "headless/ns2_title_catalog.h",
+      "disposition": "reviewed_without_new_code_edit",
+      "contract_id": "U89",
+      "prior_status": "SOURCE",
+      "proof_ref": "tools/check-ns2-title-catalog-host.py",
+      "reviewed_source_git_blob": "96910dc19759cd989f7a6ecf5992f8dcbdadda14",
+      "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
+      "evidence": "U89 bounded offline NS2 title IDs and image URL registry. A separately CI-invoked host test checks title uniqueness, metadata fallback and image source constraints. No FPS optimization or PS5 executable compatibility claimed."
+    },
+    {
       "path": "headless/firmware_zip_import.h",
       "disposition": "reviewed_without_new_code_edit",
       "contract_id": "U88",
@@ -4529,6 +4539,7 @@
     "vendor/encore-active/eden-core/src/core/file_sys/romfs_factory.cpp",
     "vendor/encore-active/eden-core/src/core/hle/service/aoc/addon_content_manager.cpp",
     "headless/extracted_npdm_identity.h",
-    "headless/firmware_zip_import.h"
+    "headless/firmware_zip_import.h",
+    "headless/ns2_title_catalog.h"
   ]
 }
