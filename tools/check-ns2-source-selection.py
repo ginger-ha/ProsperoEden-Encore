@@ -163,6 +163,15 @@ def main() -> int:
                 "CompileReviewedNativeGraphicsSpirv(" in pipeline_source.read_text() and
                 "original->ShaderStage() != Shader::Stage::VertexB" in pipeline_source.read_text(),
                 "Native renderer capture must keep standalone Fragment stage and original VertexB-only contract")
+        require("CompileReviewedNativeMergedVertexSpirv(" in bridge_source.read_text() and
+                "Shader::Maxwell::MergeDualVertexPrograms(ir_a,ir_b,vertex_b)" in bridge_source.read_text() and
+                "ir_a.stage!=Shader::Stage::VertexA" in bridge_source.read_text() and
+                "ir_b.stage!=Shader::Stage::VertexB" in bridge_source.read_text() and
+                "CompileCapturedNs2MergedVertexSpirvFromReader(" in pipeline_source.read_text() and
+                "CompileCapturedNs2MergedVertexSpirv(" in pipeline_source.read_text() and
+                "gpu_address_a==gpu_address_b" in pipeline_source.read_text() and
+                pipeline_source.read_text().count("registry.IsCurrent(*session)") >= 5,
+                "NS2 dual native vertex shader compilation must use real merged IR and session ticket")
         require(
             'if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)' in CMAKE and
             'set(EDEN_SHARED_NS2_EXEFS ON)' in CMAKE and

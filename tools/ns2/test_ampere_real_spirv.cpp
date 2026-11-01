@@ -141,6 +141,36 @@ int main(int argc,char** argv) {
         file.close();
         Require(bool(file),"could not flush actual Fragment SPIR-V");
     }
+    // The VertexA program must run before VertexB, exactly as in the real
+    // maintained Vulkan pipeline's MergeDualVertexPrograms call.
+    auto merge_a=BuildMaxwellShaderImage(
+        header,code,static_cast<u32>(Shader::Stage::VertexA));
+    auto merge_b=BuildMaxwellShaderImage(
+        header,code,static_cast<u32>(Shader::Stage::VertexB));
+    auto merge_env_a=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<SyntheticSource>(Shader::Stage::VertexA),std::move(merge_a));
+    auto merge_env_b=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<SyntheticSource>(Shader::Stage::VertexB),std::move(merge_b));
+    Require(merge_env_a && merge_env_b,
+            "both native vertex stages need owned Maxwell environments");
+    const auto merged=CompileReviewedNativeMergedVertexSpirv(
+        *merge_env_a,*merge_env_b,host,profile,Shader::RuntimeInfo{});
+    Require(merged.Ready() && merged.words.size()>5 &&
+            merged.words[0]==0x07230203U && merged.words[3]!=0,
+            "real VertexA+VertexB Maxwell merge SPIR-V emission failed");
+    {
+        const auto output=std::string(argv[1])+"-merged.spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write merged vertex SPIR-V");
+        file.write(reinterpret_cast<const char*>(merged.words.data()),
+                   static_cast<std::streamsize>(merged.words.size()*sizeof(u32)));
+        file.close();Require(bool(file),"could not flush merged native vertex SPIR-V");
+    }
+    const auto rejected_merge=CompileReviewedNativeMergedVertexSpirv(
+        *merge_env_b,*merge_env_a,host,profile,Shader::RuntimeInfo{});
+    Require(rejected_merge.status==NativeSpirvStatus::UnsupportedStage &&
+            rejected_merge.words.empty(),
+            "swapped native vertex stages must never generate a module");
     auto vertex_a_image=BuildMaxwellShaderImage(
         header,code,static_cast<u32>(Shader::Stage::VertexA));
     Require(vertex_a_image.ValidForCompiler(),"VertexA negative fixture failed");
@@ -155,9 +185,11 @@ int main(int argc,char** argv) {
     auto& registry=Service::Nvidia::Devices::NativeGpuProcessRegistry::Instance();
     Kernel::KProcess process{};
     GuestFixture guest{};
-    guest.bytes.resize(0x80+code.size());
+    guest.bytes.resize(0x1000+0x80+code.size());
     std::copy(header.begin(),header.end(),guest.bytes.begin());
     std::copy(code.begin(),code.end(),guest.bytes.begin()+0x80);
+    std::copy(header.begin(),header.end(),guest.bytes.begin()+0x1000);
+    std::copy(code.begin(),code.end(),guest.bytes.begin()+0x1000+0x80);
     auto compile=[&](Shader::Stage stage,bool dispatcher=false) {
         return VideoCommon::CompileCapturedNs2VertexSpirvFromReader(
             &process,std::make_unique<SyntheticSource>(stage),
@@ -186,6 +218,21 @@ int main(int argc,char** argv) {
             fragment_capture.words==fragment.words,
             "authenticated Fragment capture must compile the same SPIR-V module");
     guest.reads=0;
+    const auto merged_capture=VideoCommon::CompileCapturedNs2MergedVertexSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::VertexA),
+        std::make_unique<SyntheticSource>(Shader::Stage::VertexB),
+        guest.address,guest.address+0x1000,ReadGuest,&guest,
+        host,profile,Shader::RuntimeInfo{});
+    Require(merged_capture.Ready() && merged_capture.words==merged.words,
+            "same-process native VertexA/B capture must match real merged IR/SPIR-V");
+    const auto rejected_pair=VideoCommon::CompileCapturedNs2MergedVertexSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::VertexA),
+        std::make_unique<SyntheticSource>(Shader::Stage::VertexB),
+        guest.address,guest.address,ReadGuest,&guest,
+        host,profile,Shader::RuntimeInfo{});
+    Require(rejected_pair.status==NativeSpirvStatus::UnsupportedStage &&
+            rejected_pair.words.empty(),
+            "ambiguous same-address native dual vertex pair must reject");
     const auto complete=compile(Shader::Stage::VertexB);
     Require(complete.Ready() && complete.words==baseline_direct && guest.reads>0,
             "registered guest shader capture must match real Maxwell SPIR-V");

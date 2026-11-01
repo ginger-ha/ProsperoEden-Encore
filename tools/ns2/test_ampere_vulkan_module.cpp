@@ -28,7 +28,7 @@ static std::vector<uint32_t> ReadSpirv(const char* file) {
     return words;
 }
 int main(int argc,char** argv) {
-    Require(argc==4,"expected direct, dispatcher and Fragment module files");
+    Require(argc==5,"expected direct, dispatcher, Fragment and merged modules");
     VkApplicationInfo application{};
     application.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application.pApplicationName="NS2 synthetic shader module smoke test";

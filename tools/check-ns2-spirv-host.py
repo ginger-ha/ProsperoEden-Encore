@@ -92,7 +92,7 @@ def main():
     run([cxx, "-pthread", "-Wl,--gc-sections", "-o", str(binary)] +
         [str(obj) for _, obj in jobs] + ["-latomic"])
     print(run([str(binary), str(OUT / "synthetic")]).stdout, end="")
-    for mode in ("direct", "dispatcher", "fragment"):
+    for mode in ("direct", "dispatcher", "fragment", "merged"):
         path = OUT / f"synthetic-{mode}.spv"
         print(run([validator, "--target-env", "spv1.5", str(path)]).stdout, end="")
         print(f"spirv-val SPIR-V 1.5 {mode}: PASS")
@@ -105,7 +105,8 @@ def main():
     print(run([str(module_test),
                str(OUT / "synthetic-direct.spv"),
                str(OUT / "synthetic-dispatcher.spv"),
-               str(OUT / "synthetic-fragment.spv")]).stdout, end="")
+               str(OUT / "synthetic-fragment.spv"),
+               str(OUT / "synthetic-merged.spv")]).stdout, end="")
     print("SPIR-V validation and Vulkan shader-module creation passed; "
           "real PS5 Vulkan renderer not exercised.")
 
