@@ -210,9 +210,22 @@ def main() -> int:
         }
         require(all(svc_contracts.values()),
                 "NS2 SVC owner drift: " + ",".join(k for k, good in svc_contracts.items() if not good))
-        property_sets = [i for i in range(len(CMAKE)) if
-                         CMAKE.startswith("set_property(TARGET core PROPERTY SOURCES", i)]
-        require(sum(i > selection for i in property_sets) == 7 and
+        # Source ownership includes both review-gated shared NS1/NS2 owners
+        # and opt-in native GPU research. Match the exact selected source
+        # variables (including the two NVDRV overlay stages) instead of a
+        # stale count from before kernel/audio/GPU-access integration.
+        selected_owners = re.findall(
+            r'set_property\(TARGET core PROPERTY SOURCES "\$\{([^}]+)\}"\)',
+            CMAKE[selection:])
+        expected_owners = [
+            "eden_ns2_exefs_sources", "eden_ns2_svc_sources",
+            "eden_ns2_gpu_access_sources", "eden_ns2_process_sources",
+            "eden_ns2_kernel_sources", "eden_ns2_audio_sources",
+            "eden_ns2_am_sources", "eden_ns2_scale_sources",
+            "eden_ns2_nvdrv_sources", "eden_ns2_nvdrv_sources",
+            "eden_ns2_research_kernel_sources", "eden_ns2_supervisor_sources",
+        ]
+        require(sorted(selected_owners) == sorted(expected_owners) and
                 'target_compile_definitions(core PRIVATE EDEN_NS2_PROCESS_RUN_GUARD=1)' in CMAKE and
                 'list(APPEND eden_ns2_process_sources "${EDEN_NS2_NATIVE_PROCESS_SOURCE}")' in CMAKE and
                 'list(REMOVE_ITEM eden_ns2_process_sources "hle/service/os/process.cpp")' in CMAKE and
