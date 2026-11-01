@@ -333,38 +333,10 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert n56_current.count(n56_after) == 1, 'N56 vendor guard differs from exact owner'
     assert n56_current.count('Saved PS5 driver pipeline cache atomically') == 1
     n56_baseline = n56_current.replace(n56_after, n56_before)
-    # An independently reviewed PS5 launch prewarm changes only a bounded
-    # native disk-reader budget and one end-of-load summary. Reconstruct the
-    # exact earlier generator output rather than exempting this translation
-    # unit from byte-for-byte source parity.
-    prewarm_deltas = (
-        (
-            "    // Restore a bounded prefix of a title's saved pipelines before gameplay.\n"
-            "    // Games with fewer cached entries load only those entries. This policy\n"
-            "    // applies to every title (NS1 and NS2) without any title ID exceptions.\n"
-            "    // Keep the worker queue, draw order and GPU fences unchanged.\n"
-            "    constexpr size_t kStartupPrewarmPipelines = 32;",
-            "    // Eight entries at most: restore some persisted pipelines without\n"
-            "    // rebuilding an unbounded title cache at launch. This token controls only\n"
-            "    // the disk READER; the persistent Vulkan compiler workers stay alive.\n"
-            "    constexpr size_t kStartupPrewarmPipelines = 8;",
-        ),
-        (
-            "    // Only the disk reader observes cancellation. The bounded queued jobs\n",
-            "    // Only the disk reader observes cancellation. The queued <=8 jobs\n",
-        ),
-        (
-            '    std::printf("EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld limit=%zu\\n",\n'
-            '                state.total, state.built, state.valid, state.built - state.valid,\n'
-            '                static_cast<long long>(startup_prewarm_ms), kStartupPrewarmPipelines);',
-            '    std::printf("EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld\\n",\n'
-            '                state.total, state.built, state.valid, state.built - state.valid,\n'
-            '                static_cast<long long>(startup_prewarm_ms));',
-        ),
-    )
-    for native, generated in prewarm_deltas:
-        assert n56_baseline.count(native) == 1, 'PS5 bounded prewarm source changed'
-        n56_baseline = n56_baseline.replace(native, generated)
+    # prepare-vulkan-port.py already regenerates the 32-entry prewarm
+    # exactly. Only N56's opt-in cache-header guard is removed here.
+    # A separate N56 immutable baseline checker reverses all three reviewed
+    # native prewarm deltas before checking the historic Git blob SHA.
     n56_file = temp/'normalized-vendor-n56'/n56_name
     n56_file.parent.mkdir(parents=True, exist_ok=True)
     n56_file.write_text(n56_baseline)
