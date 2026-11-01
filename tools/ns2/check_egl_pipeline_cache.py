@@ -56,6 +56,43 @@ prewarm_deltas = (
 for native, generated in prewarm_deltas:
     assert reconstructed.count(native) == 1, 'N56 source changed outside reviewed prewarm'
     reconstructed = reconstructed.replace(native, generated)
+# The N3m Ampere pipeline path is opt-in research only. Strip exactly
+# three independently pinned preprocessor regions before checking the
+# original N56/NS1 Vulkan Git blob. No unbounded source whitelist.
+n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n'
+assert reconstructed.count(n3m_flag) == 3, 'N3m native shader gates drifted'
+def n3m_hash(source):
+    value = 0xcbf29ce484222325
+    for byte in source.encode('ascii'):
+        value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+    return f'{value:016x}'
+n3m_positions = (
+    reconstructed.index(n3m_flag),
+    reconstructed.index(n3m_flag, reconstructed.index(
+        'GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline()')),
+    reconstructed.index(n3m_flag, reconstructed.index(
+        'std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline()')),
+)
+n3m_hashes = (
+    '6d290bcca80076a4',
+    '07f605ea23426e28',
+    '3f9e28a2403298cb',
+)
+n3m_blocks = []
+for start, expected_hash in zip(n3m_positions, n3m_hashes):
+    end = reconstructed.index('#endif\n', start) + len('#endif\n')
+    fragment = reconstructed[start:end]
+    assert n3m_hash(fragment) == expected_hash, 'N3m unreviewed shader handoff drift'
+    n3m_blocks.append(fragment)
+assert '#else\n    if (!RefreshStages(graphics_key.unique_hashes)) {\n#endif\n' in n3m_blocks[1], (
+    'N3m must preserve NS1 shader cache refresh')
+assert 'CaptureNs2GraphicsShaderFromGpu(' in n3m_blocks[1]
+assert 'CreateNs2GraphicsShaderEnvironment(' in n3m_blocks[2]
+reconstructed = reconstructed.replace(n3m_blocks[0], '', 1)
+reconstructed = reconstructed.replace(
+    n3m_blocks[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\n', 1)
+reconstructed = reconstructed.replace(n3m_blocks[2], '', 1)
+assert n3m_flag not in reconstructed, 'N3m experimental source still in NS1 baseline'
 data=reconstructed.encode()
 assert hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()==("0d4c16e0afab6d18b44e51dc5cb9dda512f0557e"), "N56 native owner differs outside reviewed guard"
 assert 'EDEN_NS2_PIPELINE_CACHE_EXPERIMENTAL OR' in CMAKE
