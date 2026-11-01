@@ -825,6 +825,49 @@ int main(){
             images.Destroy(*second_image) && images.Records().empty(),
             "GSV 430 rejects stale images and retires independent references");
 
+    // Native video pools (911) are distinct from 429 native image handles.
+    // Both kinds must reject foreign backing before any GPU VA allocation.
+    std::array<u32,16> video{};
+    video[0] = 0;
+    video[1] = 5;
+    video[2] = (63u << 16) | 127u; // 128 x 64, RGBA
+    const auto video_layout = CalculateNativeVideoImageLayout(video, 2);
+    require(video_layout && video_layout->image_bytes == 65536 &&
+            video_layout->image_stride == 65536 &&
+            video_layout->total_bytes == 131072,
+            "GSV video pool 911 computes upstream RGBA image byte and stride");
+    NativeVideoPoolLedger pools;
+    require(!pools.Add(0x80000000u, 2, 0, 131072, video[2], *video_layout) &&
+            !pools.Add(0x80000000u, 2, 20, 65536, video[2], *video_layout) &&
+            pools.ImageCount() == 0,
+            "GSV 911 rejects nonexistent or undersized NVMap backing");
+    require(pools.Add(0x80000000u, 2, 20, 131072, video[2], *video_layout) &&
+            pools.ImageCount() == 2,
+            "GSV 911 allocates a bounded image ID range");
+    const auto second_video = pools.Lookup(0x80000001u);
+    require(second_video && second_video->backing == 20 &&
+            second_video->offset == 65536 &&
+            second_video->size == 65536 &&
+            second_video->packed_dimensions == video[2],
+            "GSV 426/428 resolve image backing, offset, size and dimensions");
+    require(!pools.Add(0x80000001u, 2, 20, 131072, video[2], *video_layout) &&
+            !pools.Lookup(0x80000002u) &&
+            pools.Remove(0x80000000u) && pools.ImageCount() == 0 &&
+            !pools.Remove(0x80000000u),
+            "GSV 911/912 reject overlapping and stale image pools");
+    video[1] = 1; // NV12 4:2:0, even dimensions
+    const auto nv12 = CalculateNativeVideoImageLayout(video, 2);
+    require(nv12 && nv12->nv12 && nv12->image_bytes == 24576 &&
+            nv12->total_bytes == 49152 && nv12->chroma_offset == 16384,
+            "GSV native NV12 two-plane pitch/chroma layout");
+    video[2] = (63u << 16) | 126u; // odd width
+    require(!CalculateNativeVideoImageLayout(video, 2),
+            "GSV native NV12 rejects odd pixel dimensions");
+    video[2] = (63u << 16) | 127u;
+    video[3] = 1;
+    require(!CalculateNativeVideoImageLayout(video, 2),
+            "GSV video image pools reject unreviewed format flags");
+
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
             generic->backend==static_cast<u8>(Tegra::PTEKind::GENERIC_16BX2),
