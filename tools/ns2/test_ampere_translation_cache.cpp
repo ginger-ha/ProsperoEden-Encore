@@ -79,7 +79,16 @@ int main() {
     no_exit.resize(16);
     Check(!cache.GetOrTranslate(header,no_exit,4).Ready() &&
           cache.Stats().entries==2,
-          "no-EXIT program does not produce partial entry");
+          "no-EXIT program does not produce a successful partial entry");
+    const auto first_rejected = cache.Stats();
+    Check(!cache.GetOrTranslate(header,no_exit,4).Ready() &&
+          cache.Stats().translations == first_rejected.translations &&
+          cache.Stats().negative_hits == first_rejected.negative_hits + 1,
+          "unchanged rejected native shader must hit bounded negative cache");
+    no_exit[0] ^= 1;
+    Check(!cache.GetOrTranslate(header,no_exit,4).Ready() &&
+          cache.Stats().translations == first_rejected.translations + 1,
+          "changed native shader bytes must not reuse a previous rejection");
 
     Reader r;
     r.bytes.resize(0x80);
