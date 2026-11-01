@@ -21,3 +21,15 @@ The source-linked C++20 test tools/ns2/test_graphics_hle.cpp exercises
 bounds, creation, binding, rebind, resource identity and destruction under
 O0/O2 UBSan. The preflight tool checks dispatch wiring to the real source.
 Successful tests do not establish first PS5 frame or gameplay compatibility.
+
+
+## Native image sizing — commands 435 and 1510
+
+The research supervisor also forwards TIPC 435 (size) and 1510
+(size plus alignment) to the already tested
+`CalculateNativeImageRequirements` helper. That helper supports only reviewed
+block-linear four-byte-color layouts, validates the sixteen preference words,
+checks size/count arithmetic and returns 4096-byte alignment. Unrecognized
+formats or malformed word counts receive a kernel error, not a fabricated
+size. This allows native image resource **planning**, not image creation,
+Vulkan submission or first-frame presentation.

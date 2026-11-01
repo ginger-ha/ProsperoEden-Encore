@@ -41,6 +41,11 @@ def main()->int:
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text
+    for command, method in ((435,"CalculateNativeImageSize"),(1510,"CalculateNativeImageRequirements")):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    assert 'CalculateNativeImageRequirements(std::span<const u32>{data + 2, 16}, data[18])' in text
+    assert 'if (data[1] != 17) return {};' in text
+    assert 'rb.Push(request ? static_cast<u32>(request->alignment)' in text
     assert 'Kernel::KMemoryState::FlagMapped' in text
     compiler=shutil.which("clang++") or shutil.which("g++")
     if not compiler:
