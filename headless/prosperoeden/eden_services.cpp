@@ -221,7 +221,7 @@ std::string ExtractedLocalCover(const std::filesystem::path& title) {
             std::ifstream input(candidate, std::ios::binary);
             char signature[8]{};
             input.read(signature, sizeof(signature));
-            if (input.gcount() != sizeof(signature)) continue;
+            if (input.gcount() != static_cast<std::streamsize>(sizeof(signature))) continue;
             const bool jpeg = static_cast<unsigned char>(signature[0]) == 0xff &&
                               static_cast<unsigned char>(signature[1]) == 0xd8;
             const bool png = std::memcmp(signature, "\x89PNG\r\n\x1a\n", 8) == 0;
