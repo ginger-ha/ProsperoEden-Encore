@@ -362,6 +362,19 @@ def main() -> int:
                 'm_mappings.RecordSparse(' in worker_hle_cpp and
                 'm_mappings.RecordReleasedSparse(' in worker_hle_cpp,
                 "Native GPU worker IPC must reject unsupported mappings")
+        # GSV must be able to resolve a registered, live guest AS FD to the
+        # exact current KProcess GMMU; no cross-title address-space reuse.
+        session_owner = (session_root / "gpu_session.cpp").read_text()
+        session_header = (session_root / "gpu_session.h").read_text()
+        native_as_owner = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv_as/core/hle/service/nvdrv/devices/nvhost_as_gpu.cpp").read_text()
+        require("GetRegisteredAddressSpace(u32 id)" in session_header and
+                "IGpuSession::GetRegisteredAddressSpace(u32 id)" in session_owner and
+                "m_shared->address_spaces.Registered(id)" in session_owner and
+                "m_module->VerifyFD(" in session_owner and
+                "as->OwnsNativeProcess(m_process)" in session_owner and
+                "bool nvhost_as_gpu::OwnsNativeProcess(Kernel::KProcess* process)" in native_as_owner and
+                "m_native_process == process && vm.initialised && gmmu" in native_as_owner,
+                "Native GSV address-space resolver must enforce live FD and process-scoped GMMU")
         require('target_sources(core PRIVATE "${EDEN_NS2_GPU_SESSION_SOURCE}"' in CMAKE and
                 '"${EDEN_NS2_GPU_WORKER_SOURCE}"' in CMAKE and
                 '"${EDEN_NS2_GPU_SHARED_SOURCE}")' in CMAKE and
