@@ -622,11 +622,42 @@ const char* eden_startup_error() {
         try {
             const std::string keys = Eden::AssetsPath("keys");
             const std::string firmware = Eden::AssetsPath("firmware");
+            // Extracted NS2 system-code dumps have an independent NCM
+            // index. Those index keys identify records; they are NOT NCA
+            // decryption keys and must never be passed to KeyManager.
+            // Discovery is read-only, independent of prod.keys. Do not claim
+            // a functional HOS runtime from this probe.
+            const auto extracted_dump = [&]() -> std::string {
+                const auto is_regular = [](const std::filesystem::path& file) {
+                    std::error_code ec;
+                    const auto status = std::filesystem::symlink_status(file, ec);
+                    return !ec && std::filesystem::is_regular_file(status) &&
+                           !std::filesystem::is_symlink(status);
+                };
+                for (const auto& root : {std::filesystem::path(firmware),
+                                         std::filesystem::path(firmware) / "ns2-extracted",
+                                         std::filesystem::path(firmware) / "firmware"}) {
+                    if (is_regular(root / ".ns2jb-firmware-dump.json") &&
+                        is_regular(root / "firmware-dump-named.json") &&
+                        is_regular(root / "ncm-system-programs.bin"))
+                        return root.string();
+                }
+                return {};
+            }();
+            if (!extracted_dump.empty())
+                std::fprintf(stderr, "EDEN_NS2_NCM_INVENTORY_DISCOVERED root=%s crypto_keys=none_imported status=research_only\\n",
+                             extracted_dump.c_str());
             Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys);
             FileSys::RealVfsFilesystem vfs;
             const auto prod = vfs.OpenFile(std::string{keys} + "/prod.keys", FileSys::OpenMode::Read);
-            if (!prod || !prod->GetSize())
+            if (!prod || !prod->GetSize()) {
+                if (!extracted_dump.empty())
+                    return "NS2 extracted system-code inventory found in " + extracted_dump +
+                           ". Its NCM index needs no prod.keys to identify titles; "
+                           "however extracted NS2 services are not bootable yet. "
+                           "Encrypted NS1/NS2 NCAs still require separate cryptographic keys.";
                 return "Missing or empty keys/prod.keys in " + Eden::AssetsDir() + ".";
+            }
             auto& manager = Core::Crypto::KeyManager::Instance();
             if (!manager.HasKey(Core::Crypto::S256KeyType::Header))
                 return "prod.keys could not supply an NCA header key. Replace it with a valid key dump.";
@@ -658,28 +689,10 @@ const char* eden_startup_error() {
                 }
             }
             if (!count) {
-                // NS2JB captures may contain 90 NPDM/system-code records but
-                // zero NCAs. Identify this alternative input honestly rather
-                // than presenting it as firmware accepted by the NS1 services.
-                // Do not traverse or execute untrusted system-code modules.
-                for (const char* subdir : {"ns2-extracted", "firmware"}) {
-                    const auto root = std::filesystem::path(firmware) / subdir;
-                    std::error_code probe_error;
-                    if (std::filesystem::is_regular_file(root / ".ns2jb-firmware-dump.json",
-                                                         probe_error) &&
-                        std::filesystem::is_regular_file(root / "firmware-dump-named.json",
-                                                         probe_error) &&
-                        std::filesystem::is_regular_file(root / "ncm-system-programs.bin",
-                                                         probe_error)) {
-                        std::fprintf(stderr,
-                                     "EDEN_NS2_SYSTEM_CODE_DUMP_DETECTED root=%s status=not_nca_firmware\n",
-                                     root.string().c_str());
-                        return "NS2 extracted system-code dump detected in " +
-                               root.string() +
-                               ". This NSO/NPDM dump is not an NCA firmware installation. "
-                               "NS2 system-service loading still requires compatibility work.";
-                    }
-                }
+                if (!extracted_dump.empty())
+                    return "NS2 extracted system-code inventory found in " + extracted_dump +
+                           ". NCM title/version index parsed by the host importer; "
+                           "native HOS service loading is not yet supported.";
                 return "No firmware NCAs found in " + Eden::AssetsPath("firmware") + ".";
             }
             if (!version) return "Firmware SystemVersion data is missing or unreadable. Install a complete firmware dump.";
