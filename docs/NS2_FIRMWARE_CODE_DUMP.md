@@ -30,37 +30,55 @@ No NCA archives, NCA Control RomFS, system-version content, or any proof
 that all guest services are present can be inferred from this archive.
 The importer deliberately does **not** synthesize those missing parts.
 
-## Safely stage your own dump
+## Automatic recognition and import on PS5 (current main source)
 
-On a Mac or PC from the repository checkout:
+**No user-side script or ZIP repackaging is required.** Leave an ordinary
+firmware ZIP in a supported family folder. On next launcher initialization,
+Encore scans the selected storage root and known family directories, validates
+bounded ZIP32 entries, deflates them using the native zlib runtime, checks
+per-file CRC and stages the files in a new \`encore-imported-*\` directory.
+An invalid archive is rejected and the original ZIP is never modified.
+The content folders are resolved again after import.
 
-```sh
-python3 tools/ns2/prepare_firmware_dump.py firmware.zip
-python3 tools/ns2/prepare_firmware_dump.py firmware.zip --output ns2-extracted
-```
+The console family and the firmware *format* are independent:
 
-The first command checks all NCM index records, manifest SHA-256 values, program signatures,
-the declared missing files and archive paths. The second creates a **new**
-`ns2-extracted` folder without modifying the original zip, keys or existing
-firmware. It strips Apple metadata and ensures no symlink/path traversal.
+| Family | NCA files | extracted NSO/NPDM system code | ZIP |
+| --- | --- | --- | --- |
+| Switch 1 | recognized | recognized | automatically staged |
+| Switch 2 | recognized | recognized | automatically staged |
 
-Upload that directory by FTP to:
+Supported folder layouts under the selected root include:
 
-```text
-/data/prosperoeden/firmware/ns2-extracted/
-  .ns2jb-firmware-dump.json
-  firmware-dump-named.json
-  ncm-system-programs.bin
-  0400000000000019/main
-  0400000000000019/main.npdm
-  0400000000000019/code-info.bin
-  ...
-```
+\`\`\`text
+firmware/*.nca                      # legacy flat NS1
+firmware/ns1/  firmware/ns2/
+firmware/switch1/  firmware/switch2/
+switch1/firmware/  switch2/firmware/
+ns1/firmware/  ns2/firmware/
+firmware/ns1.zip  firmware/ns2.zip
+keys/prod.keys
+keys/ns1/prod.keys  keys/ns2/prod.keys
+keys/switch1/prod.keys  keys/switch2/prod.keys
+switch1/keys/prod.keys  switch2/keys/prod.keys
+\`\`\`
 
-Keep existing `/data/prosperoeden/firmware/*.nca` files in place and
-unchanged, with your own `keys/prod.keys` where encrypted NCA support is
-required. **The extracted system-code inventory itself needs no prod.keys**. Do not mix system-code files
-into `roms/`. Do not FTP an unexpanded ZIP into `firmware/`.
+An explicitly named family folder can contain NCAs, an extracted dump or a
+ZIP. A legacy flat NCA without other family evidence remains NS1 for backward
+compatibility; an unlabelled ZIP whose contents do not indicate the family
+is not guessed as NS2. Two indistinguishable NCA sets mixed at the same
+directory level cannot be separated safely by filename alone; put those into
+family-labelled folders. ZIP extraction is a storage operation, **not**
+proof of either generation's guest services executing.
+
+For debugging or offline checksum inspection only, the optional host tool
+\`tools/ns2/prepare_firmware_dump.py\` still exists. Users should not need it
+for an ordinary PS5 installation. ZIP import validates archive CRC/path
+integrity; the separate host tool additionally validates the NS2JB manifest's
+SHA-256 records.
+
+Keep previously installed firmware, original archives, user keys and game
+data unchanged. NCM \`inventory.keys\` describe content indexing, not NCA
+decryption keys.
 
 ## Runtime boundary
 
