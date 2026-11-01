@@ -2,6 +2,7 @@
 """Static source-owner guard for research NS2 CMake overlays, not a native build."""
 from __future__ import annotations
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
