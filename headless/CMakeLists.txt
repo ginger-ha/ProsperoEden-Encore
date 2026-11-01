@@ -1889,11 +1889,19 @@ add_dependencies(eden-headless eden-metadata)
 # N76 -- NS2 guest CNTPCT calibration through Encore's shared CPU/JIT.
 # Upstream-compatible guest tick semantics. Opt-in, default NS1 unchanged.
 option(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL
-    "Research only: per-program NSW2 31.25 MHz CPU system counter" OFF)
-if(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL)
-    if(NOT PS5_NATIVE OR NOT EDEN_NS2_METADATA_EXPERIMENTAL OR
-       NOT EDEN_NS2_A64_EXPERIMENTAL OR EDEN_FINAL_RELEASE_PROFILE)
-        message(FATAL_ERROR "N76 requires PS5 NS2 research metadata+A64 (non-release)")
+    "Research opt-in: per-program NSW2 31.25 MHz CPU system counter" OFF)
+# A single PS5 release can select the real NS2 31.25 MHz timer per program
+# while preserving 19.2 MHz for every first-generation title. The shared
+# optimized G11 JIT and common clock are already maintained and host-tested.
+# This is NOT the six-core scheduler or experimental A64 decoder.
+set(EDEN_SHARED_NS2_GUEST_COUNTER OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_GUEST_COUNTER ON)
+endif()
+if(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL OR EDEN_SHARED_NS2_GUEST_COUNTER)
+    if(NOT PS5_NATIVE OR NOT EDEN_REVIEWED_DUAL_NPDM OR
+       (NOT EDEN_NS2_A64_EXPERIMENTAL AND NOT EDEN_SHARED_NS2_GUEST_COUNTER))
+        message(FATAL_ERROR "N76 requires native PS5 with shared NPDM and NS2 loader or A64 research")
     endif()
     set(EDEN_N76_CLOCK_ROOT
         "${PORT_ROOT}/vendor/encore-active/eden-core")
@@ -1937,6 +1945,9 @@ if(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL)
     if(NOT n76_legacy_owner_idx EQUAL -1)
         message(FATAL_ERROR "N76 must not compile the unqualified legacy A64 owner")
     endif()
+    # The selector is harmless for NS1: the combined ExeFS loader calls
+    # SelectProgram(metadata.IsSwitch2()) on every normal game load, restoring
+    # 19.2 MHz after an NS2 session; G11 retains the optimized native owner.
     # The dedicated host selector guard verifies the opt-in G11 source bytes.
     foreach(n76_target IN ITEMS core common)
         target_compile_definitions(${n76_target} PRIVATE EDEN_NS2_GUEST_COUNTER=1)
