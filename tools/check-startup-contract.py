@@ -41,6 +41,15 @@ assert 'const f32 bg_blue = quiet_loading_handoff ? 0.039f :' in native_presente
 assert 'const VkRect2D scissor{' in native_presenter
 assert 'const VkRect2D scissor = hud.loading' not in native_presenter
 assert 'PresentVulkanLoading(renderer);' in graphics
+# A black picture with a live stderr is not proof of a dead game process.
+# Emit only bounded milestone signals: Core load, GPU start, guest run and
+# two time thresholds while Vulkan still has no first guest frame.
+for stage in ('stage=core_loaded', 'stage=gpu_started', 'stage=guest_run_begin'):
+    assert stage in main, stage
+assert 'EDEN_VULKAN_LOADING_WAIT stage=10s' in graphics
+assert 'EDEN_VULKAN_LOADING_WAIT stage=30s' in graphics
+assert 'vulkan_loading_diagnostic_stage = 0;' in graphics
+assert 'guest_frame_handoff=0' in graphics
 assert 'PresentLoading();' in vulkan_backend
 assert '"void main(){ color = vec4(0.024, 0.035, 0.039, 1.0); }\\n";' in graphics
 
