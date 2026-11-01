@@ -20,7 +20,7 @@ The default storage root is:
 
 ## Storage layout
 
-Encore always expects the same folder structure under the selected storage root:
+Encore keeps one selected storage root, but **firmware and keys can be arranged flexibly inside it**. The legacy flat layout remains supported:
 
 ```text
 <root>/
@@ -45,6 +45,32 @@ With the default internal root, that means for example:
 /data/prosperoeden/mods/
 ```
 
+You can also keep the two console generations separate without a fixed layout:
+
+```text
+<root>/firmware/ns1/                # NCA, extracted system dump, or ZIP
+<root>/firmware/ns2/                # NCA, extracted system dump, or ZIP
+<root>/keys/ns1/prod.keys
+<root>/keys/ns2/prod.keys
+```
+
+Aliases include `firmware/switch1`, `firmware/switch2`,
+`switch1/firmware`, `switch2/firmware`, `keys/switch1`,
+`keys/switch2`, `switch1/keys` and `switch2/keys`. Flat
+`firmware/*.nca` is treated as NS1 for compatibility. NS2 NCA packages
+need an NS2-labelled location rather than guessing by extension. Both
+families can have NCA, extracted or ZIP firmware: neither generation is
+inferred solely from the file format.
+
+**On-console ZIP firmware import:** copy the original ZIP into a
+family-labelled firmware folder (or use a clearly named
+`firmware/ns1.zip` or `firmware/ns2.zip`). Encore recognizes and
+stages the contents automatically, preserves the original ZIP and does
+not require running a Mac/PC helper. Imported system-code inventories
+are not a guarantee of compatible NS2 guest services. NCM `keys`
+inside JSON are indexing records and cannot replace cryptographic
+`prod.keys` for encrypted NCAs.
+
 Application-managed data also stays under `/data/prosperoeden`:
 
 ```text
@@ -60,7 +86,9 @@ Application-managed data also stays under `/data/prosperoeden`:
 
 You may choose another **root** in **Settings → Storage**.
 
-Only the root changes. The structure does not.
+Only the selected storage **root** changes. The usual standard folders are
+created when needed, but the NS1/NS2 firmware and keys layouts above remain
+flexible beneath that root.
 
 For example, an external root must still contain:
 
@@ -77,7 +105,8 @@ For example, an external root must still contain:
 
 Encore creates the standard subfolders when a valid writable external root is selected.
 
-It does not support separate custom paths for keys, firmware, games, updates or mods.
+This is a **single storage root**, not arbitrary paths outside it. Within
+that root, firmware and key discovery accepts the NS1/NS2 variants above.
 
 ---
 
