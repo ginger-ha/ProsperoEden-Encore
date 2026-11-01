@@ -58,6 +58,22 @@ adapt('src/video_core/renderer_vulkan/vk_rasterizer.cpp', 'vulkan_rasterizer.cpp
     # R: DrawTexture needs the same pending guest memory invalidation drain
     # as ordinary draw/clear, before its texture-cache mutex acquisition.
     ("    FlushWork();\n\n    std::scoped_lock l{texture_cache.mutex};\n    texture_cache.SynchronizeDescriptors(false);", "    FlushWork();\n    // Apply queued guest page remaps before reading cache-owned texture views.\n    // InnerInvalidation itself locks texture_cache.mutex.\n    gpu_memory->FlushCaching();\n\n    std::scoped_lock l{texture_cache.mutex};\n    texture_cache.SynchronizeDescriptors(false);"),
+    # Raw DrawTexture uses an independent blit pipeline. Pre-programming
+    # guest dynamic state under texture_cache.mutex only adds lock-held work;
+    # the raw blit sets its own viewport/scissor and the trailing Scheduler
+    # invalidation re-dirties guest state for the next ordinary draw.
+    ("    texture_cache.UpdateRenderTargets(false);\n\n"
+     "    UpdateDynamicStates();\n\n"
+     "    query_cache.NotifySegment(true);",
+     "    texture_cache.UpdateRenderTargets(false);\n\n"
+     "#ifdef PS5_NATIVE\n"
+     "    // Raw blit uses its own viewport/scissor and pipeline. The next\n"
+     "    // guest draw restores dynamic state after Scheduler::InvalidateState.\n"
+     "    // Avoid wasted state setup while texture_cache.mutex is held.\n"
+     "#else\n"
+     "    UpdateDynamicStates();\n"
+     "#endif\n\n"
+     "    query_cache.NotifySegment(true);"),
     # The raw-image Vulkan blit in DrawTexture binds a graphics pipeline
     # without invalidating the tracked guest pipeline state. Restore the
     # scheduler's graphics/descriptor state after the blit is queued.
