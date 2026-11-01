@@ -11,6 +11,7 @@ assert '#include "ns2_title_catalog.h"' in services
 assert 'Eden::Ns2Catalog::Find(game.title_id)' in services
 assert 'FetchKnownNs2Front(title_id, cancel)' in services
 assert 'EDEN_NS2_TITLE_RESOLVED' in services
+assert 'if (game.cover.empty() && !game.box_front.empty()) game.cover = game.box_front;' in services
 assert 'base/exefs/icon.jpg' in services and 'exefs/icon.png' in services
 assert 'IsSafeExtractedDirectory(parent)' in services
 assert 'icon_' in services and 'std::memcmp(signature,' in services
