@@ -36,7 +36,7 @@ The importer deliberately does **not** synthesize those missing parts.
 firmware ZIP in a supported family folder. On next launcher initialization,
 Encore scans the selected storage root and known family directories, validates
 bounded ZIP32 entries, deflates them using the native zlib runtime, checks
-per-file CRC and stages the files in a new \`encore-imported-*\` directory.
+per-file CRC and stages the files in a new `encore-imported-*` directory.
 An invalid archive is rejected and the original ZIP is never modified.
 The content folders are resolved again after import.
 
@@ -49,7 +49,7 @@ The console family and the firmware *format* are independent:
 
 Supported folder layouts under the selected root include:
 
-\`\`\`text
+```text
 firmware/*.nca                      # legacy flat NS1
 firmware/ns1/  firmware/ns2/
 firmware/switch1/  firmware/switch2/
@@ -60,7 +60,7 @@ keys/prod.keys
 keys/ns1/prod.keys  keys/ns2/prod.keys
 keys/switch1/prod.keys  keys/switch2/prod.keys
 switch1/keys/prod.keys  switch2/keys/prod.keys
-\`\`\`
+```
 
 An explicitly named family folder can contain NCAs, an extracted dump or a
 ZIP. A legacy flat NCA without other family evidence remains NS1 for backward
@@ -71,13 +71,13 @@ family-labelled folders. ZIP extraction is a storage operation, **not**
 proof of either generation's guest services executing.
 
 For debugging or offline checksum inspection only, the optional host tool
-\`tools/ns2/prepare_firmware_dump.py\` still exists. Users should not need it
+`tools/ns2/prepare_firmware_dump.py` still exists. Users should not need it
 for an ordinary PS5 installation. ZIP import validates archive CRC/path
 integrity; the separate host tool additionally validates the NS2JB manifest's
 SHA-256 records.
 
 Keep previously installed firmware, original archives, user keys and game
-data unchanged. NCM \`inventory.keys\` describe content indexing, not NCA
+data unchanged. NCM `inventory.keys` describe content indexing, not NCA
 decryption keys.
 
 ## Runtime boundary
