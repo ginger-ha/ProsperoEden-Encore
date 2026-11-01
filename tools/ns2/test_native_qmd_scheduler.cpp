@@ -126,9 +126,22 @@ int main() {
                 return address!=launch->constant_buffers[0].gpu_address;
             }));
         assert(mapped_queries==2);
+        // Native Ampere uses 49-bit QMD GPU VAs, including high CBUF
+        // address bits beyond the Switch 1/Maxwell 40-bit allocation.
         d[33]|=1U<<8;
+        const auto wide_cbuf=Tegra::DecodeNativeComputeLaunch(d);
+        assert(wide_cbuf &&
+               wide_cbuf->constant_buffers[0].gpu_address==
+                   ((std::uint64_t{0x105}<<32)|0x12340000ULL));
+        d[33]|=1U<<17;
         assert(!Tegra::DecodeNativeComputeLaunch(d));
-        d[33]&=~(1U<<8);
+        d[33]&=~((1U<<8)|(1U<<17));
+        // An enabled CBUF near the 49-bit limit may never wrap its size.
+        d[32]=0xfffffff0U;
+        d[33]=0x1ffffU|(4U<<19);
+        assert(!Tegra::DecodeNativeComputeLaunch(d));
+        d[32]=0x12340000U;
+        d[33]=5U|(4U<<19);
         // Local memory allocations have 24 significant bits, unlike
         // the older 20-bit mask that truncated native Ampere QMD3.
         d[23]=0x100080;
