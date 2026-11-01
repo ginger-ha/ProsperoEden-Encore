@@ -1949,7 +1949,7 @@ if(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL OR EDEN_SHARED_NS2_GUEST_COUNTER)
     # SelectProgram(metadata.IsSwitch2()) on every normal game load, restoring
     # 19.2 MHz after an NS2 session; G11 retains the optimized native owner.
     # The dedicated host selector guard verifies the opt-in G11 source bytes.
-    foreach(n76_target IN ITEMS core common)
+    foreach(n76_target IN ITEMS core common eden-headless)
         target_compile_definitions(${n76_target} PRIVATE EDEN_NS2_GUEST_COUNTER=1)
         target_include_directories(${n76_target} BEFORE PRIVATE
             "${EDEN_N76_CLOCK_ROOT}/include")
