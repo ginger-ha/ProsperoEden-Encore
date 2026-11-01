@@ -30,12 +30,18 @@ for rel,sha,marker in pairs:
     assert raw.decode().count(old)==1,("pinned source changed",rel)
     expected=raw.decode().replace(old,new)
     if rel=="loader/loader.cpp":
-        # Encore also accepts the pinned native NAX format on filename
-        # fallback; a magic/signature probe still has first priority.
-        nax_before='    else if (extension == "nca")\n        return FileType::NCA;'
-        nax_after=nax_before+'\n    else if (extension == "nax")\n        return FileType::NAX;'
+        # Preserve the existing NAX delta and reconstruct both reviewed
+        # ExeFS-main identification changes exactly; no audit waiver.
+        nax_before='    else if (extension == "nca")\\n        return FileType::NCA;'
+        nax_after=nax_before+'\\n    else if (extension == "nax")\\n        return FileType::NAX;'
         assert expected.count(nax_before)==1
         expected=expected.replace(nax_before,nax_after)
+        old_head="FileType IdentifyFile(FileSys::VirtualFile file) {\n    if (const auto nsp_type = IdentifyFileLoader<AppLoader_NSP>(file)) {"
+        new_head="FileType IdentifyFile(FileSys::VirtualFile file) {\n    // An ExeFS/main with its owning directory must use the directory loader.\n    // Generic NSO detection otherwise loses main.npdm identity and skips rtld/sdk.\n    // The directory validator keeps standalone NSOs on the NSO loader.\n    if (file->GetName() == \"main\") {\n        if (const auto romdir_type =\n                IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file))\n            return *romdir_type;\n    }\n    if (const auto nsp_type = IdentifyFileLoader<AppLoader_NSP>(file)) {"
+        old_tail="    } else if (const auto romdir_type =\n                   IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file)) {\n        return *romdir_type;\n    } else {\n        return FileType::Unknown;\n    }"
+        new_tail="    } else {\n        return FileType::Unknown;\n    }"
+        assert expected.count(old_head)==1 and expected.count(old_tail)==1
+        expected=expected.replace(old_head,new_head).replace(old_tail,new_tail)
     if rel == "file_sys/registered_cache.cpp":
         # Reviewed second delta: when add-on providers scan an extracted
         # title folder, never enumerate potentially enormous romfs/exefs
