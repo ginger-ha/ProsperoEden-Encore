@@ -221,6 +221,12 @@ def main() -> int:
                 "native shader dispatch required" in qmd_header and
                 "QMD dependency underflow" in qmd_header,
                 "Upstream-derived QMD3 scheduler must isolate title state, reject unsafe dispatch and retain third release slot")
+        require("ProcessNativeComputeReportSemaphore(" in puller and
+                "if (reg == 0x6c3)" in puller and
+                "if (method == 0x6c3)" in puller and
+                "NativeComputeSemaphoreReduction(" in puller and
+                "QueryType::Payload" in puller,
+                "Ampere report semaphores must work for direct and TU104 MME emits")
         require("EDEN_NS2_GPFIFO submit=" in nvdrv_source and
                 "EDEN_NS2_GPU_BIND count=" in puller and
                 "engine == 0xc7c0" in puller and
