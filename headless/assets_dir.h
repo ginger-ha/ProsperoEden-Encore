@@ -48,69 +48,156 @@ inline bool StorageDirectory(const std::filesystem::path& path) {
     return !ec && std::filesystem::is_directory(status) &&
            !std::filesystem::is_symlink(status);
 }
-inline bool HasFirmwareNca(const std::filesystem::path& folder) {
-    if (!StorageDirectory(folder)) return false;
+// Console family and storage format are orthogonal. Never assume NS2==dump
+// or NS1==NCA: either generation may use encrypted NCAs, extracted code or ZIP.
+enum class FirmwareFormat { None, Nca, Extracted, Zip };
+inline bool StorageTitleId(std::string_view name) {
+    if (name.size() != 16) return false;
+    for (char ch : name)
+        if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') ||
+              (ch >= 'A' && ch <= 'F'))) return false;
+    return true;
+}
+inline FirmwareFormat DetectFirmwareFormat(const std::filesystem::path& folder) {
+    namespace fs = std::filesystem;
+    if (!StorageDirectory(folder)) return FirmwareFormat::None;
+    if (StorageRegular(folder / "firmware-dump-named.json") &&
+        StorageRegular(folder / "ncm-system-programs.bin"))
+        return FirmwareFormat::Extracted;
+    if (StorageRegular(folder / "main.npdm") ||
+        StorageRegular(folder / "exefs/main.npdm"))
+        return FirmwareFormat::Extracted;
     std::error_code ec;
 #if defined(__PROSPERO__)
     const auto entries = ReadNativeDirectory(folder, ec);
-    if (ec) return false;
-    for (const auto& entry : entries) {
-        const auto path = entry.path();
-        if (path.extension() == ".nca" && StorageRegular(path)) return true;
-    }
 #else
-    std::size_t visited = 0;
-    for (std::filesystem::directory_iterator it{folder,
-             std::filesystem::directory_options::skip_permission_denied, ec}, end;
-         !ec && it != end && visited++ < 2048; it.increment(ec)) {
-        if (it->path().extension() == ".nca" && StorageRegular(it->path())) return true;
-    }
+    std::vector<fs::directory_entry> entries;
+    for (fs::directory_iterator it{folder, fs::directory_options::skip_permission_denied, ec}, end;
+         !ec && it != end && entries.size() < 2048; it.increment(ec))
+        entries.push_back(*it);
 #endif
-    return false;
+    if (ec) return FirmwareFormat::None;
+    bool archive = false, extracted = false;
+    for (const auto& entry : entries) {
+        const fs::path path = entry.path();
+        if (StorageRegular(path)) {
+            if (path.extension() == ".nca") return FirmwareFormat::Nca;
+            if (path.extension() == ".zip") archive = true;
+        } else if (StorageDirectory(path) && StorageTitleId(path.filename().string())) {
+            if (StorageRegular(path / "main.npdm")) extracted = true;
+        }
+    }
+    if (extracted) return FirmwareFormat::Extracted;
+    return archive ? FirmwareFormat::Zip : FirmwareFormat::None;
+}
+inline bool HasFirmwareNca(const std::filesystem::path& folder) {
+    return DetectFirmwareFormat(folder) == FirmwareFormat::Nca;
 }
 inline bool HasExtractedSystemCode(const std::filesystem::path& folder) {
-    return StorageDirectory(folder) &&
-           StorageRegular(folder / ".ns2jb-firmware-dump.json") &&
-           StorageRegular(folder / "firmware-dump-named.json") &&
-           StorageRegular(folder / "ncm-system-programs.bin");
+    return DetectFirmwareFormat(folder) == FirmwareFormat::Extracted;
 }
-// Explicit family folders take priority over the legacy flat storage path.
-// The flat layout is still preferred over any guessed/unmarked location.
-// Nested wrappers from dumps are accepted only at known, bounded levels.
+inline bool FirmwareHasNs2Identity(const std::filesystem::path& dir) {
+    if (StorageRegular(dir / ".ns2jb-firmware-dump.json")) return true;
+    // A 040... system-program folder is NS2 evidence; no NCA-only guessing.
+    std::error_code ec;
+#if defined(__PROSPERO__)
+    const auto entries = ReadNativeDirectory(dir, ec);
+#else
+    std::vector<std::filesystem::directory_entry> entries;
+    for (std::filesystem::directory_iterator it{dir,
+         std::filesystem::directory_options::skip_permission_denied, ec}, end;
+         !ec && it != end && entries.size() < 512; it.increment(ec))
+        entries.push_back(*it);
+#endif
+    if (ec) return false;
+    for (const auto& entry : entries) {
+        const auto p = entry.path();
+        const std::string name = p.filename().string();
+        if (StorageDirectory(p) && StorageTitleId(name) &&
+            name.substr(0, 3) == "040" && StorageRegular(p / "main.npdm"))
+            return true;
+    }
+    return false;
+}
+inline bool FirmwareHasNs1Identity(const std::filesystem::path& dir) {
+    // A 010... extracted system title is NS1 evidence; .nca alone is not.
+    std::error_code ec;
+#if defined(__PROSPERO__)
+    const auto entries = ReadNativeDirectory(dir, ec);
+#else
+    std::vector<std::filesystem::directory_entry> entries;
+    for (std::filesystem::directory_iterator it{dir,
+         std::filesystem::directory_options::skip_permission_denied, ec}, end;
+         !ec && it != end && entries.size() < 512; it.increment(ec))
+        entries.push_back(*it);
+#endif
+    if (ec) return false;
+    for (const auto& entry : entries) {
+        const auto p = entry.path();
+        const std::string name = p.filename().string();
+        if (StorageDirectory(p) && StorageTitleId(name) &&
+            name.substr(0, 3) == "010" && StorageRegular(p / "main.npdm"))
+            return true;
+    }
+    return false;
+}
+// Explicit family folder wins, but only when it contains a recognizable
+// firmware format; a flat NCA remains assigned to NS1 for backward compatibility.
+// Flat extracted data requires identifying contents, not a guessed generation.
 inline std::string ResolveFirmwarePath(SwitchFamily family) {
     namespace fs = std::filesystem;
     const fs::path root{AssetsDir()};
-    const auto try_candidate = [&](const fs::path& candidate) {
-        // Every candidate below has a statically known ancestry under root.
-        const fs::path relative = candidate.lexically_relative(root);
-        fs::path segment = root;
+    const auto valid = [&](const fs::path& p) {
         if (!StorageDirectory(root)) return false;
-        for (const auto& part : relative) {
-            segment /= part;
-            if (!StorageDirectory(segment)) return false;
+        fs::path walk = root;
+        for (const auto& part : p.lexically_relative(root)) {
+            walk /= part;
+            if (!StorageDirectory(walk)) return false;
         }
-        return family == SwitchFamily::Switch1 ? HasFirmwareNca(candidate)
-                                                : HasExtractedSystemCode(candidate);
+        return DetectFirmwareFormat(p) != FirmwareFormat::None;
     };
-    const char* explicit1[] = {"firmware/ns1", "firmware/switch1",
-                               "ns1/firmware", "switch1/firmware",
-                               "ns1", "switch1", "firmware"};
-    const char* explicit2[] = {"firmware/ns2", "firmware/switch2",
-                               "firmware/ns2-extracted", "ns2/firmware",
-                               "switch2/firmware", "ns2", "switch2",
-                               "firmware", "firmware/firmware"};
-    const char* const* locations = family == SwitchFamily::Switch1 ? explicit1 : explicit2;
-    const std::size_t n = family == SwitchFamily::Switch1
-        ? std::size(explicit1) : std::size(explicit2);
-    for (std::size_t i = 0; i < n; ++i) {
-        const fs::path candidate = root / locations[i];
-        if (try_candidate(candidate)) return candidate.string();
-        // Some dumps have an extra `firmware/` wrapper.
-        if (family == SwitchFamily::Switch2 && locations[i] != std::string_view{"firmware"}) {
-            if (try_candidate(candidate / "firmware")) return (candidate / "firmware").string();
+    constexpr std::array<std::string_view, 9> ns1{
+        "firmware/ns1", "firmware/switch1", "ns1/firmware",
+        "switch1/firmware", "ns1", "switch1",
+        "firmware/ns1-extracted", "firmware/switch1-extracted", "firmware"};
+    constexpr std::array<std::string_view, 10> ns2{
+        "firmware/ns2", "firmware/switch2", "firmware/ns2-extracted",
+        "ns2/firmware", "switch2/firmware", "ns2", "switch2",
+        "firmware/switch2-extracted", "firmware", "firmware/firmware"};
+    const auto check_explicit = [&](std::string_view name) -> std::string {
+        fs::path p = root / name;
+        if (valid(p)) return p.string();
+        if (valid(p / "firmware")) return (p / "firmware").string();
+        return {};
+    };
+    if (family == SwitchFamily::Switch1) {
+        for (auto name : ns1) {
+            if (name == "firmware") continue;
+            if (auto p = check_explicit(name); !p.empty()) return p;
+        }
+    } else {
+        for (auto name : ns2) {
+            if (name == "firmware" || name == "firmware/firmware") continue;
+            if (auto p = check_explicit(name); !p.empty()) return p;
         }
     }
-    return (root / "firmware").string();
+    const fs::path flat = root / "firmware";
+    if (valid(flat)) {
+        const auto kind = DetectFirmwareFormat(flat);
+        if (family == SwitchFamily::Switch2 &&
+            kind == FirmwareFormat::Extracted && FirmwareHasNs2Identity(flat))
+            return flat.string();
+        if (family == SwitchFamily::Switch1 &&
+            (kind == FirmwareFormat::Nca ||
+             (kind == FirmwareFormat::Extracted && FirmwareHasNs1Identity(flat))))
+            return flat.string();
+        // Do not claim an unlabelled ZIP or NCA belongs to Switch 2.
+    }
+    if (family == SwitchFamily::Switch2 && valid(flat / "firmware") &&
+        FirmwareHasNs2Identity(flat / "firmware")) return (flat / "firmware").string();
+    // Nonexistent default is intentional, and never passed off as detected.
+    return (root / "firmware" /
+            (family == SwitchFamily::Switch1 ? "ns1" : "ns2")).string();
 }
 inline std::string ResolveKeysPath(SwitchFamily family) {
     namespace fs = std::filesystem;
