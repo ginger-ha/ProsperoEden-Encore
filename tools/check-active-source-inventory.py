@@ -83,6 +83,7 @@ print("ENCORE_SHARED_NS2_KERNEL_SOURCE_PASS", f"new_shipping={len(shared_ns2_ker
 shared_ns2_audio_owners = {
     "ns2-runtime/audio/core/hle/service/audio/audio.cpp",
     "ns2-runtime/audio/core/hle/service/audio/nx2_audio_user_client.h",
+    "ns2-runtime/audio/core/hle/service/nx2_streamplay.h",
 }
 assert shared_ns2_audio_owners <= set(physical_all), (
     "Missing NS2 audio service owners", sorted(shared_ns2_audio_owners - set(physical_all))
