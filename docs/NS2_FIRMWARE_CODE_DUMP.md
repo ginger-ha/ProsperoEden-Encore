@@ -1,0 +1,76 @@
+# Nintendo Switch 2 — NS2JB extracted firmware code dump
+
+**Status (2026-11-01): detection/import supported; native system-service execution NOT supported.** This is not a switch from the established NS1 NCA firmware layout.
+
+## Actual input inspected
+
+The supplied `firmware.zip` is a `ns2jb-system-code-dump`, with
+`firmware-dump-named.json`, `ncm-system-programs.bin`, and
+`040.../main` (`NSO0`), `040.../main.npdm` (`META`/`ACI0`),
+`040.../code-info.bin` per system-program ID.
+
+The JSON says `complete: true` and `captured: 90`, but those describe the
+*dump process*, not an installable or entirely executable firmware:
+87/90 have both `main` and `main.npdm`; 3 have `main.npdm`
+only, with `main` explicitly absent (result 514):
+
+- `0400000000000837`
+- `0400000000000843`
+- `040000000000085D`
+
+No NCA archives, NCA Control RomFS, system-version content, or any proof
+that all guest services are present can be inferred from this archive.
+The importer deliberately does **not** synthesize those missing parts.
+
+## Safely stage your own dump
+
+On a Mac or PC from the repository checkout:
+
+```sh
+python3 tools/ns2/prepare_firmware_dump.py firmware.zip
+python3 tools/ns2/prepare_firmware_dump.py firmware.zip --output ns2-extracted
+```
+
+The first command checks all manifest SHA-256 values, program signatures,
+the declared missing files and archive paths. The second creates a **new**
+`ns2-extracted` folder without modifying the original zip, keys or existing
+firmware. It strips Apple metadata and ensures no symlink/path traversal.
+
+Upload that directory by FTP to:
+
+```text
+/data/prosperoeden/firmware/ns2-extracted/
+  .ns2jb-firmware-dump.json
+  firmware-dump-named.json
+  ncm-system-programs.bin
+  0400000000000019/main
+  0400000000000019/main.npdm
+  0400000000000019/code-info.bin
+  ...
+```
+
+Keep existing `/data/prosperoeden/firmware/*.nca` files in place and
+unchanged, with your own `keys/prod.keys`. Do not mix system-code files
+into `roms/`. Do not FTP an unexpanded ZIP into `firmware/`.
+
+## Runtime boundary
+
+Encore now reports an NS2 system-code dump if the usual firmware NCA
+check finds zero NCAs. It **never** substitutes that code dump for
+cryptographic NCA validation or reports the native guest runtime ready.
+Full extracted-system-module loading needs a verified backend for
+module registration, FS data partitions, IPC/service versions and
+guest-kernel compatibility; these are not provided by the archive itself.
+A green import does not imply either NS2 commercial title boots or a
+working Switch 2 HOS.
+
+## ExeFS game art and metadata
+
+For games placed under `roms/<game>/base/exefs/main` with an adjacent
+`main.npdm`, the library first uses the existing complete NPDM parser,
+then a strictly bounded, symlink-resistant `META`/`ACI0` title-ID
+fallback if the parser rejects unfamiliar NS2 metadata. It uses this ID
+for cached title data and cover lookup; it does **not** bypass native
+loader validation. A game with no usable title ID or an absent catalogue
+match still needs a real metadata/artwork source, and `Core load failed`
+must be diagnosed separately.
