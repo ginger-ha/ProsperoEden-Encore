@@ -74,6 +74,8 @@ def main()->int:
         'as->MapNativeImage(image->backing, image->offset,',
         'it->second.address_space->UnmapNative4K(',
         'm_video_mappings.erase(it)',
+        'it->second.address_space == as',
+        'const auto as = FindRegisteredGpuAddressSpace(packet[3]);',
         'nvmap.UnpinHandle(pool->backing)',
         'm_video_pools.Remove(pool->first_id)',
         'for (const auto& [key, mapping] : m_video_mappings)',
@@ -95,6 +97,10 @@ def main()->int:
     ):
         assert snippet in text, "Missing real parent GSV 423 lifecycle: " + snippet
 
+    for command in (314,315):
+        assert '{'+str(command)+', &IGraphicsSupervisor::ConfigureNativeWindowImagePool' in text
+    assert 'm_native_images.ConfigureWindowPool(packet[2], create)' in text
+    assert '!image->window_pool' in text
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (

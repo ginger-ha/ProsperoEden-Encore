@@ -372,6 +372,10 @@ def main() -> int:
                 "m_shared->address_spaces.Registered(id)" in session_owner and
                 "m_module->VerifyFD(" in session_owner and
                 "as->OwnsNativeProcess(m_process)" in session_owner and
+                "m_opened_gpu_as[id] = as;" in session_owner and
+                "GetDevice<Nvidia::Devices::nvdevice>" in session_owner and
+                "as.get() == live.get()" in session_owner and
+                "m_opened_gpu_as" in session_header and
                 "bool nvhost_as_gpu::OwnsNativeProcess(Kernel::KProcess* process)" in native_as_owner and
                 "m_native_process == process && vm.initialised && gmmu" in native_as_owner,
                 "Native GSV address-space resolver must enforce live FD and process-scoped GMMU")

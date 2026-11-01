@@ -818,6 +818,15 @@ int main(){
             images.Get(*first_image)->preference[1] == 1 &&
             images.Count() == 2,
             "GSV 429 owns distinct image IDs linked to genuine NVMap backing");
+    require(images.ConfigureWindowPool(*first_image, true) &&
+            images.Get(*first_image)->window_pool &&
+            !images.ConfigureWindowPool(*first_image, true) &&
+            !images.Destroy(*first_image) &&
+            images.ConfigureWindowPool(*first_image, false) &&
+            !images.Get(*first_image)->window_pool,
+            "GSV 314/315 require explicit window alias retirement");
+    require(!images.ConfigureWindowPool(0xffffffffU, true),
+            "GSV native window alias rejects unowned image IDs");
     require(!images.Destroy(0) && !images.Destroy(0xffffffffU) &&
             images.Destroy(*first_image) &&
             !images.Get(*first_image).has_value() &&
@@ -855,6 +864,11 @@ int main(){
             pools.Remove(0x80000000u) && pools.ImageCount() == 0 &&
             !pools.Remove(0x80000000u),
             "GSV 911/912 reject overlapping and stale image pools");
+    const NativeVideoImageLayout unaddressable{
+        0x1fffff000ULL, 0x1000U, 0xfffff000U, 0x100U, false, 0};
+    require(!pools.Add(0x80000010u, 3, 20, 0x200000000ULL,
+                       video[2], unaddressable),
+            "GSV 428 refuses pool images with unrepresentable 32-bit offsets");
     video[1] = 1; // NV12 4:2:0, even dimensions
     const auto nv12 = CalculateNativeVideoImageLayout(video, 2);
     require(nv12 && nv12->nv12 && nv12->image_bytes == 24576 &&
