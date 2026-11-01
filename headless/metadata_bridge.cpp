@@ -672,7 +672,7 @@ const char* eden_startup_error() {
                         std::filesystem::is_regular_file(root / "ncm-system-programs.bin",
                                                          probe_error)) {
                         std::fprintf(stderr,
-                                     "EDEN_NS2_SYSTEM_CODE_DUMP_DETECTED root=%s status=not_nca_firmware\\n",
+                                     "EDEN_NS2_SYSTEM_CODE_DUMP_DETECTED root=%s status=not_nca_firmware\n",
                                      root.string().c_str());
                         return "NS2 extracted system-code dump detected in " +
                                root.string() +
