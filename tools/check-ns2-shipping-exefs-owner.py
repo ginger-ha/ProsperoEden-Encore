@@ -65,6 +65,9 @@ kernel_root = ROOT / 'vendor/encore-active/ns2-runtime/kernel/core/hle/kernel'
 addr = (kernel_root / 'k_address_space_info.cpp').read_text()
 svc = (kernel_root / 'svc/svc_physical_memory.cpp').read_text()
 assert '.size = 16_GiB' in addr and 'KAddressSpaceInfo::Type::Heap' in addr
+assert '.size = 8_GiB' in addr and 'Ns2HeapInfo' in addr
+assert 'Settings::MemoryLayout::Memory_12Gb' in addr and 'return Ns2HeapInfo;' in addr
+assert 'if (width == 39 && type == KAddressSpaceInfo::Type::Heap' in addr
 assert 'KSystemControl::Init::GetIntendedMemorySize()' in svc
 assert '(std::max)(MainMemorySizeMax,' in svc
 for owner in ('hle/kernel/k_address_space_info.cpp', 'hle/kernel/svc/svc_physical_memory.cpp'):
