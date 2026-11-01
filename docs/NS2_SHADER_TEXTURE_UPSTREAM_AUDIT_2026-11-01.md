@@ -49,4 +49,3 @@ The shader host fixtures are `tools/ns2/test_shader_generic31.cpp`, `tools/ns2/t
 - `41313252594`: PS5 experimental native build success for previous GPU/VI2/Compute lot `ea2a5cb`; artifact contains **none** of the new shader/texture fixes here.
 - A subsequent host run is required to verify Generic31, 32 storage bindings, and native LDC/HSETP2 changes; mark as *source-integrated, not console-tested* until it finishes.
 - No claim that all upstream commits were ported: this audit is about **high-impact structural and visual gaps**, not a full diff of every third-party tree.
-
