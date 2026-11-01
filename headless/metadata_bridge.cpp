@@ -741,13 +741,18 @@ const char* eden_startup_error() {
             // decryption keys and must never be passed to KeyManager.
             // Discovery is read-only, independent of prod.keys. Do not claim
             // a functional HOS runtime from this probe.
-            const std::string extracted_dump = Eden::HasExtractedSystemCode(Eden::Ns2FirmwarePath())
-                ? Eden::Ns2FirmwarePath() : std::string{};
+            const std::string ns2_firmware = Eden::Ns2FirmwarePath();
+            const auto ns2_format = Eden::DetectFirmwareFormat(ns2_firmware);
+            const std::string extracted_dump =
+                ns2_format == Eden::FirmwareFormat::Extracted ? ns2_firmware : std::string{};
             const std::string ns2_keys = Eden::Ns2KeysPath();
-            if (!extracted_dump.empty()) {
+            if (ns2_format != Eden::FirmwareFormat::None) {
+                const char* format = ns2_format == Eden::FirmwareFormat::Nca ? "nca" :
+                                     ns2_format == Eden::FirmwareFormat::Zip ? "zip" :
+                                     "extracted";
                 std::fprintf(stderr,
-                    "EDEN_STORAGE_NS2 firmware=%s keys_dir=%s runtime=research_only\\n",
-                    extracted_dump.c_str(), ns2_keys.c_str());
+                    "EDEN_STORAGE_NS2 firmware=%s keys_dir=%s format=%s runtime=research_only\n",
+                    ns2_firmware.c_str(), ns2_keys.c_str(), format);
             }
             if (!extracted_dump.empty())
                 std::fprintf(stderr, "EDEN_NS2_NCM_INVENTORY_DISCOVERED root=%s crypto_keys=none_imported status=research_only\n",
