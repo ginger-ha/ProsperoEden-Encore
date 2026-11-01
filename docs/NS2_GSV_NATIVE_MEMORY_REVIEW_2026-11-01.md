@@ -85,3 +85,20 @@ busy resources are never forcibly unlocked.
 The resource-lifetime code is native GPU preparation, not yet a PS5 Vulkan
 image allocation, 4K GPU shader execution or presentation. The NS1 renderer
 and ordinary release selectors are unchanged.
+
+## Native video image pools and 4K GPU mapping (TIPC 911/912, 426/427/428)
+
+The research supervisor now has a separate, bounded native video-image pool
+ledger. Command 911 computes reviewed linear RGBA or NV12 image layout,
+requires owned/allocated process-bound NVMap memory and retains a real
+internal NVMap duplicate plus a device pin. Commands 428/426 resolve actual
+image descriptors and map a reviewed 4K-aligned image slice into the
+registered process GMMU. The GMMU address-space owner allocates the GPU VA,
+installs the PTEs, and supports exact rollback/unmap. Command 427 decrements
+mapping references and unmaps only after the final caller releases it.
+Command 912 rejects destruction of a pool with live mappings. Supervisor
+teardown drains image VA mappings, pools and native backing in this order.
+
+This does not provide video decode or a VI2 present/layer consumer: metadata
+and real GMMU mappings alone cannot produce first Switch 2 video output.
+No fictitious Vulkan image or completed graphics fence is emitted.
