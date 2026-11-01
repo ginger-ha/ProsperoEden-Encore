@@ -8,6 +8,18 @@ BASE = ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv
 source = (BASE / "nvhost_gpu.cpp").read_text()
 header = (BASE / "nvhost_gpu.h").read_text()
 native_puller = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp").read_text()
+# BindObject must not change the active subchannel before native class
+# authentication, or a rejected Ampere bind can hijack subsequent methods.
+bind_source = native_puller.split("void Puller::ProcessBindMethod(", 1)[1].split(
+    "void Puller::ProcessFenceActionMethod(", 1)[0]
+ampere_3d_bind = bind_source.split(
+    "if (engine_id == static_cast<EngineID>(0xc797)) {", 1)[1].split(
+    "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[0]
+ampere_dma_bind = bind_source.split(
+    "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[1].split(
+    "switch (engine_id)", 1)[0]
+binding_write = "bound_engines[method_call.subchannel] = engine_id;"
+
 required_puller = (
     "engine_id == static_cast<EngineID>(0xc797)",
     "CallNative3D(dma_pusher,method_call.method,",
@@ -46,6 +58,15 @@ checks = [
     (all(s in header for s in required_header), "native header exposes caller FD"),
     (all(s in native_puller for s in required_puller),
      "actual research Puller owns authenticated native 3D/Turing macro dispatch"),
+    (binding_write not in bind_source.split(
+        "if (engine_id == static_cast<EngineID>(0xc797)) {", 1)[0],
+     "native classes do not commit binding before authentication"),
+    (ampere_3d_bind.count(binding_write) == 1 and
+     ampere_3d_bind.index(binding_write) > ampere_3d_bind.index("if (native_3d_failed || native_macro_method)"),
+     "native 3D bind commits only after channel authorization and valid MME state"),
+    (ampere_dma_bind.count(binding_write) == 1 and
+     ampere_dma_bind.index(binding_write) > ampere_dma_bind.index("IsNative("),
+     "native DMA bind commits only after channel authorization"),
     ("UsesNativeAbi()" not in source + header, "no unscoped native ABI call"),
     (source.count("return SubmitGPFIFOImpl(params, std::move(entries), fd);") == 2,
      "both GPFIFO submit paths propagate FD"),
