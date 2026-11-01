@@ -12,6 +12,13 @@ SERVICE = (ROOT / "headless/prosperoeden/eden_services.cpp").read_text()
 assert HEADER.exists()
 assert 'sceUserServiceGetForegroundUser(&user_id)' in SERVICE
 assert 'avatar128.dds' in SERVICE
+assert 'bool IsDecodableAvatarFile(const std::string& path)' in SERVICE
+assert 'stbi_info(path.c_str(), &width, &height, &channels)' in SERVICE
+assert 'pe::gfx::load_avatar_dds(path, &decoded)' in SERVICE
+profile_selection = SERVICE.split('std::string EdenServices::profile_avatar()', 1)[1].split('unsigned EdenServices::controllers()', 1)[0]
+assert profile_selection.count('IsDecodableAvatarFile(') == 4
+assert 'IsReadableAvatarFile(' not in profile_selection
+assert 'status=png_decode_failed fallback=dds' in SERVICE
 assert 'load_avatar_dds(resolved, image)' in SERVICE
 
 # The native profile is resolved periodically, with image-source revision

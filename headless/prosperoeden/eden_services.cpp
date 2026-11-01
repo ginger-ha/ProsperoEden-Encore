@@ -86,6 +86,34 @@ bool IsReadableAvatarFile(const std::string& path) {
     (void)::close(fd);
     return readable;
 }
+// Check actual image decodability off the UI thread, not merely stat/open.
+// A readable but corrupt PS5 PNG must not shadow the same user's valid DDS.
+bool IsDecodableAvatarFile(const std::string& path) {
+    if (!IsReadableAvatarFile(path)) return false;
+    if (path.ends_with(".dds")) {
+        pe::gfx::Image decoded;
+        const bool valid = pe::gfx::load_avatar_dds(path, &decoded) && !decoded.empty();
+        if (!valid) {
+            static std::atomic_flag warned = ATOMIC_FLAG_INIT;
+            if (!warned.test_and_set())
+                std::fprintf(stderr, "EDEN_PROFILE_AVATAR status=dds_decode_failed\n");
+        }
+        return valid;
+    }
+    int width = 0, height = 0, channels = 0;
+    const bool header_ok = stbi_info(path.c_str(), &width, &height, &channels) != 0 &&
+                           width > 0 && height > 0 && width <= 1024 && height <= 1024;
+    stbi_uc* rgba = header_ok ? stbi_load(path.c_str(), &width, &height, &channels, 4) : nullptr;
+    const bool valid = rgba != nullptr;
+    if (rgba) stbi_image_free(rgba);
+    if (!valid) {
+        static std::atomic_flag warned = ATOMIC_FLAG_INIT;
+        if (!warned.test_and_set())
+            std::fprintf(stderr, "EDEN_PROFILE_AVATAR status=png_decode_failed fallback=dds\n");
+    }
+    return valid;
+}
+
 #endif
 
 // Only a deconstructed title's base content counts towards its Library size.
@@ -1608,13 +1636,13 @@ std::string EdenServices::profile_avatar() {
     constexpr const char* staged_marker="/data/NiakPS5/assets/niak-profile-source.txt";
     if (pe::ps5::avatar_owner_marker_matches(staged_marker,
             static_cast<std::uint32_t>(user_id), "png") &&
-        IsReadableAvatarFile(std::string(staged_root)+"niak-profile.png")) {
+        IsDecodableAvatarFile(std::string(staged_root)+"niak-profile.png")) {
         std::fprintf(stderr,"EDEN_PROFILE_AVATAR format=staged_png status=found\n");
         return std::string(staged_root)+"niak-profile.png";
     }
     if (pe::ps5::avatar_owner_marker_matches(staged_marker,
             static_cast<std::uint32_t>(user_id), "dds") &&
-        IsReadableAvatarFile(std::string(staged_root)+"niak-profile.dds")) {
+        IsDecodableAvatarFile(std::string(staged_root)+"niak-profile.dds")) {
         std::fprintf(stderr,"EDEN_PROFILE_AVATAR format=staged_dds status=found\n");
         return std::string(staged_root)+"niak-profile.dds";
     }
@@ -1632,13 +1660,13 @@ std::string EdenServices::profile_avatar() {
         for (const char* prefix : {"0x", "0X", ""}) {
             const std::string root =
                 std::string("/system_data/priv/cache/profile/") + prefix + id + "/";
-            if (IsReadableAvatarFile(root + "avatar.png")) {
+            if (IsDecodableAvatarFile(root + "avatar.png")) {
                 std::fprintf(stderr, "EDEN_PROFILE_AVATAR format=png status=found\n");
                 return root + "avatar.png";
             }
             for (const char* name : {"avatar128.dds", "avatar260.dds",
                                      "avatar64.dds", "avatar440.dds"}) {
-                if (IsReadableAvatarFile(root + name)) {
+                if (IsDecodableAvatarFile(root + name)) {
                     std::fprintf(stderr, "EDEN_PROFILE_AVATAR format=dds status=found\n");
                     return root + name;
                 }

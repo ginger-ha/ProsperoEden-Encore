@@ -51,6 +51,15 @@ native_romfs = (root / "vendor/sources/eden/src/core/file_sys/romfs.h").read_tex
 assert native_extracted.count('#include "core/file_sys/romfs.h"') == 1
 assert 'romfs = FileSys::CreateRomFS(std::move(extracted_romfs), nullptr);' in native_extracted
 assert 'VirtualFile CreateRomFS(VirtualDir dir, VirtualDir ext = nullptr);' in native_romfs
+# The selected native loader must route an extracted ExeFS/main to the
+# directory loader *before* generic NSO detection (rtld/sdk + NPDM identity).
+loader_cpp = (root / "vendor/encore-active/eden-core/src/core/loader/loader.cpp").read_text()
+identify = loader_cpp.split("FileType IdentifyFile(FileSys::VirtualFile file) {", 1)[1].split("\n}\n", 1)[0]
+assert 'file->GetName() == "main"' in identify
+assert identify.count("IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file)") == 1
+assert identify.index("IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file)") < identify.index("IdentifyFileLoader<AppLoader_NSO>(file)")
+assert 'return *nso_type;' in identify  # bare NSOs must still load as NSO
+
 # The real launcher must read the owning NPDM for extracted program identity,
 # rather than claiming the 20-40 MiB 'main' executable is a complete game.
 bridge = (root / "headless/metadata_bridge.cpp").read_text()
