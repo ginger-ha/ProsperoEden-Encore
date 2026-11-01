@@ -299,6 +299,8 @@ jobs:
             tools/ns2/test_native_gpu_submission.cpp \
             -o build-ns2-a64/native-gpfifo-test
           build-ns2-a64/native-gpfifo-test
+      - name: Validate real native GMMU VA partitions with C++20 UBSan
+        run: python3 -B tools/check-ns2-gmmu-va-layout-host.py
       - name: Syntax-check experimental native 4KiB NVDRV address-space owner (GCC)
         shell: bash
         run: |
