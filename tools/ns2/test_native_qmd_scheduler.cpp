@@ -116,6 +116,13 @@ int main() {
         d[33]|=1U<<8;
         assert(!Tegra::DecodeNativeComputeLaunch(d));
         d[33]&=~(1U<<8);
+        // Local memory allocations have 24 significant bits, unlike
+        // the older 20-bit mask that truncated native Ampere QMD3.
+        d[23]=0x100080;
+        d[50]=0x100040;
+        const auto widened=Tegra::DecodeNativeComputeLaunch(d);
+        assert(widened && widened->local_pos_bytes==0x100080 &&
+               widened->local_crs_bytes==0x100040);
         d[12]=0;
         assert(!Tegra::DecodeNativeComputeLaunch(d));
         d[12]=3;d[18]=0x30;
