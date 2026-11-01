@@ -2310,10 +2310,23 @@ endif()
 # Research-only Switch 2 AM command 320. Keep the Encore-maintained application
 # metadata service as the source ancestor: title-version diagnostics must survive.
 option(EDEN_NS2_AM_EXPERIMENTAL
-    "Research only: Switch 2 application-manager command 320" OFF)
-if(EDEN_NS2_AM_EXPERIMENTAL)
-    if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
-        message(FATAL_ERROR "NS2 AM command 320 requires experimental metadata")
+    "Research opt-in for Switch 2 application-manager command 320" OFF)
+# A safe, shared NS2 applet compatibility command: the versioned native AM
+# owner adds command 320 while retaining all existing Encore handlers.
+# Keep the older command behavior for NS1 and leave advanced proxy/scale
+# services as separately qualified research paths.
+set(EDEN_SHARED_NS2_AM OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_AM ON)
+endif()
+if(EDEN_NS2_AM_EXPERIMENTAL OR EDEN_SHARED_NS2_AM)
+    if(EDEN_NS2_AM_EXPERIMENTAL)
+        if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
+            message(FATAL_ERROR "NS2 AM research command 320 requires experimental metadata")
+        endif()
+    endif()
+    if(NOT EDEN_REVIEWED_DUAL_NPDM)
+        message(FATAL_ERROR "NS2 AM shared command 320 requires reviewed metadata")
     endif()
     set(EDEN_NS2_AM_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/am")
     if(NOT EXISTS "${EDEN_NS2_AM_ROOT}/core/hle/service/am/service/application_functions.cpp"
