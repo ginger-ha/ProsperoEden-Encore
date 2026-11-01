@@ -268,6 +268,9 @@ int main(int argc,char** argv) {
     Require(session_compute.ComputeMetadataReady() &&
             session_compute.words==compute.words && guest.reads>0,
             "QMD-owned compute capture did not compile identical SPIR-V");
+    // The existing graphics-stage isolation tests must begin with a clean
+    // guest read counter; the Compute test intentionally performed real reads.
+    guest.reads=0;
     const auto token=registry.CaptureTicket(&process);
     Require(token.has_value(),"no live NS2 GPU ticket");
     const auto no_vertex_a=compile(Shader::Stage::VertexA);
