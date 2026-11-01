@@ -80,8 +80,18 @@ for relative in shared_ns2_kernel_owners:
         assert relative.removeprefix("ns2-runtime/kernel/core/") in kernel_select
 assert 'ns2-runtime/process/core/core.cpp' in kernel_select
 print("ENCORE_SHARED_NS2_KERNEL_SOURCE_PASS", f"new_shipping={len(shared_ns2_kernel_owners)}")
+shared_ns2_audio_owners = {
+    "ns2-runtime/audio/core/hle/service/audio/audio.cpp",
+    "ns2-runtime/audio/core/hle/service/audio/nx2_audio_user_client.h",
+}
+assert shared_ns2_audio_owners <= set(physical_all), (
+    "Missing NS2 audio service owners", sorted(shared_ns2_audio_owners - set(physical_all))
+)
+assert not shared_ns2_audio_owners.intersection(set(research_paths) | shared_ns2_kernel_owners)
+assert 'set(EDEN_SHARED_NS2_AUDIO ON)' in kernel_select
+print("ENCORE_SHARED_NS2_AUDIO_SOURCE_PASS", f"owners={len(shared_ns2_audio_owners)}")
 physical = [p for p in physical_all
-            if p not in set(research_paths) | shared_ns2_kernel_owners]
+            if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {
