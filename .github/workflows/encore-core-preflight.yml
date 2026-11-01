@@ -90,6 +90,7 @@ jobs:
           python3 -B tools/check-exefs-directory-host.py
           python3 -B tools/check-ns2-extracted-inputs-host.py
           python3 -B tools/check-ns2-shipping-exefs-owner.py
+          python3 -B tools/check-ns2-gpu-access-svc-host.py
           python3 -B tools/check-firmware-matrix-host.py
           python3 -B tools/check-firmware-zip-native-host.py
           python3 -B tools/check-firmware-auto-import-host.py

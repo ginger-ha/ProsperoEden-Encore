@@ -2234,6 +2234,32 @@ if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)
     endif()
 endif()
 
+# The Switch 2 GPU-access memory SVC is a validated kernel admission,
+# not a simulated GPU mapping or a successful native submission. A separate
+# exact NS2 process PID and memory-profile guard preserves NS1's SVC table.
+set(EDEN_SHARED_NS2_GPU_ACCESS_SVC OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_GPU_ACCESS_SVC ON)
+endif()
+if(EDEN_SHARED_NS2_GPU_ACCESS_SVC)
+    set(EDEN_NS2_GPU_ACCESS_ROOT "${PORT_ROOT}/vendor/encore-active/ns2-runtime/gpu_access_svc")
+    set(EDEN_NS2_GPU_ACCESS_SOURCE "${EDEN_NS2_GPU_ACCESS_ROOT}/core/hle/kernel/svc.cpp")
+    if(NOT EXISTS "${EDEN_NS2_GPU_ACCESS_SOURCE}" OR
+       NOT EXISTS "${EDEN_NS2_GPU_ACCESS_ROOT}/core/hle/kernel/ns2_gpu_memory_attribute.h" OR
+       NOT EXISTS "${EDEN_NS2_CORE_HELPERS}/core/loader/ns2_svc_trace.h")
+        message(FATAL_ERROR "Missing validated NS2 GPU-access SVC owner")
+    endif()
+    get_target_property(eden_ns2_gpu_access_sources core SOURCES)
+    list(FIND eden_ns2_gpu_access_sources "hle/kernel/svc.cpp" eden_ns2_gpu_access_index)
+    if(eden_ns2_gpu_access_index EQUAL -1)
+        message(FATAL_ERROR "NS1 kernel SVC ownership changed: review NS2 GPU-access selector")
+    endif()
+    list(REMOVE_ITEM eden_ns2_gpu_access_sources "hle/kernel/svc.cpp")
+    list(APPEND eden_ns2_gpu_access_sources "${EDEN_NS2_GPU_ACCESS_SOURCE}")
+    set_property(TARGET core PROPERTY SOURCES "${eden_ns2_gpu_access_sources}")
+    target_include_directories(core BEFORE PRIVATE "${EDEN_NS2_GPU_ACCESS_ROOT}")
+endif()
+
 # N52: process-run admission in the single maintained vendor source.
 option(EDEN_NS2_PROCESS_RUN_GUARD_EXPERIMENTAL
     "Research only: reject real NS2 KProcess::Run startup errors" OFF)

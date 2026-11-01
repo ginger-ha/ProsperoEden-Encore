@@ -122,4 +122,11 @@ assert 'service_context.CloseEvent(event)' in streamplay
 assert 'rb.PushCopyObjects(ctx, event->GetReadableEvent())' in streamplay
 assert 'rb.PushIpcInterface<INx2StreamPlayUserService>(ctx, system)' in streamplay
 
+# Shared NS2 GPU-access SVC 0x80 is restricted to an actual NS2
+# ExeFS process and the 12 GiB profile; no blanket success of unknown calls.
+gpu_svc = (ROOT / 'vendor/encore-active/ns2-runtime/gpu_access_svc/core/hle/kernel/svc.cpp').read_text()
+assert 'Eden::NS2::SvcTrace::IsActive(process.GetProcessId())' in gpu_svc
+assert 'Settings::MemoryLayout::Memory_12Gb' in gpu_svc
+assert 'process.GetPageTable().Contains(address, size)' in gpu_svc
+assert 'else if (process.Is64Bit())' in gpu_svc
 print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1 audio_u=1 streamplay=1")

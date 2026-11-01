@@ -91,8 +91,16 @@ assert shared_ns2_audio_owners <= set(physical_all), (
 assert not shared_ns2_audio_owners.intersection(set(research_paths) | shared_ns2_kernel_owners)
 assert 'set(EDEN_SHARED_NS2_AUDIO ON)' in kernel_select
 print("ENCORE_SHARED_NS2_AUDIO_SOURCE_PASS", f"owners={len(shared_ns2_audio_owners)}")
+shared_ns2_gpu_access_owners = {
+    "ns2-runtime/gpu_access_svc/core/hle/kernel/svc.cpp",
+    "ns2-runtime/gpu_access_svc/core/hle/kernel/ns2_gpu_memory_attribute.h",
+}
+assert shared_ns2_gpu_access_owners <= set(physical_all), sorted(shared_ns2_gpu_access_owners - set(physical_all))
+assert not shared_ns2_gpu_access_owners.intersection(set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners)
+assert 'set(EDEN_SHARED_NS2_GPU_ACCESS_SVC ON)' in kernel_select
+print("ENCORE_SHARED_NS2_GPU_ACCESS_SOURCE_PASS", f"owners={len(shared_ns2_gpu_access_owners)}")
 physical = [p for p in physical_all
-            if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners]
+            if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners | shared_ns2_gpu_access_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {
