@@ -93,6 +93,27 @@ reconstructed = reconstructed.replace(
     n3m_blocks[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\n', 1)
 reconstructed = reconstructed.replace(n3m_blocks[2], '', 1)
 assert n3m_flag not in reconstructed, 'N3m experimental source still in NS1 baseline'
+# The separately authenticated Ampere Compute cache admission gate is a
+# research-only addition, not part of the original NS1 Vulkan driver cache
+# baseline. Remove its ONE exact reviewed block before comparing Git blobs.
+# Reject missing, duplicate, or modified blocks rather than weakening N56.
+native_compute_guard = """#if defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
+    // An authenticated Ampere compute engine must never enter the legacy
+    // Maxwell ShaderCache::ComputeShader() path: those 128-bit instructions
+    // need the new QMD-scoped native SPIR-V pipeline and resource binding.
+    // Until the renderer owns that real pipeline and submits the dispatch,
+    // reject instead of compiling native bytes as Switch 1 Maxwell.
+    if (Service::Nvidia::Devices::NativeGpuChannelRegistry::Instance()
+            .CaptureComputeTicket(kepler_compute))
+        return nullptr;
+#endif
+"""
+assert reconstructed.count(native_compute_guard) == 1, (
+    'U91 authenticated native Compute guard moved outside reviewed block')
+compute_anchor = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\\n"
+assert reconstructed.count(compute_anchor + native_compute_guard) == 1, (
+    'U91 Compute guard no longer precedes legacy Maxwell cache admission')
+reconstructed = reconstructed.replace(native_compute_guard, '', 1)
 data=reconstructed.encode()
 assert hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()==("0d4c16e0afab6d18b44e51dc5cb9dda512f0557e"), "N56 native owner differs outside reviewed guard"
 assert 'EDEN_NS2_PIPELINE_CACHE_EXPERIMENTAL OR' in CMAKE
