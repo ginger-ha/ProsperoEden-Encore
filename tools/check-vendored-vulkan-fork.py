@@ -386,6 +386,44 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         normalized.write_text(baseline)
         normalized_expected[name] = normalized
 
+    # Reproduce the exact reviewed PS5 presentation-layer high-water policy.
+    # Normalization removes only the bounded native replacement; the active
+    # renderer still keeps up to 8 idle layers without a device-wide stall.
+    blit_name = 'vulkan_blit_screen.cpp'
+    blit = expected[blit_name].read_text()
+    native_layer_policy = (
+        "    // The compositor reads exactly framebuffers.size() layers. Preserve a\n"
+        "    // bounded high-water reserve so transient HUD layer shrink/growth does\n"
+        "    // not destroy GPU-referenced resources and force a device-wide idle.\n"
+        "    // More than eight retained layers are reclaimed only after an ordinary\n"
+        "    // GPU drain; active layers are never capped or skipped.\n"
+        "    constexpr size_t kMaxRetainedLayers = 8;\n"
+        "    const bool retire_excess_layers =\n"
+        "        layers.size() > kMaxRetainedLayers && layers.size() > framebuffers.size();\n"
+        "    if (!rebuild_layers && !retire_excess_layers &&\n"
+        "        layers.size() < framebuffers.size()) {"
+    )
+    baseline_layer_policy = "    if (!rebuild_layers && layers.size() < framebuffers.size()) {"
+    native_retirement = (
+        "    } else if (rebuild_layers || retire_excess_layers) {\n"
+        "        // Only true layout changes or over-budget retirement can destroy\n"
+        "        // resources still captured by queued Vulkan command buffers."
+    )
+    baseline_retirement = (
+        "    } else if (rebuild_layers || layers.size() != framebuffers.size()) {\n"
+        "        // Removal destroys GPU-referenced descriptors/images. Reconfiguration\n"
+        "        // has already waited in the resource_update_required block above."
+    )
+    assert blit.count(native_layer_policy) == 1, 'PS5 bounded Vulkan layer policy moved'
+    assert blit.count(native_retirement) == 1, 'PS5 layer retirement policy moved'
+    assert blit.count('WaitIdle(device);') >= 1, 'PS5 layer GPU fence guard absent'
+    baseline_blit = blit.replace(native_layer_policy, baseline_layer_policy)
+    baseline_blit = baseline_blit.replace(native_retirement, baseline_retirement)
+    blit_path = temp / 'normalized-vendor-present-layers' / blit_name
+    blit_path.parent.mkdir(parents=True, exist_ok=True)
+    blit_path.write_text(baseline_blit)
+    normalized_expected[blit_name] = blit_path
+
     mismatches=[name for name in sorted(actual) if not filecmp.cmp(actual[name],normalized_expected.get(name, expected[name]),shallow=False)]
     if mismatches:
         # Print a tightly bounded exact diff before failing. The generator and
