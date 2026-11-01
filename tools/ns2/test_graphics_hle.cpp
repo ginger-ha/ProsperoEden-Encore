@@ -768,6 +768,33 @@ int main(){
             native_memory.OwnedIds().empty(),
             "GSV 114/112 track externally owned physical GPU backing");
 
+    // Native 429/430 image IDs retain a separately owned NVMap backing
+    // reference; creation is not a claim of Vulkan rendering or presentation.
+    preferences[6] = 1;
+    const auto image_requirements = CalculateNativeImageRequirements(preferences, 2);
+    require(image_requirements && image_requirements->size == 65536,
+            "native image requirements available for backing registry");
+    NativeImageLedger images;
+    require(!images.Create(0, 0x10000, *image_requirements, preferences) &&
+            !images.Create(16, 0x8000, *image_requirements, preferences) &&
+            images.Count() == 0,
+            "GSV 429 rejects absent or undersized backing memory");
+    const auto first_image = images.Create(16, 0x10000, *image_requirements, preferences);
+    const auto second_image = images.Create(16, 0x10000, *image_requirements, preferences);
+    require(first_image && *first_image == 1 &&
+            second_image && *second_image == 2 &&
+            images.Get(*first_image)->backing == 16 &&
+            images.Get(*first_image)->size == 0x10000 &&
+            images.Get(*first_image)->preference[1] == 1 &&
+            images.Count() == 2,
+            "GSV 429 owns distinct image IDs linked to genuine NVMap backing");
+    require(!images.Destroy(0) && !images.Destroy(0xffffffffU) &&
+            images.Destroy(*first_image) &&
+            !images.Get(*first_image).has_value() &&
+            !images.Destroy(*first_image) && images.Count() == 1 &&
+            images.Destroy(*second_image) && images.Records().empty(),
+            "GSV 430 rejects stale images and retires independent references");
+
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
             generic->backend==static_cast<u8>(Tegra::PTEKind::GENERIC_16BX2),

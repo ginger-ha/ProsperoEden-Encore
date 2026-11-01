@@ -54,3 +54,15 @@ This is **actual backing ownership**, not a Vulkan VkImage, Ampere shader
 execution or VI2 present path. Command 429 remains unsupported until the
 native image registry and renderer can consume a correctly retained backing.
 No Switch 1 release source has been replaced by this change.
+
+## Native image registry 429/430 (research only)
+
+Commands **429** and **430** are now routed through a bounded 1024-image
+registry. Creating an image requires the known 16-word block-linear layout,
+a fully allocated and bound NVMap backing handle large enough for its
+calculated size, and an actual NVMap internal duplicate. Destroying the image
+releases that internal duplicate and its unique logical image ID. Unreleased
+images retain the backing until supervisor teardown drains those references.
+This is the same resource-lifetime dependency used by the upstream GSV; the
+PS5 Vulkan/VI2 image consumer, Ampere lowering and final screen presentation
+remain to be integrated and proven on console. Unsupported formats fail.

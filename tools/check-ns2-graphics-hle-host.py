@@ -54,6 +54,16 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    for snippet in (
+        'm_native_images.Create(backing, handle->size,',
+        'm_native_images.Destroy(packet[2])',
+        'handle->Duplicate(true)',
+        'FreeHandle(\n                image->backing, true)',
+        'for (const auto& [image_id, image] : m_native_images.Records())',
+    ):
+        assert snippet in text, "Missing native image NVMap ownership: " + snippet
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text
