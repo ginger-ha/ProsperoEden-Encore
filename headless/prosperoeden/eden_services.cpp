@@ -5,6 +5,7 @@
 #endif
 
 #include "assets_dir.h"
+#include "ns2_title_catalog.h"
 #include "crash_report.h"
 #ifdef PS5_NATIVE
 #include "boot_trace.h"
@@ -780,6 +781,55 @@ bool FetchCaseFace(const std::vector<std::string>& candidates,
     return false;
 }
 
+// A small, independently sourced NS2 fallback for titles Nlib/LaunchBox omit.
+// Fetch only allowlisted retail product URLs on the existing media worker.
+bool FetchKnownNs2Front(std::uint64_t id, const std::atomic<bool>* cancel) {
+    const auto* known = Eden::Ns2Catalog::Find(id);
+    if (!known || known->front_host.empty() || known->front_path.empty() ||
+        (cancel && cancel->load(std::memory_order_acquire))) return false;
+    const std::string target = CaseFacePath(id, "front");
+    if (ValidNlibTga(target)) return false;
+    static std::array<std::mutex, 16> locks;
+    std::scoped_lock per_title{locks[id % locks.size()]};
+    if (ValidNlibTga(target)) return false;
+    static std::mutex retry_guard;
+    static std::unordered_map<std::uint64_t, std::chrono::steady_clock::time_point> retry;
+    {
+        std::lock_guard guard{retry_guard};
+        const auto existing = retry.find(id);
+        if (existing != retry.end() && std::chrono::steady_clock::now() < existing->second)
+            return false;
+        retry[id] = std::chrono::steady_clock::now() + std::chrono::minutes(5);
+    }
+    const auto body = Common::Net::MakeRequest(std::string(known->front_host),
+                                                std::string(known->front_path));
+    if (!body || body->size() < 1024 || body->size() > (16u << 20) ||
+        (cancel && cancel->load(std::memory_order_acquire))) {
+        std::fprintf(stderr, "EDEN_NS2_COVER title=%016llX status=unavailable\n",
+                     static_cast<unsigned long long>(id));
+        return false;
+    }
+    if (static_cast<unsigned char>((*body)[0]) != 0xff ||
+        static_cast<unsigned char>((*body)[1]) != 0xd8) return false;
+    int w=0, h=0, channels=0;
+    if (!stbi_info_from_memory(reinterpret_cast<const unsigned char*>(body->data()),
+                               static_cast<int>(body->size()), &w, &h, &channels) ||
+        w < 128 || h < 200 || w > 4096 || h > 4096 ||
+        static_cast<std::uint64_t>(w) * h > 3840u * 2160u) return false;
+    (void)mkdir(Eden::CoversDir().c_str(), 0777);
+    const std::string staged = target + ".new";
+    if (!WriteJpegTga(*body, staged, true) ||
+        std::rename(staged.c_str(), target.c_str()) != 0) {
+        (void)std::remove(staged.c_str());
+        return false;
+    }
+    std::ofstream source(target + ".source", std::ios::trunc);
+    if (source) source << known->front_host << known->front_path << '\n';
+    std::fprintf(stderr, "EDEN_NS2_COVER title=%016llX status=stored bytes=%zu\n",
+                 static_cast<unsigned long long>(id), body->size());
+    return true;
+}
+
 unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
                       const std::string& alternate_name, int language_choice,
                       const std::atomic<bool>* cancel) {
@@ -794,7 +844,7 @@ unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
         std::fprintf(stderr, "EDEN_CASE_LOOKUP title=%016llX status=no-match name=%s alternate=%s index_entries=%zu\n",
                      static_cast<unsigned long long>(title_id), name.c_str(),
                      alternate_name.c_str(), index.size());
-        return 0;
+        return FetchKnownNs2Front(title_id, cancel) ? 1u : 0u;
     }
     std::fprintf(stderr,
                  "EDEN_CASE_LOOKUP title=%016llX status=match front=%zu back=%zu spine=%zu scenes=%zu/%zu/%zu\n",
@@ -1802,6 +1852,15 @@ std::vector<pe::ui::Game> EdenServices::games(const std::atomic<bool>* cancel) {
             if (cancel && cancel->load(std::memory_order_acquire))
                 return {}; // extraction finished; skip ID/Nlib/add-on metadata
             game.title_id = ResolveTitleId(path, file);
+            if (const auto* known = Eden::Ns2Catalog::Find(game.title_id)) {
+                game.name = std::string(known->name);
+                SaveTitle(file, game.name);
+                if (!known->publisher.empty()) game.publisher = std::string(known->publisher);
+                if (!known->release_date.empty()) game.release_date = std::string(known->release_date);
+                if (!known->genre.empty()) game.categories = std::string(known->genre);
+                std::fprintf(stderr, "EDEN_NS2_TITLE_RESOLVED id=%016llX name=%s\n",
+                             static_cast<unsigned long long>(game.title_id), game.name.c_str());
+            }
             if (game.title_id != 0) {
                 const NlibEnrichment nlib = CachedNlibEnrichment(game.title_id, language_choice);
                 if (!nlib.icon.empty()) game.cover = nlib.icon;
@@ -1812,15 +1871,16 @@ std::vector<pe::ui::Game> EdenServices::games(const std::atomic<bool>* cancel) {
                 if (!nlib.name.empty()) game.name = nlib.name;
                 game.intro = nlib.intro;
                 game.description = nlib.description;
-                game.publisher = nlib.publisher;
+                if (!nlib.publisher.empty()) game.publisher = nlib.publisher;
                 game.developer = nlib.developer;
-                game.release_date = nlib.release_date;
-                game.categories = nlib.categories;
+                if (!nlib.release_date.empty()) game.release_date = nlib.release_date;
+                if (!nlib.categories.empty()) game.categories = nlib.categories;
                 // Render already-cached real paper scans immediately during
                 // local enumeration, without waiting for network enrichment.
                 const pe::ui::BoxArt cached_case = box_art(game.title_id);
                 game.box_front = cached_case.front;
                 game.box_back = cached_case.back;
+                if (game.cover.empty() && !game.box_front.empty()) game.cover = game.box_front;
             }
             const GameLanguage language = LanguageFor(path, game.title_id, language_choice);
             game.addons = AddOnSummary(game.title_id);
@@ -1872,10 +1932,12 @@ pe::ui::Game EdenServices::enrich_game_media(pe::ui::Game game,
     NlibEnrichment enrichment = EnsureNlibEnrichment(game.title_id, language_choice, cancel);
     game.artwork_changed = enrichment.artwork_changed;
     if (!enrichment.icon.empty()) game.cover = std::move(enrichment.icon);
+    else if (game.cover.empty() && !game.box_front.empty()) game.cover = game.box_front;
     if (!enrichment.hero.empty()) game.hero = std::move(enrichment.hero);
     if (!enrichment.screenshots.empty()) game.screenshots = std::move(enrichment.screenshots);
     if (enrichment.max_players > 0) game.max_players = enrichment.max_players;
     if (!enrichment.name.empty()) game.name = std::move(enrichment.name);
+    else if (const auto* known = Eden::Ns2Catalog::Find(game.title_id)) game.name = std::string(known->name);
     if (!enrichment.intro.empty()) game.intro = std::move(enrichment.intro);
     if (!enrichment.description.empty()) game.description = std::move(enrichment.description);
     if (!enrichment.publisher.empty()) game.publisher = std::move(enrichment.publisher);
