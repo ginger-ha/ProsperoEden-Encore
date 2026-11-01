@@ -98,7 +98,8 @@ int main(int argc,char** argv) {
     for (bool dispatcher:{false,true}) {
         const auto compiled=CompileReviewedNativeVertexSpirv(
             *env,host,profile,Shader::RuntimeInfo{},dispatcher);
-        Require(compiled.Ready(),"real PS5 renderer bridge must produce owned SPIR-V");
+        Require(compiled.PipelineMetadataReady() && compiled.stage == Shader::Stage::VertexB,
+                "native VertexB shader must return pipeline Info and stage");
         const auto& words=compiled.words;
         if (!dispatcher) baseline_direct=words;
         Require(words.size()>5&&words[0]==0x07230203U,"missing SPIR-V magic");
@@ -129,7 +130,8 @@ int main(int argc,char** argv) {
             "legacy VertexB API must reject a real Fragment stage");
     const auto fragment=CompileReviewedNativeGraphicsSpirv(
         *fragment_env,host,profile,Shader::RuntimeInfo{});
-    Require(fragment.Ready() && fragment.words.size()>5 &&
+    Require(fragment.PipelineMetadataReady() && fragment.stage == Shader::Stage::Fragment &&
+            fragment.words.size()>5 &&
             fragment.words[0]==0x07230203U && fragment.words[3]!=0,
             "stage-aware native Fragment SPIR-V emission failed");
     {
@@ -155,7 +157,8 @@ int main(int argc,char** argv) {
             "both native vertex stages need owned Maxwell environments");
     const auto merged=CompileReviewedNativeMergedVertexSpirv(
         *merge_env_a,*merge_env_b,host,profile,Shader::RuntimeInfo{});
-    Require(merged.Ready() && merged.words.size()>5 &&
+    Require(merged.PipelineMetadataReady() && merged.stage == Shader::Stage::VertexB &&
+            merged.words.size()>5 &&
             merged.words[0]==0x07230203U && merged.words[3]!=0,
             "real VertexA+VertexB Maxwell merge SPIR-V emission failed");
     {
@@ -166,6 +169,25 @@ int main(int argc,char** argv) {
                    static_cast<std::streamsize>(merged.words.size()*sizeof(u32)));
         file.close();Require(bool(file),"could not flush merged native vertex SPIR-V");
     }
+    // Native stages must share the same descriptor binding sequence as the
+    // maintained Vulkan graphics pipeline; each stage may not restart at 0.
+    Shader::Backend::Bindings initial_bindings{};
+    initial_bindings.uniform_buffer = 3;
+    initial_bindings.texture = 11;
+    const auto chained_vertex = CompileReviewedNativeMergedVertexSpirv(
+        *merge_env_a,*merge_env_b,host,profile,Shader::RuntimeInfo{},initial_bindings);
+    Require(chained_vertex.PipelineMetadataReady() &&
+            chained_vertex.next_bindings.uniform_buffer >= initial_bindings.uniform_buffer &&
+            chained_vertex.next_bindings.texture >= initial_bindings.texture,
+            "native merged vertex pipeline lost the incoming binding seed");
+    const auto chained_fragment = CompileReviewedNativeGraphicsSpirv(
+        *fragment_env,host,profile,Shader::RuntimeInfo{},false,
+        chained_vertex.next_bindings);
+    Require(chained_fragment.PipelineMetadataReady() &&
+            chained_fragment.stage == Shader::Stage::Fragment &&
+            chained_fragment.next_bindings.uniform_buffer >= chained_vertex.next_bindings.uniform_buffer &&
+            chained_fragment.next_bindings.texture >= chained_vertex.next_bindings.texture,
+            "native graphics stages lost their cumulative Vulkan descriptor bindings");
     const auto rejected_merge=CompileReviewedNativeMergedVertexSpirv(
         *merge_env_b,*merge_env_a,host,profile,Shader::RuntimeInfo{});
     Require(rejected_merge.status==NativeSpirvStatus::UnsupportedStage &&
@@ -214,16 +236,27 @@ int main(int argc,char** argv) {
     const auto fragment_capture=VideoCommon::CompileCapturedNs2GraphicsSpirvFromReader(
         &process,std::make_unique<SyntheticSource>(Shader::Stage::Fragment),
         guest.address,ReadGuest,&guest,host,profile,Shader::RuntimeInfo{});
-    Require(fragment_capture.Ready() &&
+    Require(fragment_capture.PipelineMetadataReady() &&
             fragment_capture.words==fragment.words,
             "authenticated Fragment capture must compile the same SPIR-V module");
+    guest.reads=0;
+    const auto seeded_guest_fragment=VideoCommon::CompileCapturedNs2GraphicsSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::Fragment),
+        guest.address,ReadGuest,&guest,host,profile,Shader::RuntimeInfo{},
+        nullptr,false,chained_vertex.next_bindings);
+    Require(seeded_guest_fragment.PipelineMetadataReady() &&
+            seeded_guest_fragment.stage == Shader::Stage::Fragment &&
+            seeded_guest_fragment.next_bindings.uniform_buffer >= chained_vertex.next_bindings.uniform_buffer &&
+            seeded_guest_fragment.next_bindings.texture >= chained_vertex.next_bindings.texture &&
+            guest.reads>0,
+            "authenticated GPU capture failed to propagate graphics binding seed");
     guest.reads=0;
     const auto merged_capture=VideoCommon::CompileCapturedNs2MergedVertexSpirvFromReader(
         &process,std::make_unique<SyntheticSource>(Shader::Stage::VertexA),
         std::make_unique<SyntheticSource>(Shader::Stage::VertexB),
         guest.address,guest.address+0x1000,ReadGuest,&guest,
         host,profile,Shader::RuntimeInfo{});
-    Require(merged_capture.Ready() && merged_capture.words==merged.words,
+    Require(merged_capture.PipelineMetadataReady() && merged_capture.words==merged.words,
             "same-process native VertexA/B capture must match real merged IR/SPIR-V");
     const auto rejected_pair=VideoCommon::CompileCapturedNs2MergedVertexSpirvFromReader(
         &process,std::make_unique<SyntheticSource>(Shader::Stage::VertexA),
@@ -234,7 +267,7 @@ int main(int argc,char** argv) {
             rejected_pair.words.empty(),
             "ambiguous same-address native dual vertex pair must reject");
     const auto complete=compile(Shader::Stage::VertexB);
-    Require(complete.Ready() && complete.words==baseline_direct && guest.reads>0,
+    Require(complete.PipelineMetadataReady() && complete.words==baseline_direct && guest.reads>0,
             "registered guest shader capture must match real Maxwell SPIR-V");
     guest.reads=0;
     guest.unregister_on_read=&process;
