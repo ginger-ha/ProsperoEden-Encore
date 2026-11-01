@@ -348,5 +348,26 @@ int main() {
         assert(f.released.size()==1);
         assert(std::get<0>(f.released[0])==0xdead);
     }
+    // Native inline QMDs use the full 49-bit GPU VA space. A QMD above
+    // the 32-bit PCAS-word range must remain address-distinct, and its
+    // completed semaphore cannot be confused with a low-40-bit alias.
+    {
+        Fixture f;
+        constexpr Address upper = 0x10100020000ULL;
+        constexpr Address lower = 0x100020000ULL;
+        auto high = EmptyGrid();
+        high[12]=1; high[13]=1; high[14]=1;
+        SetRelease(high,24,0x2000,14);
+        auto low = EmptyGrid();
+        SetRelease(low,24,0x3000,15);
+        f.descriptors[upper] = high;
+        f.descriptors[lower] = low;
+        assert(f.signal(upper,3).empty());
+        assert(f.dispatched==1 && f.released.size()==1 &&
+               std::get<0>(f.released[0])==0x2000);
+        assert(f.signal(lower,3).empty());
+        assert(f.dispatched==1 && f.released.size()==2 &&
+               std::get<0>(f.released[1])==0x3000);
+    }
     return 0;
 }
