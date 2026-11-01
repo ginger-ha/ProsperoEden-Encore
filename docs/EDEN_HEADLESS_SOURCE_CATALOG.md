@@ -13,8 +13,8 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **178** chemins sous `headless/`, dont **60** sources C/C++ et **118** en-têtes/fragments.
-- **97** chemins déjà présents dans le graphe moteur.
+- **179** chemins sous `headless/`, dont **60** sources C/C++ et **119** en-têtes/fragments.
+- **98** chemins déjà présents dans le graphe moteur.
 - **81** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
@@ -143,6 +143,7 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/network_audit_sockets.c` | runtime/bridge | U06 | Chemin indexé, preuve dépend du graphe |
 | `headless/network_domain_rules.c` | runtime/bridge | U07 | Chemin indexé, preuve dépend du graphe |
 | `headless/network_domain_rules.h` | en-tête/fragment | U38 | Chemin indexé, preuve dépend du graphe |
+| `headless/ns2_title_catalog.h` | en-tête/fragment | U89 | Chemin indexé, preuve dépend du graphe |
 | `headless/pad.cpp` | runtime/bridge | U03 | Chemin indexé, preuve dépend du graphe |
 | `headless/pad_diagnostics.h` | en-tête/fragment | U71 | Chemin indexé, preuve dépend du graphe |
 | `headless/performance.cpp` | runtime/bridge | J01 | Chemin indexé, preuve dépend du graphe |
