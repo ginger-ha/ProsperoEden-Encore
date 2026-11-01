@@ -303,7 +303,10 @@ sizing = extract_owner("std::optional<std::uint64_t> ExtractedBaseBytes(",
                        "\n// Local user-supplied covers")
 covers = extract_owner("std::string ExtractedLocalCover(",
                        "\nstd::uint64_t ResolveTitleId(")
+nacp = extract_owner("struct ExtractedSidecarMetadata {",
+                     "\nstd::string ExtractedLocalCover(")
 fixture = r"""
+#include <array>
 #include <atomic>
 #include <cassert>
 #include <cstdint>
@@ -314,10 +317,13 @@ fixture = r"""
 #include <fstream>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <unistd.h>
 #include "game_files.h"
 
 SIZING
+NACP
 COVERS
 
 int main() {
@@ -340,6 +346,30 @@ int main() {
     assert(Eden::FindDeconstructedGameMain(game) == "base/exefs/main");
     const auto bytes = ExtractedBaseBytes(game, nullptr);
     assert(bytes && *bytes == 4 + 8 + 4096);
+    assert(ExtractedLocalNacp(game).name.empty());
+    // Test the actual, bounded NACP reader with both localized and English
+    // titles. French takes priority, irrespective of folder names.
+    std::string nacp_data(0x4000, '\\0');
+    nacp_data.replace(0x000, 16, "Mario Kart World");
+    nacp_data.replace(3 * 0x300, 22, "Mario Kart World France");
+    nacp_data.replace(3 * 0x300 + 0x200, 8, "Nintendo");
+    std::ofstream(game / "base" / "control.nacp", std::ios::binary)
+        .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
+    const auto local = ExtractedLocalNacp(game);
+    assert(local.name == "Mario Kart World France" && local.developer == "Nintendo");
+    fs::remove(game / "base" / "control.nacp");
+    nacp_data.assign(0x4000, '\\0');
+    nacp_data[0] = static_cast<char>(0xc0); // invalid UTF-8 lead
+    std::ofstream(game / "base" / "control.nacp", std::ios::binary)
+        .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
+    assert(ExtractedLocalNacp(game).name.empty());
+    fs::remove(game / "base" / "control.nacp");
+    const auto outside_nacp = root / "outside.nacp";
+    std::ofstream(outside_nacp, std::ios::binary)
+        .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
+    fs::create_symlink(outside_nacp, game / "base" / "control.nacp");
+    assert(ExtractedLocalNacp(game).name.empty());
+    fs::remove(game / "base" / "control.nacp");
     assert(ExtractedLocalCover(game).empty());
     // The selected ExeFS artwork may be an image stored as a .dat sidecar,
     // e.g. icon_AmericanEnglish.dat in native Switch dumps.
@@ -370,7 +400,7 @@ int main() {
     fs::remove_all(root);
     std::puts("EXTRACTED_BASE_FOOTPRINT_AND_ARTWORK_PASS");
 }
-""".replace("SIZING", sizing).replace("COVERS", covers)
+""".replace("SIZING", sizing).replace("NACP", nacp).replace("COVERS", covers)
 with tempfile.TemporaryDirectory(prefix="encore-extracted-library-") as temp:
     cpp = Path(temp) / "test.cpp"
     cpp.write_text(fixture)
