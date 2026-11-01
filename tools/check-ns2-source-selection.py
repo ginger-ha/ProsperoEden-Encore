@@ -235,7 +235,10 @@ def main() -> int:
                 "if (method == 0x107)" in puller and
                 "AccelerateInlineToMemory(" in puller and
                 "std::copy_n(regs.begin() + 0xc8" in puller and
-                "ProcessNativeComputeQmd(pusher, 0xb0, 3, subchannel)" in puller,
+                "ProcessNativeComputeQmdAt(pusher, address, 3, subchannel, 0x107)" in puller and
+                "ProcessNativeComputeQmdAt(DmaPusher& pusher, GPUVAddr address" in puller and
+                "qmd_units >= (u64{1} << 41)" in puller and
+                "qmd_pointer = static_cast<u32>(qmd_units)" not in puller,
                 "Native inline Compute QMD must upload coherent 256-byte descriptor before PCAS")
         require("ProcessNativeComputeReportSemaphore(" in puller and
                 "if (reg == 0x6c3)" in puller and
