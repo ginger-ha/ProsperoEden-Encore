@@ -161,10 +161,26 @@ std::optional<std::uint64_t> ExtractedBaseBytes(const std::filesystem::path& tit
 std::string ExtractedLocalCover(const std::filesystem::path& title) {
     namespace fs = std::filesystem;
     if (!Eden::IsSafeExtractedDirectory(title)) return {};
+    // Borrow the upstream loose-ExeFS sidecar discovery contract (Eglantine
+    // 4d2cf41837): the game icon may live next to main or in base/exefs.
+    // No synthetic thumbnails or fabricated rear art are needed.
     for (const char* relative : {"cover.tga", "cover.png", "cover.jpg", "cover.jpeg",
                                  "icon.tga", "icon.png", "icon.jpg",
+                                 "exefs/cover.png", "exefs/cover.jpg",
+                                 "exefs/icon.png", "exefs/icon.jpg",
                                  "base/cover.tga", "base/cover.png", "base/cover.jpg",
-                                 "base/icon.png", "base/icon.jpg"}) {
+                                 "base/icon.png", "base/icon.jpg",
+                                 "base/exefs/cover.png", "base/exefs/cover.jpg",
+                                 "base/exefs/icon.png", "base/exefs/icon.jpg"}) {
+        // symlink_status(candidate) does not detect symlinked ancestors.
+        // Check each ancestor before reading a user-supplied sidecar.
+        fs::path parent = title;
+        bool safe = true;
+        for (const auto& segment : fs::path(relative).parent_path()) {
+            parent /= segment;
+            if (!Eden::IsSafeExtractedDirectory(parent)) { safe = false; break; }
+        }
+        if (!safe) continue;
         const fs::path candidate = title / relative;
         std::error_code error;
         const auto status = fs::symlink_status(candidate, error);
