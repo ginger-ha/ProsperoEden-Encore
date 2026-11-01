@@ -100,6 +100,7 @@ FrameDiagnostics::PresentIntervalWitness<24> vulkan_interval_witness;
 bool vulkan_loading{};
 double vulkan_loading_start{-1};
 unsigned vulkan_loading_frames{};
+unsigned vulkan_loading_diagnostic_stage{};
 LoadingPace vulkan_loading_pace;
 void Check(bool success, const char* operation) {
     if (!success) {
@@ -568,6 +569,22 @@ bool LoadingTick(VideoCore::RendererBase& renderer, bool idle) {
             ++vulkan_loading_frames;
             if (first) sceSystemServiceHideSplashScreen();
         }
+        // Diagnostic at most twice per game. Avoid repeated stderr writes or
+        // costly GPU queries: detailed logs previously degraded FC 27.
+        // A still-active loading screen means no game SwapBuffers handoff yet,
+        // not necessarily a stalled emulator process.
+        const double elapsed = now - vulkan_loading_start;
+        if (vulkan_loading_diagnostic_stage == 0 && elapsed >= 10.0) {
+            vulkan_loading_diagnostic_stage = 1;
+            std::fprintf(stderr,
+                "EDEN_VULKAN_LOADING_WAIT stage=10s idle=%d loading_presents=%u guest_frame_handoff=0\n",
+                int(idle), vulkan_loading_frames);
+        } else if (vulkan_loading_diagnostic_stage == 1 && elapsed >= 30.0) {
+            vulkan_loading_diagnostic_stage = 2;
+            std::fprintf(stderr,
+                "EDEN_VULKAN_LOADING_WAIT stage=30s idle=%d loading_presents=%u guest_frame_handoff=0\n",
+                int(idle), vulkan_loading_frames);
+        }
         return true;
     }
 #endif
@@ -577,6 +594,7 @@ GraphicsWindow::GraphicsWindow(bool use_vulkan) : vulkan(use_vulkan) {
     vulkan_loading = vulkan;
     vulkan_loading_start = -1;
     vulkan_loading_frames = 0;
+    vulkan_loading_diagnostic_stage = 0;
     vulkan_loading_pace = {};
     hud_enabled.store(LoadPreferences().hud, std::memory_order_relaxed);
 #ifdef EDEN_PS5_VULKAN
