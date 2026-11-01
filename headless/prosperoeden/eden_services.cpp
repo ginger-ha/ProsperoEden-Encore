@@ -188,6 +188,46 @@ std::string ExtractedLocalCover(const std::filesystem::path& title) {
         const auto size = fs::file_size(candidate, error);
         if (!error && size >= 128 && size <= (16u << 20)) return candidate.string();
     }
+    // Eglantine's loose ExeFS sidecars are often JPEG images named
+    // icon_<language>.dat rather than *.jpg. The launcher decodes image
+    // CONTENT with stb_image, independently of the extension. Scan only
+    // known filenames at bounded depth; never follow symlinked parents.
+    constexpr const char* languages[] = {
+        "French", "CanadianFrench", "AmericanEnglish", "BritishEnglish",
+        "Japanese", "German", "Spanish", "LatinAmericanSpanish", "Italian",
+        "Dutch", "Portuguese", "Russian", "Korean", "SimplifiedChinese",
+        "TraditionalChinese"
+    };
+    for (const char* base : {"exefs", "base/exefs", ".", "base"}) {
+        const fs::path dir = title / base;
+        // Check all ancestors, including base/; symlink_status(final) is not
+        // sufficient because it follows symlinked intermediate directories.
+        fs::path ancestor = title;
+        bool safe = true;
+        for (const auto& segment : fs::path(base)) {
+            ancestor /= segment;
+            if (!Eden::IsSafeExtractedDirectory(ancestor)) { safe = false; break; }
+        }
+        if (!safe) continue;
+        for (const char* language : languages) {
+            const fs::path candidate = dir / (std::string("icon_") + language + ".dat");
+            std::error_code error;
+            const auto status = fs::symlink_status(candidate, error);
+            if (error || !fs::is_regular_file(status) || fs::is_symlink(status)) continue;
+            const auto size = fs::file_size(candidate, error);
+            if (error || size < 128 || size > (16u << 20)) continue;
+            // Only JPEG/PNG sidecars. Other binary .dat resources must NOT be
+            // handed to the cover decoder as images.
+            std::ifstream input(candidate, std::ios::binary);
+            char signature[8]{};
+            input.read(signature, sizeof(signature));
+            if (input.gcount() != sizeof(signature)) continue;
+            const bool jpeg = static_cast<unsigned char>(signature[0]) == 0xff &&
+                              static_cast<unsigned char>(signature[1]) == 0xd8;
+            const bool png = std::memcmp(signature, "\x89PNG\r\n\x1a\n", 8) == 0;
+            if (jpeg || png) return candidate.string();
+        }
+    }
     return {};
 }
 
