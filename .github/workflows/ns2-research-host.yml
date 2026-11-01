@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - research/ns2-ps5-compatibility
+      - main
     paths:
       - 'vendor'
       - 'vendor/**'
       - 'headless/CMakeLists.txt'
       - 'tools/ns2/**'
       - 'tools/check-ns2-*.py'
+      - 'docs/NS2_GSV_NATIVE_MEMORY_REVIEW_2026-11-01.md'
       - '.github/workflows/ns2-research-host.yml'
   workflow_dispatch:
 

@@ -748,6 +748,25 @@ int main(){
     require(native_memory.Destroy(second_memory) == P::NativeMemoryStatus::Success &&
             native_memory.Count() == 0,
             "GSV native-memory resources survive independent destroy order");
+    // Production 111 returns a GLOBAL NVMap handle (nonsequential, often a
+    // multiple of four), not the local synthetic ledger ID.
+    require(native_memory.Adopt(16, 0x6000) == P::NativeMemoryStatus::Success &&
+            native_memory.Get(16)->size == 0x6000 &&
+            native_memory.OwnedIds().size() == 1 &&
+            native_memory.OwnedIds()[0] == 16,
+            "GSV 111 adopts actual externally allocated NVMap ID");
+    require(native_memory.Adopt(16, 0x6000) == P::NativeMemoryStatus::AlreadyBound &&
+            native_memory.Adopt(0, 0x6000) == P::NativeMemoryStatus::InvalidHandle &&
+            native_memory.Adopt(20, 0x1001) == P::NativeMemoryStatus::InvalidSize &&
+            native_memory.Count() == 1,
+            "GSV 111 rejects aliasing and invalid native NVMap handles");
+    require(native_memory.ValidateBind(16, 0x100000, 0x6000) ==
+                P::NativeMemoryStatus::Success &&
+            native_memory.Bind(16, 0x100000, 0x6000) ==
+                P::NativeMemoryStatus::Success &&
+            native_memory.Destroy(16) == P::NativeMemoryStatus::Success &&
+            native_memory.OwnedIds().empty(),
+            "GSV 114/112 track externally owned physical GPU backing");
 
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
