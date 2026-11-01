@@ -25,6 +25,37 @@ current=ORIG.read_text()
 assert current.count(after)==1, "N56 exact vendor source guard drift"
 assert "Saved PS5 driver pipeline cache atomically" in current
 reconstructed=current.replace(after,before)
+# Reconstruct the three audited, bounded native prewarm deltas before
+# enforcing the original full Git blob hash. The strict baseline and N56
+# truncated-cache regression remain unchanged; do not whitelist this file.
+prewarm_deltas = (
+    (
+        "    // Restore a bounded prefix of a title's saved pipelines before gameplay.\n"
+        "    // Games with fewer cached entries load only those entries. This policy\n"
+        "    // applies to every title (NS1 and NS2) without any title ID exceptions.\n"
+        "    // Keep the worker queue, draw order and GPU fences unchanged.\n"
+        "    constexpr size_t kStartupPrewarmPipelines = 32;",
+        "    // Eight entries at most: restore some persisted pipelines without\n"
+        "    // rebuilding an unbounded title cache at launch. This token controls only\n"
+        "    // the disk READER; the persistent Vulkan compiler workers stay alive.\n"
+        "    constexpr size_t kStartupPrewarmPipelines = 8;",
+    ),
+    (
+        "    // Only the disk reader observes cancellation. The bounded queued jobs\n",
+        "    // Only the disk reader observes cancellation. The queued <=8 jobs\n",
+    ),
+    (
+        '    std::printf("EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld limit=%zu\\n",\n'
+        '                state.total, state.built, state.valid, state.built - state.valid,\n'
+        '                static_cast<long long>(startup_prewarm_ms), kStartupPrewarmPipelines);',
+        '    std::printf("EDEN_PS5_SHADER_PREWARM queued=%zu completed=%zu valid=%zu rejected=%zu prebuild_ms=%lld\\n",\n'
+        '                state.total, state.built, state.valid, state.built - state.valid,\n'
+        '                static_cast<long long>(startup_prewarm_ms));',
+    ),
+)
+for native, generated in prewarm_deltas:
+    assert reconstructed.count(native) == 1, 'N56 source changed outside reviewed prewarm'
+    reconstructed = reconstructed.replace(native, generated)
 data=reconstructed.encode()
 assert hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()==("0d4c16e0afab6d18b44e51dc5cb9dda512f0557e"), "N56 native owner differs outside reviewed guard"
 assert 'EDEN_NS2_PIPELINE_CACHE_EXPERIMENTAL OR' in CMAKE
