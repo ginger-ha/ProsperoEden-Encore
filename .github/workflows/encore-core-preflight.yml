@@ -88,6 +88,7 @@ jobs:
           python3 -B tools/check-python-source-syntax.py
           python3 -B tools/check-encore-ncz-sources.py
           python3 -B tools/check-exefs-directory-host.py
+          python3 -B tools/check-ns2-extracted-inputs-host.py
           python3 -B tools/check-extracted-aoc-layout-host.py
           python3 -B tools/check-ncz.py
           python3 -B tools/check-launcher-gl-scissor-reuse-host.py
