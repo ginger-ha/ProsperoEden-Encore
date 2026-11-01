@@ -92,6 +92,16 @@ assert load.index('IsSwitch2ExtractedProgram(') < load.index('InitializeKernel(s
 assert 'Settings::MemoryLayout::Memory_12Gb' in load
 assert 'SetGlobal(false)' in load and 'SetValue(Settings::MemoryLayout::Memory_12Gb)' in load
 assert 'initialized_memory_layout != Settings::values.memory_layout_mode.GetValue()' in shared_core
+# NS2 per-title 12 GiB memory override must return to the previous NS1
+# global/custom profile after shutdown, including a direct title transition.
+assert 'ns2_previous_layout_global = Settings::values.memory_layout_mode.UsingGlobal();' in shared_core
+assert 'ns2_previous_layout = Settings::values.memory_layout_mode.GetValue();' in shared_core
+assert 'void RestoreNs2MemoryLayout() {' in shared_core
+assert 'layout.SetValue(ns2_previous_layout);' in shared_core
+assert 'layout.SetGlobal(ns2_previous_layout_global);' in shared_core
+assert shared_core.count('RestoreNs2MemoryLayout();') == 2
+assert shared_core.index('kernel.Shutdown();') < shared_core.index('RestoreNs2MemoryLayout();', shared_core.index('kernel.Shutdown();'))
+assert 'ns2_memory_layout_override = false;' in shared_core
 assert 'bool extended_memory_layout' not in shared_core
 # Real aud:u manager bridge is additive and shares maintained NS1 audio HLE.
 audio_root = ROOT / 'vendor/encore-active/ns2-runtime/audio/core/hle/service/audio'
