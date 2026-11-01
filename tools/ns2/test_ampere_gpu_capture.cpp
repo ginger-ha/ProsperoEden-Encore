@@ -16,11 +16,13 @@ struct MappedMemory {
     std::vector<u8> data;
     std::size_t mapped_bytes{};
     u32 reads{};
+    bool reject_batch{};
 };
 static bool Read(void* opaque, u64 address, void* destination, std::size_t size) {
     auto& mem = *static_cast<MappedMemory*>(opaque);
     ++mem.reads;
-    if (!destination || !size || address < mem.base) return false;
+    if (!destination || !size || address < mem.base || (mem.reject_batch && size > 16))
+        return false;
     const u64 offset = address - mem.base;
     if (offset > mem.mapped_bytes || size > mem.mapped_bytes - offset ||
         offset > mem.data.size() || size > mem.data.size() - offset)
@@ -139,5 +141,42 @@ int main() {
     Require(CaptureNativeGraphicsShader(std::numeric_limits<u64>::max()-10,4,Read,&mem).status==
                 NativeCaptureStatus::InvalidInput,
             "GPU address arithmetic overflow rejected before guest access");
+    // A mapped long shader spans several 4 KiB GMMU pages. The coherent
+    // reader should batch operations within each page without changing the
+    // exact native instruction stream or consuming memory beyond termination.
+    MappedMemory long_shader{};
+    long_shader.base=0x200000;
+    long_shader.data.resize(0x80);
+    for (u32 index=0;index<512;++index)
+        Push(long_shader.data,pred_true|0x918);
+    Push(long_shader.data,pred_true|0x94d,0,exit_true);
+    long_shader.mapped_bytes=long_shader.data.size();
+    const auto long_result=CaptureNativeComputeShader(
+        long_shader.base+0x80,Read,&long_shader);
+    Require(long_result.Ready() &&
+            long_result.captured_native_bytes==513*16 &&
+            long_shader.reads < 20,
+            "long native shaders use bounded coherent GPU page reads");
+    // A reader that only accepts 16-byte accesses must still work exactly.
+    long_shader.reads=0;
+    long_shader.reject_batch=true;
+    const auto non_batched=CaptureNativeComputeShader(
+        long_shader.base+0x80,Read,&long_shader);
+    Require(non_batched.Ready() &&
+            non_batched.image.diagnostic_cache_key==
+                long_result.image.diagnostic_cache_key &&
+            long_shader.reads >= 513,
+            "failed page prefetch falls back to exact mapped instruction reads");
+    // Last instruction missing: the status and byte-accurate fault offset
+    // must match the historical per-instruction implementation.
+    long_shader.reject_batch=false;
+    long_shader.reads=0;
+    long_shader.mapped_bytes-=16;
+    const auto end_fault=CaptureNativeComputeShader(
+        long_shader.base+0x80,Read,&long_shader);
+    Require(end_fault.status==NativeCaptureStatus::Unmapped &&
+            end_fault.first_error_offset==512*16 &&
+            end_fault.image.code.empty(),
+            "partial final page returns the original unmapped shader offset");
     std::puts("NS2 mapped native shader capture: PASS (no PS5 game execution)");
 }
