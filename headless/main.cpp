@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <exception>
 #include "assets_dir.h"
+#include "extracted_npdm_identity.h"
 #include "gpu_failure.h"
 #include "guest_fault.h"
 #include "jit_list.h"
@@ -2025,6 +2026,23 @@ int main(int argc, char** argv) {
                             "EDEN_LOADER_FAILURE core_status=%u loader_status=%u reason=%s\n",
                             core_status, core_status - loader_base, detail.c_str());
                         if (loader_status == Loader::ResultStatus::ErrorBadFileAccessControl) {
+                            // One-shot probe only after a failed load. Distinguish an
+                            // unsupported 0x300 NS2 ACID layout from malformed FAC.
+                            // This never bypasses guest access-control checks.
+                            const std::filesystem::path selected{guest};
+                            const auto rom_root = std::filesystem::path(Eden::AssetsPath("roms"));
+                            if (selected.filename() == "main" &&
+                                Eden::IsSafeDeconstructedGamePath(
+                                    rom_root, selected.lexically_relative(rom_root).generic_string())) {
+                                const auto probe = Eden::ExtractedNpdm::ProbeAccess(
+                                    selected.parent_path() / "main.npdm");
+                                std::fprintf(stderr,
+                                    "EDEN_EXEFS_NPDM_FAC_PROBE meta=%d acid=%d layout=%s acid_size=%u fac_offset=%u fac_size=%u fac_bounds=%d\n",
+                                    int(probe.header_ok), int(probe.acid_found),
+                                    probe.acid_found ? (probe.extended ? "ns2" : "ns1") : "unknown",
+                                    probe.acid_size, probe.fac_offset, probe.fac_size,
+                                    int(probe.fac_valid));
+                            }
                             throw std::runtime_error("NPDM filesystem access-control metadata could not be read "
                                 "(Core 14 / Loader 7). This is not a missing NCA header key. "
                                 "The extracted game's main.npdm may use an unsupported ACID layout; "
