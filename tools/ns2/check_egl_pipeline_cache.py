@@ -75,8 +75,8 @@ n3m_positions = (
 )
 n3m_hashes = (
     '6d290bcca80076a4',
-    '07f605ea23426e28',
-    '3f9e28a2403298cb',
+    'e124d0c26db95140',
+    'ce14a0542e3f0a56',
 )
 n3m_blocks = []
 for start, expected_hash in zip(n3m_positions, n3m_hashes):

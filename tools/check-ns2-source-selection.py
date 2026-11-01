@@ -141,6 +141,19 @@ def main() -> int:
                 "IsGraphicsCurrent(" in engine_registry and
                 "channel_generation" in engine_registry,
                 "Native 3D rendering requires per-channel authenticated class identity")
+        native_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text()
+        require("AcquireGraphicsTranslationCache(" in engine_registry and
+                "std::shared_ptr<Shader::Ampere::NativeTranslationCache>" in engine_registry and
+                "translation_cache{}" in engine_registry and
+                "AcquireGraphicsTranslationCache(" in native_capture and
+                "4 * 1024 * 1024, 32" in native_capture and
+                "NativeTranslationCache::GetOrTranslate" in
+                    (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/translation_cache.cpp").read_text(),
+                "N3m shader cache must be bounded and bound to authenticated engine epoch")
+        require("native_translation_cache.get()" in active_vk and
+                "AcquireGraphicsTranslationCache(maxwell3d, *native_ticket)" in active_vk and
+                "AcquireGraphicsTranslationCache(maxwell3d, *ticket)" in active_vk,
+                "N3m active Vulkan translation must reuse exact GPU session cache")
         require('#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL' in active_vk and
                 "CaptureGraphicsTicket(maxwell3d)" in active_vk and
                 "CaptureNs2GraphicsShaderFromGpu(" in active_vk and
