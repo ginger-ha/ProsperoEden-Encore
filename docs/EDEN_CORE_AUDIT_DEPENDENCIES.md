@@ -245,17 +245,17 @@ historiques ci-dessous recoupent le graphe : **ne pas les additionner**.
 
 | Périmètre | Points | Fichiers distincts | Mentions de fonctions / contrats |
 | --- | ---: | ---: | ---: |
-| Graphe connu | 499 | 476 | 1009 |
+| Graphe connu | 500 | 477 | 1010 |
 | HOST — preuve ciblée hôte | 62 | 57 | 127 |
-| SOURCE — lecture effectuée, preuve insuffisante | 414 | 404 | 843 |
+| SOURCE — lecture effectuée, preuve insuffisante | 415 | 405 | 844 |
 | OPEN — question technique non résolue | 15 | 15 | 28 |
 | PARKED — expérimentation suspendue | 8 | 8 | 11 |
-| **Encore à qualifier (SOURCE + OPEN)** | **429** | **418** | **871** |
+| **Encore à qualifier (SOURCE + OPEN)** | **430** | **419** | **872** |
 | Dont priorité P0 (SOURCE + OPEN) | 103 | 98 | 235 |
 
-Le **noyau restant** compte donc 429 critères répartis sur
-418 fichiers et 871 mentions fonction/contrat :
-15 OPEN et 414 SOURCE.
+Le **noyau restant** compte donc 430 critères répartis sur
+419 fichiers et 872 mentions fonction/contrat :
+15 OPEN et 415 SOURCE.
 Cela **ne signifie pas que toutes ces fonctions sont jamais lues** :
 plusieurs sont déjà étudiées, mais nécessitent une preuve spécifique.
 L'inventaire exhaustif des sources Encore est suivi séparément dans
@@ -954,6 +954,7 @@ function/contract tokens are checked by CI for existence only; the
 | U85 | P1 | U83 | headless/ncz_vfs.h | FileSys::VirtualFile Open(; void SetUnpackFolder( | SOURCE | tools/check-encore-ncz-sources.py | NCZ VFS declarations paired with native implementation and selection; no gameplay qualification | 🟡 Source étudiée |
 | U86 | P1 | U01,V04 | headless/frame_metrics.h | ResetForTitle; OnSourceComposite; OnRealQueued; OnGeneratedQueued; OnSwapchainPresentReturned; Sample | SOURCE | tools/check-feature-r01-native-frame-metrics-host.py | Exact native Vulkan renderer/presenter source hooks and C++ UBSan concurrency, 30-to-60 submitted/present API rates; not guest simulation FPS, actual scanout or input-to-photon | 🟡 Source étudiée |
 | U87 | P1 | U82 | headless/extracted_npdm_identity.h | inline std::uint64_t TitleId( | SOURCE | tools/check-ns2-extracted-inputs-host.py | Bounded read-only META/ACI0 title identity for extracted NS1/NS2 library metadata; no firmware or native boot qualification | 🟡 Source étudiée |
+| U88 | P1 | U87 | headless/firmware_zip_import.h | inline bool Import( | SOURCE | tools/check-firmware-zip-native-host.py | Bounded user ZIP staging with CRC and atomic rename; extracted NS1/NS2 service boot remains unqualified | 🟡 Source étudiée |
 <!-- AUDIT_ROWS_END -->
 
 
