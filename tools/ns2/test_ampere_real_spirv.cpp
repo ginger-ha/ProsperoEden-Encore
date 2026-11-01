@@ -112,6 +112,35 @@ int main(int argc,char** argv) {
         Require(bool(file),"cannot flush complete SPIR-V");
         std::printf("SPIR-V emitted: %s (%zu words)\n",output.c_str(),words.size());
     }
+    // Compile an actual native Fragment stage through Maxwell IR and Sirit.
+    // The explicit stage-aware path must emit a real Fragment execution model;
+    // it must not relabel the old VertexB module as Fragment.
+    auto fragment_image=BuildMaxwellShaderImage(
+        header,code,static_cast<u32>(Shader::Stage::Fragment));
+    Require(fragment_image.ValidForCompiler(),"fragment shader lowering invalid");
+    auto fragment_env=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<SyntheticSource>(Shader::Stage::Fragment),
+        std::move(fragment_image));
+    Require(bool(fragment_env),"fragment source ownership rejected");
+    const auto fragment_via_legacy=CompileReviewedNativeVertexSpirv(
+        *fragment_env,host,profile,Shader::RuntimeInfo{});
+    Require(fragment_via_legacy.status==NativeSpirvStatus::UnsupportedStage &&
+            fragment_via_legacy.words.empty(),
+            "legacy VertexB API must reject a real Fragment stage");
+    const auto fragment=CompileReviewedNativeGraphicsSpirv(
+        *fragment_env,host,profile,Shader::RuntimeInfo{});
+    Require(fragment.Ready() && fragment.words.size()>5 &&
+            fragment.words[0]==0x07230203U && fragment.words[3]!=0,
+            "stage-aware native Fragment SPIR-V emission failed");
+    {
+        const auto output=std::string(argv[1])+"-fragment.spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write Fragment SPIR-V");
+        file.write(reinterpret_cast<const char*>(fragment.words.data()),
+                   static_cast<std::streamsize>(fragment.words.size()*sizeof(u32)));
+        file.close();
+        Require(bool(file),"could not flush actual Fragment SPIR-V");
+    }
     auto vertex_a_image=BuildMaxwellShaderImage(
         header,code,static_cast<u32>(Shader::Stage::VertexA));
     Require(vertex_a_image.ValidForCompiler(),"VertexA negative fixture failed");
@@ -146,6 +175,17 @@ int main(int argc,char** argv) {
     Require(no_vertex_a.status==NativeSpirvStatus::UnsupportedStage &&
             no_vertex_a.words.empty() && guest.reads==0,
             "unmerged VertexA must reject without GMMU reads");
+    const auto fragment_legacy=compile(Shader::Stage::Fragment);
+    Require(fragment_legacy.status==NativeSpirvStatus::UnsupportedStage &&
+            fragment_legacy.words.empty() && guest.reads==0,
+            "legacy vertex session API must reject Fragment before GMMU read");
+    const auto fragment_capture=VideoCommon::CompileCapturedNs2GraphicsSpirvFromReader(
+        &process,std::make_unique<SyntheticSource>(Shader::Stage::Fragment),
+        guest.address,ReadGuest,&guest,host,profile,Shader::RuntimeInfo{});
+    Require(fragment_capture.Ready() &&
+            fragment_capture.words==fragment.words,
+            "authenticated Fragment capture must compile the same SPIR-V module");
+    guest.reads=0;
     const auto complete=compile(Shader::Stage::VertexB);
     Require(complete.Ready() && complete.words==baseline_direct && guest.reads>0,
             "registered guest shader capture must match real Maxwell SPIR-V");

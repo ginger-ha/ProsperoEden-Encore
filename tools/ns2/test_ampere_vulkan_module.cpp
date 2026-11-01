@@ -28,7 +28,7 @@ static std::vector<uint32_t> ReadSpirv(const char* file) {
     return words;
 }
 int main(int argc,char** argv) {
-    Require(argc==3,"expected direct and dispatcher module files");
+    Require(argc==4,"expected direct, dispatcher and Fragment module files");
     VkApplicationInfo application{};
     application.sType=VK_STRUCTURE_TYPE_APPLICATION_INFO;
     application.pApplicationName="NS2 synthetic shader module smoke test";
@@ -107,6 +107,13 @@ int main(int argc,char** argv) {
         const VkResult rc=vkCreateShaderModule(device,&module_info,nullptr,&shader);
         Require(rc==VK_SUCCESS && shader!=VK_NULL_HANDLE,
                 "vkCreateShaderModule rejected a synthetic NSW2 module");
+        if (i==3) {
+            // No fragment linkage or rasterizer output is claimed. Validate
+            // Vulkan module creation without reusing the vertex-only pipeline.
+            vkDestroyShaderModule(device,shader,nullptr);
+            std::printf("vkCreateShaderModule: PASS (native Fragment; no pipeline)\n");
+            continue;
+        }
         VkPipelineShaderStageCreateInfo stage{};
         stage.sType=VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stage.stage=VK_SHADER_STAGE_VERTEX_BIT;

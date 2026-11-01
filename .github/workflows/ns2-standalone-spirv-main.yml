@@ -1,0 +1,15 @@
+name: NS2 standalone graphics SPIR-V qualification (main only)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ns2/test_ampere_real_spirv.cpp'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-real-spirv:
+    uses: ./.github/workflows/ns2-research-spirv.yml
