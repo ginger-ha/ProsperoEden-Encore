@@ -346,7 +346,7 @@ int main() {
     assert(Eden::FindDeconstructedGameMain(game) == "base/exefs/main");
     const auto bytes = ExtractedBaseBytes(game, nullptr);
     assert(bytes && *bytes == 4 + 8 + 4096);
-    assert(ExtractedLocalNacp(game).name.empty());
+    assert(ExtractedLocalNacp(game, 2).name.empty());
     // Test the actual, bounded NACP reader with both localized and English
     // titles. French takes priority, irrespective of folder names.
     std::string nacp_data(0x4000, char{});
@@ -355,20 +355,21 @@ int main() {
     nacp_data.replace(3 * 0x300 + 0x200, 8, "Nintendo");
     std::ofstream(game / "base" / "control.nacp", std::ios::binary)
         .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
-    const auto local = ExtractedLocalNacp(game);
+    const auto local = ExtractedLocalNacp(game, 2);
     assert(local.name == "Mario Kart World France" && local.developer == "Nintendo");
+    assert(ExtractedLocalNacp(game, 0).name == "Mario Kart World");
     fs::remove(game / "base" / "control.nacp");
     nacp_data.assign(0x4000, char{});
     nacp_data[0] = static_cast<char>(0xc0); // invalid UTF-8 lead
     std::ofstream(game / "base" / "control.nacp", std::ios::binary)
         .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
-    assert(ExtractedLocalNacp(game).name.empty());
+    assert(ExtractedLocalNacp(game, 2).name.empty());
     fs::remove(game / "base" / "control.nacp");
     const auto outside_nacp = root / "outside.nacp";
     std::ofstream(outside_nacp, std::ios::binary)
         .write(nacp_data.data(), static_cast<std::streamsize>(nacp_data.size()));
     fs::create_symlink(outside_nacp, game / "base" / "control.nacp");
-    assert(ExtractedLocalNacp(game).name.empty());
+    assert(ExtractedLocalNacp(game, 2).name.empty());
     fs::remove(game / "base" / "control.nacp");
     assert(ExtractedLocalCover(game).empty());
     // The selected ExeFS artwork may be an image stored as a .dat sidecar,
