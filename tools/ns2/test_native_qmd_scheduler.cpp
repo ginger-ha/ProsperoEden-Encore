@@ -20,6 +20,8 @@ struct Fixture {
     std::vector<std::tuple<Address,std::uint32_t,std::uint32_t>> released;
     unsigned dispatched{};
     bool allow_dispatch{true};
+    // Fail one release callback before it queues any guest-visible write.
+    std::unordered_map<Address, unsigned> transient_release_failures;
     bool read(Address address, Descriptor& out) {
         const auto it=descriptors.find(address);
         if(it==descriptors.end())return false;
@@ -27,6 +29,11 @@ struct Fixture {
         return true;
     }
     bool release(Address address, std::uint32_t value, std::uint32_t flags) {
+        if (auto it=transient_release_failures.find(address);
+            it!=transient_release_failures.end() && it->second>0) {
+            --it->second;
+            return false;
+        }
         released.emplace_back(address,value,flags);
         return true;
     }
@@ -108,6 +115,39 @@ int main() {
         assert(f.signal(0x70000,2).empty()); // retry genuine dispatch
         assert(f.dispatched==2);
         assert(f.released.size()==1);
+    }
+    // If a later semaphore cannot be queued, the previously queued slots
+    // must not be repeated; the compute program must not run twice either.
+    {
+        Fixture f;auto d=EmptyGrid();
+        d[12]=1;d[13]=1;d[14]=1;
+        SetRelease(d,24,0x1111,5,true);
+        SetRelease(d,28,0x2222,7);
+        SetRelease(d,52,0x3333,11);
+        f.descriptors[0x88800]=d;
+        f.transient_release_failures[0x2222]=1;
+        assert(f.signal(0x88800,3)=="unmapped QMD release");
+        assert(f.dispatched==1);
+        assert(f.released.size()==1);
+        assert(std::get<0>(f.released[0])==0x1111);
+        assert(f.signal(0x88800,2).empty());
+        assert(f.dispatched==1);
+        assert(f.released.size()==3);
+        assert(std::get<0>(f.released[1])==0x2222);
+        assert(std::get<0>(f.released[2])==0x3333);
+        assert(f.signal(0x88800,2).empty());
+        assert(f.dispatched==1 && f.released.size()==3);
+    }
+    // Empty grids need the same retry protection without a shader dispatch.
+    {
+        Fixture f;auto d=EmptyGrid();
+        SetRelease(d,24,0x5555,5);
+        f.descriptors[0x99900]=d;
+        f.transient_release_failures[0x5555]=1;
+        assert(f.signal(0x99900,3)=="unmapped QMD release");
+        assert(f.released.empty() && f.dispatched==0);
+        assert(f.signal(0x99900,2).empty());
+        assert(f.released.size()==1 && f.dispatched==0);
     }
     // Malformed QMDs fail before any guest semaphore is released.
     {
