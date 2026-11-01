@@ -2065,6 +2065,8 @@ int main(int argc, char** argv) {
                 }
 #endif
                 passed(game ? "game_loaded" : "nro_loaded");
+                std::fprintf(stderr, "EDEN_BOOT_STAGE stage=core_loaded guest=%s\n",
+                             game ? "game" : "homebrew");
                 Eden::Report("loader", "Game loaded; initializing renderer");
 #ifdef EDEN_PS5_OPENGL
                 // Retain the failure, then release CPU readiness and complete normal
@@ -2086,6 +2088,7 @@ int main(int argc, char** argv) {
                 Eden::Stall::Trace("main gpu_start");
 #endif
                 system.GPU().Start();
+                std::fprintf(stderr, "EDEN_BOOT_STAGE stage=gpu_started\n");
 #if defined(EDEN_DEV_PROFILE) && defined(PS5_NATIVE)
                 Eden::Stall::Trace("main gpu_started");
 #endif
@@ -2230,6 +2233,7 @@ int main(int argc, char** argv) {
                     jit_list.Start(system.GetApplicationProcessProgramID(), build, code_start, code_end - code_start);
                 }
                 Eden::TakeGuestFault(); // Nothing from an earlier session belongs to this one.
+                std::fprintf(stderr, "EDEN_BOOT_STAGE stage=guest_run_begin\n");
                 system.Run();
                 if (left_while_loading) {
                     std::lock_guard lock(completion->mutex);
