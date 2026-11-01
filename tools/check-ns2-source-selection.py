@@ -144,10 +144,25 @@ def main() -> int:
                 "NativeSpirvStatus::InactiveSession" in pipeline_source.read_text(),
                 "Real GMMU-to-SPIR-V owner is missing")
         bridge_source = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
+        stage_policy = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"
+        require(stage_policy.is_file() and
+                'stage == Shader::Stage::VertexB || stage == Shader::Stage::Fragment' in stage_policy.read_text() and
+                'static_assert(!IsStandaloneNativeGraphicsStage(Shader::Stage::VertexA))' in stage_policy.read_text() and
+                'static_assert(!IsStandaloneNativeGraphicsStage(Shader::Stage::Compute))' in stage_policy.read_text(),
+                "NS2 standalone shader admission must exclude VertexA merge and compute")
         require(bridge_source.is_file() and
+                "CompileReviewedNativeGraphicsSpirv(" in bridge_source.read_text() and
+                "IsStandaloneNativeGraphicsStage(env.ShaderStage())" in bridge_source.read_text() and
                 "CompileReviewedNativeVertexSpirv(" in bridge_source.read_text() and
-                "Shader::Stage::VertexB" in bridge_source.read_text(),
-                "Real VertexB-only SPIR-V bridge owner is missing")
+                "env.ShaderStage() != Shader::Stage::VertexB" in bridge_source.read_text() and
+                "ir.stage != env.ShaderStage()" in bridge_source.read_text(),
+                "Native SPIR-V must preserve real Fragment/VertexB stage and strict vertex-only ABI")
+        require("CompileCapturedNs2GraphicsSpirvFromReader(" in pipeline_source.read_text() and
+                "CompileCapturedNs2GraphicsSpirv(" in pipeline_source.read_text() and
+                "IsStandaloneNativeGraphicsStage(original->ShaderStage())" in pipeline_source.read_text() and
+                "CompileReviewedNativeGraphicsSpirv(" in pipeline_source.read_text() and
+                "original->ShaderStage() != Shader::Stage::VertexB" in pipeline_source.read_text(),
+                "Native renderer capture must keep standalone Fragment stage and original VertexB-only contract")
         require(
             'if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)' in CMAKE and
             'set(EDEN_SHARED_NS2_EXEFS ON)' in CMAKE and

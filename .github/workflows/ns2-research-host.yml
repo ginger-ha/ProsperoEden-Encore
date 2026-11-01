@@ -546,6 +546,18 @@ jobs:
               -Ivendor/sources/eden/src \
               vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/ir_bridge.cpp
           done
+      - name: Run NS2 standalone graphics stage admission (Clang and GCC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -O2 -Wall -Wextra -Werror -pedantic \
+              -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/sources/eden/src \
+              tools/ns2/test_native_graphics_stage_policy.cpp \
+              -o "build-ns2-a64/ns2-graphics-stage-${cxx//+/}"
+            "build-ns2-a64/ns2-graphics-stage-${cxx//+/}"
+          done
       - name: Syntax-check optional PS5 Vulkan NS2 SPIR-V compiler source (Clang and GCC)
         shell: bash
         run: |
