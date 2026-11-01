@@ -113,4 +113,13 @@ for command, method, manager in (
     assert '{' + str(command) + ', &INx2AudioUserClient::' + method in client
     assert 'rb.PushIpcInterface<' + manager + '>(ctx, system)' in client
 assert 'auto stub fallback' not in client.lower()
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1 audio_u=1")
+streamplay = (audio_root.parent / 'nx2_streamplay.h').read_text()
+assert audio.count('RegisterNamedService("stpl:u"') == 1
+assert '{0, &INx2StreamPlayService::GetUserService' in streamplay
+assert '{300, &INx2StreamPlayUserService::GetEvent' in streamplay
+assert 'service_context.CreateEvent(' in streamplay
+assert 'service_context.CloseEvent(event)' in streamplay
+assert 'rb.PushCopyObjects(ctx, event->GetReadableEvent())' in streamplay
+assert 'rb.PushIpcInterface<INx2StreamPlayUserService>(ctx, system)' in streamplay
+
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1 nvdrv_caps=1 kernel_heap=1 prekernel_layout=1 audio_u=1 streamplay=1")
