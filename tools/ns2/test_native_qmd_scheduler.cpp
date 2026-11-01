@@ -98,10 +98,16 @@ int main() {
     {
         Fixture f;auto d=EmptyGrid();
         d[12]=1;d[13]=1;d[14]=1;
+        SetRelease(d,52,0x7000,17);
         f.descriptors[0x70000]=d;
         f.allow_dispatch=false;
         assert(f.signal(0x70000,3)=="native shader dispatch required");
         assert(f.dispatched==1);
+        assert(f.released.empty()); // rejected shader must not fake GPU fence
+        f.allow_dispatch=true;
+        assert(f.signal(0x70000,2).empty()); // retry genuine dispatch
+        assert(f.dispatched==2);
+        assert(f.released.size()==1);
     }
     // Malformed QMDs fail before any guest semaphore is released.
     {
