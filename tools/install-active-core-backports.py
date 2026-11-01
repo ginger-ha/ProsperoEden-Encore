@@ -74,7 +74,46 @@ def derive() -> dict[str, tuple[bytes, bytes]]:
         return result
 
 
-def stage_source(destination: Path, expected: dict[str, tuple[bytes, bytes]], *, check: bool) -> None:
+# CI 41258590941 identified one previous local A64 overlay in the disposable
+# owned source cache. Recover only that exact SHA-256, never arbitrary bytes.
+KNOWN_STALE_A64_SHA256 = "08ae577aa069b589faaa8cc6659baa66c80661d78abc15381907d63b343c17b0"
+A64_OWNER = "src/core/arm/dynarmic/arm_dynarmic_64.cpp"
+
+
+def preserve_known_owned_cache_source(destination: Path, target: Path, digest: str) -> None:
+    scratch = destination.parent
+    owner = scratch / "owner"
+    if (digest != KNOWN_STALE_A64_SHA256 or destination.is_symlink() or
+            destination.name != "source" or scratch.is_symlink() or
+            not scratch.name.startswith("ps5-eden-headless.") or
+            not owner.is_file() or owner.is_symlink() or
+            owner.read_text().strip() != str(ROOT.resolve()) or
+            target.is_symlink() or
+            not target.parent.resolve().is_relative_to(destination.resolve())):
+        raise RuntimeError("Refusing repair outside the exact owner-stamped A64 cache")
+    backup_dir = scratch / ".eden-known-stale-a64"
+    if backup_dir.is_symlink():
+        raise RuntimeError("Cached A64 backup path is a symlink")
+    backup_dir.mkdir(exist_ok=True)
+    backup = backup_dir / f"arm_dynarmic_64.cpp.{digest[:16]}"
+    if backup.is_symlink():
+        raise RuntimeError("Cached A64 backup file is a symlink")
+    if not backup.exists():
+        with tempfile.NamedTemporaryFile(dir=backup_dir, delete=False) as handle:
+            staged = Path(handle.name)
+        try:
+            shutil.copyfile(target, staged)
+            if sha(staged.read_bytes()) != digest:
+                raise RuntimeError("Cached A64 bytes changed during backup")
+            staged.replace(backup)
+        finally:
+            staged.unlink(missing_ok=True)
+    elif sha(backup.read_bytes()) != digest:
+        raise RuntimeError("Cached A64 backup has a different SHA-256")
+    print(f"EDEN_KNOWN_STALE_A64_PRESERVED sha256={digest}", flush=True)
+
+
+def stage_source(destination: Path, expected: dict[str, tuple[bytes, bytes]], *, check: bool, repair_owned_cache: bool = False) -> None:
     if (destination / "GIT-COMMIT").read_text().strip() != PIN:
         raise RuntimeError("Wrong pinned core revision")
     changed = 0
@@ -102,11 +141,16 @@ def stage_source(destination: Path, expected: dict[str, tuple[bytes, bytes]], *,
         current = target.read_bytes()
         if current == maintained_bytes:
             continue
-        if check or current not in (old, new):
-            raise RuntimeError(
-                f"Active source missing/unknown revision: {relative} "
-                f"current={sha(current)} base={sha(old)} active={sha(maintained_bytes)}"
-            )
+        if current not in (old, new):
+            # Only the exact previously observed pre-N76 cached A64 bytes
+            # may be repaired; keep a content-addressed copy for diagnosis.
+            if (check or not repair_owned_cache or relative != A64_OWNER or
+                    sha(current) != KNOWN_STALE_A64_SHA256):
+                raise RuntimeError(
+                    f"Active source missing/unknown revision: {relative} "
+                    f"current={sha(current)} base={sha(old)} active={sha(maintained_bytes)}"
+                )
+            preserve_known_owned_cache_source(destination, target, sha(current))
         with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as handle:
             tmp = Path(handle.name)
         try:
@@ -123,10 +167,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("destination", nargs="?", type=Path)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--repair-owned-cache", action="store_true")
     args = parser.parse_args()
     expected = derive()
     if args.destination:
-        stage_source(args.destination, expected, check=args.check)
+        stage_source(args.destination, expected, check=args.check,
+                     repair_owned_cache=args.repair_owned_cache)
     else:
         print(f"EDEN_ACTIVE_CORE_PATCH_REPLAY_OK files={len(expected)} "
               "icache=on service_wait=on")
