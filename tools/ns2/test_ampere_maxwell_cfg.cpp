@@ -132,7 +132,30 @@ int main() {
         Require(sentinel.stage == Shader::Stage::VertexB,
                 "IR bridge calls the supplied compiler interface");
     }
-    Require(calls == 2, "IR bridge invoked exactly once per dispatcher mode");
+    Require(calls == 2, "VertexB IR bridge invoked once per dispatcher mode");
+    // Standalone Fragment uses the very same real Maxwell CFG and IR handoff,
+    // without pretending it is VertexB or inventing pipeline attachment data.
+    auto fragment_image=BuildMaxwellShaderImage(
+        header,native,static_cast<u32>(Shader::Stage::Fragment));
+    Require(fragment_image.ValidForCompiler(),
+            "Fragment native translation must contain a complete shader");
+    auto fragment_env=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<NativeSource>(Shader::Stage::Fragment),
+        std::move(fragment_image));
+    Require(fragment_env && fragment_env->ShaderStage()==Shader::Stage::Fragment,
+            "Fragment metadata must survive native Maxwell environment");
+    expected_env=fragment_env.get();
+    for (bool dispatcher:{false,true}) {
+        expected_dispatcher=dispatcher;
+        Shader::ObjectPool<Shader::IR::Inst> fragment_inst{4};
+        Shader::ObjectPool<Shader::IR::Block> fragment_blocks{4};
+        Shader::ObjectPool<Shader::Maxwell::Flow::Block> fragment_flow{64};
+        auto program=TranslateReviewedGraphicsIR(
+            fragment_inst,fragment_blocks,fragment_flow,*fragment_env,host,dispatcher);
+        Require(program.stage==Shader::Stage::Fragment,
+                "Fragment must retain its stage into the actual Maxwell CFG/IR handoff");
+    }
+    Require(calls==4,"VertexB and Fragment must each reach CFG/IR exactly twice");
     // A pretranslated native image must never smuggle Compute/QMD or
     // an unknown stage into the graphics Maxwell compiler.
     auto compute_image=BuildMaxwellShaderImage(
