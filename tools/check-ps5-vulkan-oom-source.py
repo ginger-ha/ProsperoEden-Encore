@@ -53,20 +53,32 @@ reconstructed = fork.replace("#include <array>\n#include <cstdio>\n", "")
 # dangling preprocessor guard would invalidate the strict F07 source witness.
 guard = "#ifdef EDEN_NS2_SPARSE_CACHE_PROBE\n"
 tail_guard = "#endif // EDEN_NS2_SPARSE_CACHE_PROBE\n\n"
-assert reconstructed.count(guard) == reconstructed.count(tail_guard) == 1
-start_sparse = reconstructed.index(guard)
-method_start = reconstructed.index("vk::Image MemoryAllocator::CreateSparseImage(", start_sparse)
-assert method_start == start_sparse + len(guard)
-end_sparse = reconstructed.index("vk::Buffer MemoryAllocator::CreateBuffer(", method_start)
-assert reconstructed[end_sparse-len(tail_guard):end_sparse] == tail_guard
-added_sparse = reconstructed[method_start:end_sparse-len(tail_guard)]
-assert added_sparse.count("vk::Image MemoryAllocator::CreateSparseImage(") == 1
-assert added_sparse.count("bool MemoryAllocator::AllocateSparseMemory(") == 1
-assert added_sparse.count("void MemoryAllocator::ReleaseSparseMemory(") == 1
-assert "VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT" in added_sparse
-assert "if (!device.IsSparseResidencyImage2DSupported()" in added_sparse
-assert "vmaFreeMemory(allocator, allocation)" in added_sparse
-reconstructed = reconstructed[:start_sparse] + reconstructed[end_sparse:]
+# Validate BOTH possible tracked vendor layouts: a complete guarded research
+# sparse block, or the release allocator with NO sparse methods. An incomplete
+# research block must fail; normal F07 source parity remains exact below.
+sparse_methods = (
+    "vk::Image MemoryAllocator::CreateSparseImage(",
+    "bool MemoryAllocator::AllocateSparseMemory(",
+    "void MemoryAllocator::ReleaseSparseMemory(",
+)
+if guard in reconstructed or tail_guard in reconstructed:
+    assert reconstructed.count(guard) == reconstructed.count(tail_guard) == 1
+    start_sparse = reconstructed.index(guard)
+    method_start = reconstructed.index(sparse_methods[0], start_sparse)
+    assert method_start == start_sparse + len(guard)
+    end_sparse = reconstructed.index("vk::Buffer MemoryAllocator::CreateBuffer(", method_start)
+    assert reconstructed[end_sparse-len(tail_guard):end_sparse] == tail_guard
+    added_sparse = reconstructed[method_start:end_sparse-len(tail_guard)]
+    for method in sparse_methods:
+        assert added_sparse.count(method) == 1
+    assert "VMA_ALLOCATION_CREATE_WITHIN_BUDGET_BIT" in added_sparse
+    assert "if (!device.IsSparseResidencyImage2DSupported()" in added_sparse
+    assert "vmaFreeMemory(allocator, allocation)" in added_sparse
+    reconstructed = reconstructed[:start_sparse] + reconstructed[end_sparse:]
+else:
+    assert all(method not in reconstructed for method in sparse_methods)
+    assert "EDEN_NS2_SPARSE_CACHE_PROBE" not in reconstructed
+
 start = reconstructed.index("    const VkResult result = vmaCreateImage(")
 end = reconstructed.index("    vk::Check(result);", start) + len("    vk::Check(result);")
 upstream_call = "    vk::Check(vmaCreateImage(allocator, &ci, &alloc_ci, &handle, &allocation, &alloc_info));"
