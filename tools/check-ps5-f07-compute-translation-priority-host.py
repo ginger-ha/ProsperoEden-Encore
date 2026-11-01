@@ -33,6 +33,18 @@ method_end = "    auto hash = key.Hash();\n    if (device.HasBrokenCompute()) {"
 assert source.count(method_start) == 1
 fragment = source[source.index(method_start) + len(method_start):source.index(method_end, source.index(method_start))]
 assert "ComputeTranslationPriorityScope translation_priority{build_in_parallel};" in fragment
+# MKW 5fdcbff: preserve the Vulkan driver's subgroup choice unless the
+# guest shader actually observes lane-level/warp semantics. The PS5-derived
+# renderer must agree with the pinned generator, leaving NS1 source intact.
+warp_policy = ("device.IsExtSubgroupSizeControlSupported() && uses_warp_ops "
+               "? &subgroup_size_ci : nullptr")
+assert compute.count(warp_policy) == 1
+assert generator.count(warp_policy) == 1
+for flag in ("uses_subgroup_vote", "uses_subgroup_invocation_id",
+             "uses_subgroup_shuffles", "uses_subgroup_mask",
+             "uses_quad_shuffles", "uses_fswzadd"):
+    assert f"info.{flag}" in compute and f"info.{flag}" in generator
+assert "device.IsExtSubgroupSizeControlSupported() ? &subgroup_size_ci : nullptr" not in compute
 assert "pending_first_use_compute_builds{0};" in compute
 assert "pending_first_use_compute_builds.load(std::memory_order_acquire)" in graphics
 assert "F07 foreground compute shader translation scope" in generator
