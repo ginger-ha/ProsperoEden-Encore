@@ -173,6 +173,19 @@ def main() -> int:
                 "IsFullyMappedRange(addr, sizeof(data))" in puller and
                 "IsCurrent(channel, ticket)" in puller,
                 "Ampere QMD3 must run on authenticated process session with real mapped fence handling")
+        # The EglantinePS5 shader audit found dropped last-lane vertex
+        # varyings and truncated NVN2 compute storage binding arrays. These
+        # independently produce missing geometry/black or jumping textures.
+        attribute_owner = (ROOT / "vendor/sources/eden/src/shader_recompiler/frontend/ir/attribute.h").read_text()
+        buffers_owner = (ROOT / "vendor/sources/eden/src/video_core/buffer_cache/buffer_cache_base.h").read_text()
+        lower_owner = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text()
+        require("attribute <= Attribute::Generic31W" in attribute_owner and
+                "NUM_STORAGE_BUFFERS = 32" in buffers_owner and
+                "NUM_STORAGE_BUFFERS <= 32" in buffers_owner and
+                "case 0x234: { // HSETP2" in lower_owner and
+                "case 0xb82: { // LDC U8/S8/U16/S16/U32/U64" in lower_owner and
+                "if (width > 5 ||" in lower_owner,
+                "NX2 shader/texture ABI requires full attribute vector, 32 storage slots, and reviewed half/narrow constant lowering")
         require("class NativeQmdScheduler" in qmd_header and
                 "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
                 "std::unordered_map<Address, State> states;" in qmd_header and
