@@ -140,7 +140,7 @@ def main() -> int:
                 "ReadNs2GpuShader, &memory" in pipeline_source.read_text() and
                 "CompileReviewedNativeGraphicsSpirv(" in pipeline_source.read_text() and
                 "registry.CaptureTicket(process)" in pipeline_source.read_text() and
-                pipeline_source.read_text().count("registry.IsCurrent(*session)") == 2 and
+                pipeline_source.read_text().count("registry.IsCurrent(*session)") == 5 and
                 "NativeSpirvStatus::InactiveSession" in pipeline_source.read_text(),
                 "Real GMMU-to-SPIR-V owner is missing")
         bridge_source = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
