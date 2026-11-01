@@ -146,6 +146,7 @@ def main() -> int:
                 "std::shared_ptr<Shader::Ampere::NativeTranslationCache>" in engine_registry and
                 "translation_cache{}" in engine_registry and
                 "AcquireGraphicsTranslationCache(" in native_capture and
+                "#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL" in native_capture and
                 "4 * 1024 * 1024, 32" in native_capture and
                 "NativeTranslationCache::GetOrTranslate" in
                     (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/translation_cache.cpp").read_text(),
