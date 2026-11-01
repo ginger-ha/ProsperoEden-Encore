@@ -311,6 +311,20 @@ jobs:
               -Ivendor/sources/eden/src/dynarmic/src \
               -Ivendor/sources/eden/src \
               vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp
+            # The ordinary host translation omits this conditional branch.
+            # Prove the actual PS5 QMD3 -> mapped Ampere capture callback
+            # remains syntactically linked to the genuine shader-reader ABI.
+            "$cxx" -std=c++20 -fsyntax-only -Werror -Wno-unused-parameter \
+              -DPS5_NATIVE=1 -DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1 \
+              -Ibuild-ns2-a64/fmt/include \
+              -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/encore-active/ns2-runtime/gpu_dispatch \
+              -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+              -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/eden-header-hygiene/include \
+              -Ivendor/sources/eden/src/dynarmic/src \
+              -Ivendor/sources/eden/src \
+              vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp
           done
       - name: Execute actual native Turing MME 96-bit methods (Clang/GCC UBSan)
         shell: bash
