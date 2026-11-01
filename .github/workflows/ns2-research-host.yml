@@ -288,6 +288,8 @@ jobs:
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
             vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.cpp
+      - name: Enforce per-FD native GPU channel isolation in real NVDRV owner
+        run: python3 -B tools/check-ns2-native-gpfifo-fd-scope.py
       - name: Compile and run native GPFIFO process and fence host regressions
         shell: bash
         run: |
