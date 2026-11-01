@@ -169,6 +169,7 @@ jobs:
           python3 -B tools/check-python-source-syntax.py
           python3 -B tools/check-ns2-extracted-inputs-host.py
           python3 -B tools/check-firmware-matrix-host.py
+          python3 -B tools/check-firmware-zip-native-host.py
           # Native allocation ownership and 3 GiB VA/128 MiB PA rollback
           # require their real 8-thread UBSan/TSan host harness, not just
           # source-string contracts. Installed clang-18 above.
