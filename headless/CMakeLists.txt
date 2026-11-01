@@ -2127,10 +2127,18 @@ include("${CMAKE_CURRENT_LIST_DIR}/guest_write_deferred_bridge.cmake")
 # Experimental ExeFS bridge must be selected AFTER all Encore-owned source
 # substitutions (NCZ/XCZ and the PS5 16-KiB aligned NSO loader).
 option(EDEN_NS2_EXEFS_EXPERIMENTAL
-    "Experimental Switch 2 extracted ExeFS boot (requires metadata overlay)" OFF)
-if(EDEN_NS2_EXEFS_EXPERIMENTAL)
-    if(NOT EDEN_NS2_METADATA_EXPERIMENTAL)
-        message(FATAL_ERROR "NS2 ExeFS requires EDEN_NS2_METADATA_EXPERIMENTAL=ON")
+    "Research-only extended Switch 2 extracted ExeFS boot and SVC tracing" OFF)
+# The same maintained loader owns ordinary NS1 ExeFS and NS2 extracted
+# programs in the ONE PS5 shipping binary. Preserve the audited PS5 NSO
+# implementation and baseline kernel dispatcher in release; research-only
+# NSO/SVC source replacements are not silently shipped.
+set(EDEN_SHARED_NS2_EXEFS OFF)
+if(PS5_NATIVE AND EDEN_FINAL_RELEASE_PROFILE AND EDEN_REVIEWED_DUAL_NPDM)
+    set(EDEN_SHARED_NS2_EXEFS ON)
+endif()
+if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)
+    if(NOT EDEN_REVIEWED_DUAL_NPDM)
+        message(FATAL_ERROR "NS2 ExeFS requires the reviewed dual-generation NPDM reader")
     endif()
     set(eden_ns2_loader_origin
         "${PORT_ROOT}/vendor/encore-active/eden-core/src/core/loader/loader.cpp")
@@ -2164,7 +2172,7 @@ if(EDEN_NS2_EXEFS_EXPERIMENTAL)
     endif()
     # Select a complete maintained native PS5 NSO source, preserving sparse
     # BSS and ZBIC support. Do not accidentally fall back to pinned NSO.
-    if(PS5_NATIVE)
+    if(PS5_NATIVE AND EDEN_NS2_EXEFS_EXPERIMENTAL)
         list(FIND eden_ns2_exefs_sources
              "${PORT_BUILD_DIR}/nso.cpp" eden_ns2_native_nso_idx)
         if(eden_ns2_native_nso_idx EQUAL -1)
@@ -2179,7 +2187,10 @@ if(EDEN_NS2_EXEFS_EXPERIMENTAL)
         list(APPEND eden_ns2_exefs_sources "${eden_ns2_native_nso}")
     endif()
     set_property(TARGET core PROPERTY SOURCES "${eden_ns2_exefs_sources}")
-    if(PS5_NATIVE)
+    if(EDEN_SHARED_NS2_EXEFS)
+        message(STATUS "Encore unified PS5 ExeFS: NS1/NS2 loader + reviewed NPDM; retain native optimized NSO/SVC")
+    endif()
+    if(PS5_NATIVE AND EDEN_NS2_EXEFS_EXPERIMENTAL)
         # One real vendor kernel dispatcher; research-only trace compiles in
         # place. No source rewrite and no alternate generated SVC owner.
         if(NOT EXISTS "${PORT_ROOT}/vendor/encore-active/ns2-helpers/include/core/loader/ns2_svc_trace.h")
