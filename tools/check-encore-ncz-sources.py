@@ -32,8 +32,8 @@ for rel,sha,marker in pairs:
     if rel=="loader/loader.cpp":
         # Preserve the existing NAX delta and reconstruct both reviewed
         # ExeFS-main identification changes exactly; no audit waiver.
-        nax_before='    else if (extension == "nca")\\n        return FileType::NCA;'
-        nax_after=nax_before+'\\n    else if (extension == "nax")\\n        return FileType::NAX;'
+        nax_before='    else if (extension == "nca")\n        return FileType::NCA;'
+        nax_after=nax_before+'\n    else if (extension == "nax")\n        return FileType::NAX;'
         assert expected.count(nax_before)==1
         expected=expected.replace(nax_before,nax_after)
         old_head="FileType IdentifyFile(FileSys::VirtualFile file) {\n    if (const auto nsp_type = IdentifyFileLoader<AppLoader_NSP>(file)) {"
