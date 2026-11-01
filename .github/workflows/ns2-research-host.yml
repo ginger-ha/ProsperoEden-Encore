@@ -323,6 +323,17 @@ jobs:
               -o "build-ns2-a64/native-turing-mme-${cxx//+/}"
             "build-ns2-a64/native-turing-mme-${cxx//+/}"
           done
+      - name: Exercise upstream-derived Ampere QMD3 dependency scheduler (Clang/GCC UBSan)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -O1 -Wall -Wextra -Werror -fsanitize=undefined \
+              -Ivendor/encore-active/ns2-runtime/gpu_dispatch \
+              tools/ns2/test_native_qmd_scheduler.cpp \
+              -o "build-ns2-a64/native-qmd3-${cxx//+/}"
+            "build-ns2-a64/native-qmd3-${cxx//+/}"
+          done
       - name: Compile/run native Ampere DMA channel ownership (Clang/GCC)
         shell: bash
         run: |
