@@ -2012,6 +2012,9 @@ pe::ui::Game EdenServices::enrich_game_media(pe::ui::Game game,
         const auto box = box_art(game.title_id);
         if (!box.front.empty()) game.box_front = box.front;
         if (!box.back.empty()) game.box_back = box.back;
+        // A late local/NX2 retail-cover fetch may complete after the first
+        // Nlib/cache snapshot. Always expose its real front to the game tile.
+        if (game.cover.empty() && !game.box_front.empty()) game.cover = game.box_front;
         AppendCaseScenes(game.screenshots, game.title_id);
         if (game.case_artwork_changed & (8u | 16u | 32u))
             game.artwork_changed = true; // refresh GPU copies after replacement
