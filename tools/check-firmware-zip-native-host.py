@@ -35,7 +35,10 @@ int main(int argc,char**argv) {
     namespace fs=std::filesystem;
     const fs::path archive=argv[1], unsafe=argv[2], destination=argv[3];
     std::string reason;
-    if (!Eden::FirmwareZip::Import(archive,destination,&reason)) {\n        std::fprintf(stderr, "ZIP_IMPORT_FAIL: %s\\n", reason.c_str());\n        return 2;\n    }
+    if (!Eden::FirmwareZip::Import(archive,destination,&reason)) {
+        std::fprintf(stderr, "ZIP_IMPORT_FAIL: %s\\n", reason.c_str());
+        return 2;
+    }
     assert(fs::is_regular_file(destination/"firmware/0400000000000019/main"));
     assert(fs::file_size(destination/"firmware/0400000000000019/main")==655364);
     assert(!fs::exists(destination/"__MACOSX"));
