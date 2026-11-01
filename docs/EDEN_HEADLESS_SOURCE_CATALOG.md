@@ -2,7 +2,7 @@
 
 **Branche :** `dev/ps5-sparse-jit`. **Date du relevé :** 30 octobre 2026.
 
-Ce registre complémentaire couvre les **176 chemins** de code, en-têtes et
+Ce registre complémentaire couvre les **177 chemins** de code, en-têtes et
 fragments `.c/.cc/.cpp/.h/.hpp/.inc/.cl` du dossier `headless/`.
 Il ne remplace pas `EDEN_ACTIVE_SOURCE_CATALOG.md` : les 326 fichiers
 de `vendor/encore-active` sont déjà inventoriés séparément.
@@ -13,8 +13,8 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **176** chemins sous `headless/`, dont **60** sources C/C++ et **116** en-têtes/fragments.
-- **95** chemins déjà présents dans le graphe moteur.
+- **177** chemins sous `headless/`, dont **60** sources C/C++ et **117** en-têtes/fragments.
+- **96** chemins déjà présents dans le graphe moteur.
 - **81** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
@@ -24,7 +24,7 @@ une autre forme : il manque seulement la référence de chemin exacte.
 
 Ce décompte distingue l'incomplétude du **graphe de fonctions** des
 déplacements de sources réellement nécessaires. Le registre physique couvre
-toujours 176/176 chemins ; il n'y a pas 80 overrides de dépendances oubliés.
+toujours 176/177 chemins ; il n'y a pas 80 overrides de dépendances oubliés.
 
 | Rôle indicatif | Chemins sans ID exact |
 | --- | ---: |
@@ -94,6 +94,7 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/encore_performance_policy.h` | en-tête/fragment | U55 | Chemin indexé, preuve dépend du graphe |
 | `headless/error_applet.h` | en-tête/fragment | U60 | Chemin indexé, preuve dépend du graphe |
 | `headless/experimental_performance.h` | en-tête/fragment | U23 | Chemin indexé, preuve dépend du graphe |
+| `headless/extracted_npdm_identity.h` | en-tête/fragment | U87 | Chemin indexé, preuve dépend du graphe |
 | `headless/fastmem_handler.cpp` | runtime/bridge | J07 | Chemin indexé, preuve dépend du graphe |
 | `headless/filesystem_probe.h` | en-tête/fragment | U35 | Chemin indexé, preuve dépend du graphe |
 | `headless/frame_metrics.h` | en-tête/fragment | U86 | Chemin indexé, preuve dépend du graphe |
