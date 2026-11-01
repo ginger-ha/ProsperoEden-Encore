@@ -949,3 +949,15 @@ Fast gate `41145533639` sur `74fec6c` : échec de l’assertion source `sample.b
 | `headless/ns2_title_catalog.h` | `96910dc19759cd989f7a6ecf5992f8dcbdadda14` | `U89` — `tools/check-ns2-title-catalog-host.py` ; `source-ux` PASS sur `27e8a269e2d54b61f0cd55f8aedacc575bd3c05c` | Revue source sans changement moteur ; 18 entrées testées sur hôte. Aucune preuve de fluidité FC27, HUD frais, fonctionnement NS2 ni compatibilité matérielle FW13.60. |
 
 - **Intégrité :** aucune modification de l'inventaire JSON (déjà 504 + 14 ajouts = **518** propriétaires revus), du contrôle strict, du moteur, du gitlink `vendor/` ou de `.gitmodules`. La nouvelle CI hôte doit confirmer la réparation sur le SHA publié. Aucun build PS5 ni release demandé. **F07 : 29/29 décisions pré-build, 0/12 validations console ; P0/P1 toujours ouverts.**
+
+
+## F07 — U88 : second témoin de revue absent détecté avant requalification (1 novembre 2026)
+
+- **Base `main` vérifiée :** `18eda5ad1f1af694de014a3fa665929b31d0e377`. L'audit exhaustif des deux entrées dont `source_review_document` pointe sur le registre F07 a révélé une seconde ligne manquante : `headless/firmware_zip_import.h` (U88), déjà présente dans le JSON d'inventaire et décrite dans la section U88 ci-dessus, mais absente du tableau au format strict imposé par `check-eden-optimization-coverage.py:297`. La première assertion manquante U89 masquait celle-ci. Aucune correction du test n'est nécessaire.
+- **Témoin hôte observé :** [prévalidation #41275668060](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41275668060), job `source-early`, sortie `ENCORE_FIRMWARE_ZIP_NATIVE_HOST_PASS deflate=1 dir_entries=1 crc=1 symlink_guard=1 overwrite=0 traversal=0` avant l'échec U89. La revue source couvre ZIP32 borné, chemins, CRC, refus de traversée et symlinks, staging/renommage sans écrasement. Aucune validation de firmware PS5 réel ni gain de FPS.
+
+| Source revue | Blob Git exact | Contrat et témoin | Conclusion limitée |
+| --- | --- | --- | --- |
+| `headless/firmware_zip_import.h` | `6bcdd0158269bbce565fdbdef1d9c0ba31637b72` | `U88` — `tools/check-firmware-zip-native-host.py` ; `source-early` témoin PASS sur `27e8a269e2d54b61f0cd55f8aedacc575bd3c05c` | Source revue, aucun changement moteur ; sécurité de l'import ZIP vérifiée sur hôte uniquement, compatibilité FW13.60 et performances FC27 non qualifiées. |
+
+- **Requalification :** les deux lignes U88/U89 existent désormais sans modification des 518 propriétaires ni des assertions strictes. La CI hôte du nouveau SHA reste à confirmer lors d'un déclenchement source ou manuel ; ce correctif documentaire seul n'active pas les workflows de prévalidation. Gitlink `vendor/` et `.gitmodules` inchangés. Aucun build PS5 ni release. **F07 29/29 revues, 0/12 preuves console, P0/P1 ouverts.**
