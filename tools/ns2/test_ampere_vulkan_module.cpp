@@ -281,7 +281,7 @@ int main(int argc,char** argv) {
     const auto linked_result = vkCreateGraphicsPipelines(
         device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &linked_pipeline);
     if (linked_result != VK_SUCCESS)
-        std::fprintf(stderr, "Linked native graphics pipeline result: %d\\n",
+        std::fprintf(stderr, "Linked native graphics pipeline result: %d\n",
                      static_cast<int>(linked_result));
     Require(linked_result == VK_SUCCESS && linked_pipeline != VK_NULL_HANDLE,
             "native merged VertexA/B and Fragment did not link to a Vulkan pipeline");
