@@ -66,3 +66,22 @@ images retain the backing until supervisor teardown drains those references.
 This is the same resource-lifetime dependency used by the upstream GSV; the
 PS5 Vulkan/VI2 image consumer, Ampere lowering and final screen presentation
 remain to be integrated and proven on console. Unsupported formats fail.
+
+## Parent-backed native GPU memory (TIPC 423, research only)
+
+Command **423** now decodes the exact 14-word native parent-binding packet,
+rejects nonzero reserved words, self-parenting, unaligned or wrapping ranges,
+and confirms that the allocated parent NVMap handle comes from the same
+KProcess. The parent's virtual offset must equal the requested child address,
+and the full child range must fit. The parent is internally duplicated and
+pinned before the child uses the same real page-table lock and NVMap allocation
+helper as command 114. Every failure before commit rolls back its pin and
+duplicate. The child records its parent, and command 112 releases that parent
+only after the child's resource is actually retired. On session teardown,
+the supervisor makes two bounded release passes so an owned parent that was
+pinned by a child can be released after that child. Externally borrowed or
+busy resources are never forcibly unlocked.
+
+The resource-lifetime code is native GPU preparation, not yet a PS5 Vulkan
+image allocation, 4K GPU shader execution or presentation. The NS1 renderer
+and ordinary release selectors are unchanged.

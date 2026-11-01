@@ -768,6 +768,36 @@ int main(){
             native_memory.OwnedIds().empty(),
             "GSV 114/112 track externally owned physical GPU backing");
 
+    // Native parent binding command 423 has 12 words after its TIPC header.
+    std::array<u32,14> parent_packet{
+        0x1b7, 12, 16, 0x8000, 0, 0x4000, 0, 20, 0x2000, 0, 0, 0, 0, 0};
+    const auto parent_bind = P::DecodeNativeParentBind(parent_packet);
+    require(parent_bind && parent_bind->child == 16 && parent_bind->parent == 20 &&
+            parent_bind->address == 0x8000 && parent_bind->size == 0x4000 &&
+            parent_bind->parent_offset == 0x2000,
+            "GSV 423 decodes valid child and parent NVMap fields");
+    parent_packet[11] = 1;
+    require(!P::DecodeNativeParentBind(parent_packet),
+            "GSV 423 rejects nonzero reserved packet words");
+    parent_packet[11] = 0;
+    parent_packet[7] = 16;
+    require(!P::DecodeNativeParentBind(parent_packet),
+            "GSV 423 rejects self-backed native memory");
+    parent_packet[7] = 20;
+    parent_packet[8] = 1;
+    require(!P::DecodeNativeParentBind(parent_packet),
+            "GSV 423 rejects unaligned parent offsets");
+    parent_packet[8] = 0x2000;
+    parent_packet[6] = 0xffffffff;
+    parent_packet[5] = 0xfffff000;
+    require(!P::DecodeNativeParentBind(parent_packet),
+            "GSV 423 rejects address/size overflow before backing is pinned");
+    parent_packet[6] = 0;
+    parent_packet[5] = 0x4000;
+    require(!P::DecodeNativeParentBind(
+                std::span<const u32>{parent_packet.data(), parent_packet.size() - 1}),
+            "GSV 423 rejects truncated native GPU parent packets");
+
     // Native 429/430 image IDs retain a separately owned NVMap backing
     // reference; creation is not a claim of Vulkan rendering or presentation.
     preferences[6] = 1;

@@ -54,6 +54,21 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    assert '{423, &IGraphicsSupervisor::BindNativeGpuMemory' in text
+    for snippet in (
+        'GraphicsSupervisorProtocol::DecodeNativeParentBind(packet)',
+        'session && session->process == m_process',
+        'parent->Duplicate(true)',
+        'nvmap.PinHandle(request->parent, false)',
+        'nvmap.UnpinHandle(request->parent)',
+        'nvmap.FreeHandle(request->parent, true)',
+        'm_native_parents.emplace(request->child, request->parent)',
+        'm_native_parents.find(packet[2])',
+        'BindNativeMemoryBacking(request->child,',
+        'for (const auto& [child, parent] : m_native_parents)',
+    ):
+        assert snippet in text, "Missing real parent GSV 423 lifecycle: " + snippet
+
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (
