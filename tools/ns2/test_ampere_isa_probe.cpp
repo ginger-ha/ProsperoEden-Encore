@@ -24,7 +24,9 @@ int main() {
     static_assert(sizeof(Instruction) == 16);
     check(ISA_ROW_COUNT == 629, "pinned upstream SM70 ISA row count");
     check(FindOpcodeRow(0x202) && FindOpcodeRow(0x947) &&
-          FindOpcodeRow(0x94d) && FindOpcodeRow(0x918),
+          FindOpcodeRow(0x94d) && FindOpcodeRow(0x918) &&
+          FindOpcodeRow(0x34e) && FindOpcodeRow(0x357) &&
+          FindOpcodeRow(0x957),
           "MOV, BRA, EXIT and NOP have real opcode definitions");
     check(Classify(0x947).kind == OpKind::Bra &&
           Classify(0x94d).kind == OpKind::Exit &&
@@ -43,6 +45,15 @@ int main() {
     check(result.status == ProbeStatus::Recognized && result.instructions == 3 &&
           result.recognized == 3 && result.control_flow == 2,
           "bounded sample recognized without claiming shader execution");
+    std::vector<u8> geometry_prologue;
+    Append(geometry_prologue, 0x34e, 7u << 12);
+    Append(geometry_prologue, 0x357, 7u << 12);
+    Append(geometry_prologue, 0x957, 7u << 12);
+    check(ProbeProgram(geometry_prologue).status == ProbeStatus::Recognized,
+          "verified geometry ATEXIT opcodes reach the lowering preflight");
+    geometry_prologue[3] = 1; // Disallowed LEPC operand encoding.
+    check(ProbeProgram(geometry_prologue).status == ProbeStatus::UnreviewedFields,
+          "non-reviewed LEPC operand mode remains fail closed");
     auto misaligned=valid;
     misaligned.erase(misaligned.begin());
     check(ProbeProgram(misaligned).status == ProbeStatus::InvalidSize,
