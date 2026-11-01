@@ -36,5 +36,11 @@ assert "Eden::NS2::SvcTrace::Register" in rom
 assert 'IdentifyFileLoader<AppLoader_DeconstructedRomDirectory>(file)' in loader
 assert "Eden::NS2::Content::IdentifyName" in loader
 assert "AppLoader_NSP" in loader and "AppLoader_XCI" in loader
+assert 'set(EDEN_SHARED_NS2_AM ON)' in cmake
+assert 'if(EDEN_NS2_AM_EXPERIMENTAL OR EDEN_SHARED_NS2_AM)' in cmake
+am_file = (ROOT / "vendor/encore-active/ns2-runtime/am/core/hle/service/am/service/application_functions.cpp").read_text()
+assert '{320, D<&IApplicationFunctions::GetScreenShotAndContinuousRecordingInitiallyEnabled>' in am_file
+assert "m_applet->screenshot_permission" in am_file
+assert "m_applet->game_play_recording_supported" in am_file
 assert 'Settings::SetNceEnabled(is_39bit && !metadata.UsesExtendedAcid())' in rom
-print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1")
+print("ENCORE_NS2_SHARED_EXEFS_SHIPPING_OWNER_PASS release=one ns1_nso_preserved=1 ns2_am_320=1")
