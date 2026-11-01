@@ -213,6 +213,27 @@ int main(){
             "reject inclusive maximum end overflow");
     require(!DecodeGpuSparseRegion(std::span<const u32>(region.data(),11)),
             "reject truncated sparse region request");
+    // Dense GPU-only render backing uses actual kernel pages + NVMap, not
+    // an unbacked sparse VA or an optimistic success on allocation failure.
+    require(CanBackNativeDenseGpuOnly(0, 300ULL << 20, 0,
+                                     3ULL << 30),
+            "bounded 300 MiB GPU-only backing can be admitted");
+    require(CanBackNativeDenseGpuOnly(0, 300ULL << 20, 1500ULL << 20,
+                                     512ULL << 20),
+            "six 300 MiB render targets stay inside 2 GiB budget");
+    require(!CanBackNativeDenseGpuOnly(1, 300ULL << 20, 0, 3ULL << 30),
+            "sparse allocation mode must not be marked dense resident");
+    require(!CanBackNativeDenseGpuOnly(0, 513ULL << 20, 0, 3ULL << 30),
+            "huge virtual textures cannot exhaust dense allocation pool");
+    require(!CanBackNativeDenseGpuOnly(0, 300ULL << 20, 1800ULL << 20,
+                                      3ULL << 30),
+            "reject dense backing above combined per-session budget");
+    require(!CanBackNativeDenseGpuOnly(0, 300ULL << 20, 0, 350ULL << 20),
+            "preserve minimum free memory reserve");
+    require(!CanBackNativeDenseGpuOnly(0, 0x1001, 0, 3ULL << 30),
+            "reject unaligned native dense backing");
+    require(!CanBackNativeDenseGpuOnly(0, 300ULL << 20, ~u64{0}, 3ULL << 30),
+            "reject counter overflow / stale allocation accounting");
 
     std::array<u8,4> legacyTsg{21,0,0,0};
     auto tsg=N::DecodeNativeTsgBinding(legacyTsg,false);
