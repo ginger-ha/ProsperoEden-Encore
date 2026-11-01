@@ -11,6 +11,10 @@
 #include <exception>
 #include "assets_dir.h"
 #include "extracted_npdm_identity.h"
+#ifdef EDEN_NS2_GUEST_COUNTER
+#include "common/cpu_features.h"
+#include "encore/guest_counter_policy.h"
+#endif
 #include "gpu_failure.h"
 #include "guest_fault.h"
 #include "jit_list.h"
@@ -1997,6 +2001,12 @@ int main(int argc, char** argv) {
                 }
                 Core::SystemResultStatus loaded;
                 try {
+#ifdef EDEN_NS2_GUEST_COUNTER
+                    // Reset for EVERY title, including packaged NS1 games.
+                    // The shared ExeFS loader upgrades only verified extended
+                    // NS2 NPDM programs before any guest CPU thread runs.
+                    Eden::GuestCounter::SelectProgram(false, Common::g_cpu_caps.tsc_frequency);
+#endif
                     loaded = system.Load(window, guest, params);
                 } catch (const std::exception& error) {
                     load_input.request_stop();
