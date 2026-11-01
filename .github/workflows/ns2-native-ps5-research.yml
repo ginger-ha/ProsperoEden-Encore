@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - research/ns2-ps5-compatibility
+      - main
     paths:
+      # Main compiles only from an explicit [ns2-native-build] workflow edit.
+      # Ordinary vendor/main pushes must not trigger repeated 4-hour PS5 jobs.
+      - '.github/workflows/ns2-native-ps5-research.yml'
       # Workflow-only edits never cancel an already compiling native candidate.
       - 'tools/ns2/package_native_research.sh'
       - 'tools/build-headless-native.sh'
@@ -26,6 +30,7 @@ concurrency:
 
 jobs:
   compile-native-ps5:
+    if: ${{ github.ref != 'refs/heads/main' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ns2-native-build]') }}
     name: Compile existing PS5 Encore native owners with all NS2 research switches
     runs-on: ubuntu-24.04
     timeout-minutes: 240
