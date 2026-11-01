@@ -1,5 +1,6 @@
 #include "metadata_bridge.h"
 #include "game_files.h"
+#include "extracted_npdm_identity.h"
 #include "../vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc_paths.h"
 #include "assets_dir.h"
 #include "diagnostics.h"
@@ -199,8 +200,23 @@ uint64_t eden_game_title_id(const char* rom_path) {
     Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, Eden::AssetsPath("keys"));
     FileSys::RealVfsFilesystem vfs;
     FileSys::ProgramMetadata extracted;
-    if (ReadExtractedProgramMetadata(rom_path, vfs, &extracted))
+    if (ReadExtractedProgramMetadata(rom_path, vfs, &extracted) && extracted.GetTitleID() != 0)
         return extracted.GetTitleID();
+    // NS2 NPDM may contain valid ACI0 identity but extra kernel metadata
+    // not yet understood by the NS1 ProgramMetadata parser. Recover ONLY
+    // the title ID for library art/indexing, not kernel permissions/boot.
+    const std::filesystem::path selected{rom_path};
+    const auto roms_root = std::filesystem::path(Eden::AssetsPath("roms"));
+    if (selected.filename() == "main" &&
+        Eden::IsSafeDeconstructedGamePath(
+            roms_root, selected.lexically_relative(roms_root).generic_string())) {
+        const auto id = Eden::ExtractedNpdm::TitleId(selected.parent_path() / "main.npdm");
+        if (id != 0) {
+            std::fprintf(stderr, "EDEN_EXEFS_NPDM_ID_FALLBACK title=%016llX\\n",
+                         static_cast<unsigned long long>(id));
+            return id;
+        }
+    }
     const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
     if (!file) return 0;
     std::string path = rom_path;
