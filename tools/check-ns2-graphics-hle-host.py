@@ -39,7 +39,7 @@ def main()->int:
     assert 'table.QueryInfo(&info, &page, cursor)' in text
     # Accept line wrapping only; still require the real Bind result to be
     # wrapped by NativeMemoryError (not a synthetic success path).
-    assert re.search(r'NativeMemoryError\\s*\\(\\s*m_native_memory\\.Bind\\s*\\(', text)
+    assert re.search(r'NativeMemoryError\s*\(\s*m_native_memory\.Bind\s*\(', text)
     assert 'm_native_memory.Destroy(' in text
     # GSV 111/112/114 must use real NVMap handle identity and kernel page locks,
     # not acknowledge metadata-only resources that cannot become GPU images.
