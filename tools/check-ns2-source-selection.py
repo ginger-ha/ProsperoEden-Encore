@@ -165,6 +165,7 @@ def main() -> int:
                 "NS2 boot trace must record guest-visible GPU worker IPC results")
         require("EDEN_NS2_GPFIFO submit=" in nvdrv_source and
                 "EDEN_NS2_GPU_BIND count=" in puller and
+                "engine == 0xc7c0" in puller and
                 "std::atomic<unsigned>" in puller,
                 "NS2 boot trace requires concrete GPFIFO and Ampere bind witnesses")
         require("BindGraphicsEngine(" in puller and
