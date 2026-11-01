@@ -212,7 +212,7 @@ uint64_t eden_game_title_id(const char* rom_path) {
             roms_root, selected.lexically_relative(roms_root).generic_string())) {
         const auto id = Eden::ExtractedNpdm::TitleId(selected.parent_path() / "main.npdm");
         if (id != 0) {
-            std::fprintf(stderr, "EDEN_EXEFS_NPDM_ID_FALLBACK title=%016llX\\n",
+            std::fprintf(stderr, "EDEN_EXEFS_NPDM_ID_FALLBACK title=%016llX\n",
                          static_cast<unsigned long long>(id));
             return id;
         }
@@ -657,7 +657,31 @@ const char* eden_startup_error() {
                     version |= file && file->GetSize() >= 0x100 && file->ReadBytes(0x100).size() == 0x100;
                 }
             }
-            if (!count) return "No firmware NCAs found in " + Eden::AssetsPath("firmware") + ".";
+            if (!count) {
+                // NS2JB captures may contain 90 NPDM/system-code records but
+                // zero NCAs. Identify this alternative input honestly rather
+                // than presenting it as firmware accepted by the NS1 services.
+                // Do not traverse or execute untrusted system-code modules.
+                for (const char* subdir : {"ns2-extracted", "firmware"}) {
+                    const auto root = std::filesystem::path(firmware) / subdir;
+                    std::error_code probe_error;
+                    if (std::filesystem::is_regular_file(root / ".ns2jb-firmware-dump.json",
+                                                         probe_error) &&
+                        std::filesystem::is_regular_file(root / "firmware-dump-named.json",
+                                                         probe_error) &&
+                        std::filesystem::is_regular_file(root / "ncm-system-programs.bin",
+                                                         probe_error)) {
+                        std::fprintf(stderr,
+                                     "EDEN_NS2_SYSTEM_CODE_DUMP_DETECTED root=%s status=not_nca_firmware\\n",
+                                     root.string().c_str());
+                        return "NS2 extracted system-code dump detected in " +
+                               root.string() +
+                               ". This NSO/NPDM dump is not an NCA firmware installation. "
+                               "NS2 system-service loading still requires compatibility work.";
+                    }
+                }
+                return "No firmware NCAs found in " + Eden::AssetsPath("firmware") + ".";
+            }
             if (!version) return "Firmware SystemVersion data is missing or unreadable. Install a complete firmware dump.";
             return {};
         } catch (...) {
