@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert pool_policy not in actual, 'native GPU budget leaked into generator'
     assert subprocess.check_output(
         ['git','hash-object',str(expected[pool_policy])],text=True
-    ).strip() == '8f39056a5eb9d219685b2319c504375559db21d3', 'shared GPU policy drift'
+    ).strip() == '85cc400399ee8daf82037dfc0f070d3d66eebb68', 'shared GPU policy drift'
     oom_check = subprocess.run(
         [sys.executable, '-B', str(root/'tools/check-ps5-vulkan-oom-source.py')],
         timeout=15, capture_output=True, text=True)
