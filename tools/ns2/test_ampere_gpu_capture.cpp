@@ -66,6 +66,21 @@ int main() {
             "compute capture must use a separate headerless stage domain");
     Require(mem.reads==5,
             "compute capture must read only the two actual instructions");
+    // Native QMD3 shader code can live above the 32-bit-PCAS or legacy
+    // 40-bit GPU address window. The capture reader must not alias the
+    // low guest address when a valid 49-bit GPU VA is supplied.
+    MappedMemory high_shader{};
+    high_shader.base = 0x10100000000ULL;
+    high_shader.data = mem.data;
+    high_shader.mapped_bytes = high_shader.data.size();
+    const auto upper_compute = CaptureNativeComputeShader(
+        high_shader.base+0x80,Read,&high_shader);
+    Require(upper_compute.Ready() &&
+            upper_compute.captured_native_bytes==32 &&
+            high_shader.reads==2 &&
+            upper_compute.image.diagnostic_cache_key==
+                compute.image.diagnostic_cache_key,
+            "49-bit native Compute GPU address retains exact program bytes");
     mem.mapped_bytes=0x80+16;
     const auto compute_fault=CaptureNativeComputeShader(mem.base+0x80,Read,&mem);
     Require(compute_fault.status==NativeCaptureStatus::Unmapped &&
