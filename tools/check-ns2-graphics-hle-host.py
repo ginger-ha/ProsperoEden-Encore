@@ -83,6 +83,11 @@ def main()->int:
         '{352,&IVi2Session::OutputLevels,"SetClientOutputLevels"}',
         '{106,&IVi2Session::MaxResolution,"GetBufferMaxResolution"}',
         'c.queued_modules[slot]=img->module',
+        'it->available_bit=p[5]',
+        'Signal(c.available_bit)',
+        'Signal(c->release_bit)',
+        'client->output_levels=values;',
+        'std::isfinite(v)',
         'native->format=android::PixelFormat::Rgba8888;',
         'pref[6]==1&&outw<=width&&outh<=height',
     ):
