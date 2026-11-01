@@ -52,3 +52,7 @@ or FPS claim is made, and this document does **not** close the native hardware r
 - Verify extracted Title ID on actual console, and trace NS2 first guest
   frame, CPU scheduler, NVDRV channels and GPU submit for black screens.
 - Verify profile PNG decoded/uploaded into the avatar texture on PS5.
+
+## Addendum 2026-11-01 — owner-bound avatar decode fallback
+
+The 2026-10-31 reviewed `eden_services.cpp` blob `85a20128ec98c7c039538dd8f5671a8448aadb83` was modified **only** in commit `7136f8af02cd` (36 changed lines), producing blob `ea91caf2d586d4be5550214912c08abab7429c5e`. The change makes `IsDecodableAvatarFile` reject a readable but invalid PNG, checks bounded image dimensions through stb_image, and attempts the **same foreground user's** matching DDS when the PNG cannot decode. The PNG and DDS staging owner-marker checks remain required, and no cross-profile enumeration was added. This is a source-only re-review based on the exact patch; successful appearance of an avatar on a PS5 remains **unverified**. The historical 26 October launcher performance disposition is unchanged.

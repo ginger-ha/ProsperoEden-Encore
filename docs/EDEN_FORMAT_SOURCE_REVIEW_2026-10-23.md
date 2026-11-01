@@ -23,7 +23,7 @@ fausse dette d'optimisation JIT/GPU.
 | `vendor/encore-active/eden-core/src/core/file_sys/card_image.cpp` | `f843e7f9c977b509368e71eb6356066c1a5e0c50` | Lecteur de partition cartouche NCZ, source maintenue sélectionnée |
 | `vendor/encore-active/eden-core/src/core/file_sys/registered_cache.cpp` | `618ff99d2121741c190a9fd3ae8d0fd45f7eb9fe` | Détection NSZ/XCZ des contenus enregistrés |
 | `vendor/encore-active/eden-core/src/core/file_sys/submission_package.cpp` | `29a46a6024cad1e867ac450a0bd651bebc1f0b29` | Ouverture NCZ comme archive de contenu d'un package |
-| `vendor/encore-active/eden-core/src/core/loader/loader.cpp` | `e2e87827700a0a670f0d418262e80860e79a683a` | Routage des extensions au chargeur natif et NAX |
+| `vendor/encore-active/eden-core/src/core/loader/loader.cpp` | `7943b817dfa8118b150c4970d6513ec179262af0` | Routage des extensions au chargeur natif et NAX |
 | `vendor/encore-active/eden-core/src/core/loader/nsp.cpp` | `b56195d24778a849bb768d463fdf4ceef3d5c33f` | Détection des membres NCZ d'un NSP/NSZ |
 
 ## Garanties et limites
@@ -84,3 +84,7 @@ tracked by `tools/check-exefs-directory-host.py`; see
 A mixed title folder with exactly one XCI/XCZ and other NSP/NSZ content
 selects the unique card image as its base. Multiple candidate card images
 or anonymous NSP-only mixtures still fail closed rather than guessing.
+
+## Addendum 2026-11-01 — ExeFS-first identification
+
+The loader's reviewed source is now blob `7943b817dfa8118b150c4970d6513ec179262af0`. The exact source-owner gate reconstructs the maintained file from pinned Eden, plus existing NSZ/XCZ and NAX handling, and the explicitly reviewed first-choice `AppLoader_DeconstructedRomDirectory` for a file named `main` that actually belongs to a valid ExeFS directory. Standalone NSO files continue through the generic NSO detector. This avoids treating an extracted program with `main.npdm`, `rtld` and `sdk` as an isolated `main` NSO; no claim is made that Bananza gameplay boots or that Switch 2 emulation is complete.

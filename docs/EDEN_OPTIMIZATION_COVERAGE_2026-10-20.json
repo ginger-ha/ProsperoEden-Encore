@@ -729,9 +729,9 @@
     {
       "path": "headless/prosperoeden/eden_services.cpp",
       "disposition": "new_source_issue_corrected",
-      "reviewed_source_git_blob": "85a20128ec98c7c039538dd8f5671a8448aadb83",
+      "reviewed_source_git_blob": "ea91caf2d586d4be5550214912c08abab7429c5e",
       "proof_ref": "tools/check-release-case-index-dedup-host.py",
-      "evidence": "LocaleCaseCandidates: linear-time stable regional dedup now replaces repeated vector search; actual release test. Exact selected source/O0/O2 host code parity; no PS5 FPS claim. PR #1: PS5-only owner-bound staged avatar, foreground-user lookup and readable-file check. LocaleCaseCandidates and its linear-time dedup remain byte-for-byte unchanged; no FPS claim. Source drift re-reviewed for flexible layout on 2026-10-31; see docs/FLEXIBLE_LAYOUT_INTEGRATION_SOURCE_REVIEW_2026-10-31.md. Historical optimization disposition is unchanged; hardware and FPS not claimed. Re-reviewed 2026-10-31 after extracted-game UI identity/size/cover and foreground avatar fixes. New review: docs/NS2_BLACK_SCREEN_FC27_AUDIO_REVIEW_2026-10-31.md. This revalidation is source-only: no NS2 gameplay or PS5 crash fix claim.",
+      "evidence": "LocaleCaseCandidates: linear-time stable regional dedup now replaces repeated vector search; actual release test. Exact selected source/O0/O2 host code parity; no PS5 FPS claim. PR #1: PS5-only owner-bound staged avatar, foreground-user lookup and readable-file check. LocaleCaseCandidates and its linear-time dedup remain byte-for-byte unchanged; no FPS claim. Source drift re-reviewed for flexible layout on 2026-10-31; see docs/FLEXIBLE_LAYOUT_INTEGRATION_SOURCE_REVIEW_2026-10-31.md. Historical optimization disposition is unchanged; hardware and FPS not claimed. Re-reviewed 2026-10-31 after extracted-game UI identity/size/cover and foreground avatar fixes. New review: docs/NS2_BLACK_SCREEN_FC27_AUDIO_REVIEW_2026-10-31.md. This revalidation is source-only: no NS2 gameplay or PS5 crash fix claim. 2026-11-01 exact delta: commit 7136f8a adds off-UI-thread decoding validation for staged/system PNG and DDS; prevents undecodable PNG from suppressing owner-matched DDS fallback. No gameplay, FPS or console avatar success proof.",
       "review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
       "supplemental_review_document": "docs/NS2_BLACK_SCREEN_FC27_AUDIO_REVIEW_2026-10-31.md"
     },
@@ -3267,10 +3267,10 @@
       "path": "vendor/encore-active/eden-core/src/core/loader/loader.cpp",
       "disposition": "format_feature_source_integrated",
       "source_scope": "native_maintained",
-      "reviewed_source_git_blob": "e2e87827700a0a670f0d418262e80860e79a683a",
+      "reviewed_source_git_blob": "7943b817dfa8118b150c4970d6513ec179262af0",
       "feature_review_document": "docs/EDEN_FORMAT_SOURCE_REVIEW_2026-10-23.md",
       "proof_ref": "tools/check-encore-ncz-sources.py",
-      "evidence": "New format-loader code path inspected and pinned: Pinned loader with exact NSZ/XCZ and NAX filename recognition; CMake selected. This is source integration, NOT a claimed F01-F06 optimization or console runtime proof."
+      "evidence": "New format-loader code path inspected and pinned: Pinned loader with exact NSZ/XCZ and NAX filename recognition; CMake selected. This is source integration, NOT a claimed F01-F06 optimization or console runtime proof. 2026-11-01: exact reviewed loader main/ExeFS identity priority before generic NSO, preserving standalone NSO, NCZ, NAX; source guard check-encore-ncz-sources.py. Not console-verified."
     },
     {
       "path": "vendor/encore-active/eden-core/src/core/loader/nso.cpp",
