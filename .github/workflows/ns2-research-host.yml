@@ -225,6 +225,7 @@ jobs:
             -Ibuild-ns2-a64/fmt/include \
             -Ivendor/encore-active/ns2-runtime/gpu_session \
             -Ivendor/encore-active/ns2-runtime/hle \
+            -Ivendor/encore-active/ns2-runtime/nvdrv_as \
             -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
             -Ivendor/sources/eden/src/dynarmic/src \
             -Ivendor/sources/eden/src \
