@@ -85,6 +85,7 @@
     "ns2-runtime/gpu_dispatch/video_core/engines/puller.h",
     "ns2-runtime/gpu_dispatch/video_core/macro_turing.h",
     "ns2-runtime/gpu_dispatch/video_core/native_ampere_macro_state.h",
+    "ns2-runtime/gpu_dispatch/video_core/native_qmd.h",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.cpp",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.h",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker.cpp",
