@@ -164,6 +164,15 @@ def main() -> int:
                 "EDEN_NS2_IPC owner=vi2" in supervisor_source,
                 "NS2 boot trace must record guest-visible GPU worker IPC results")
         qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
+        require("AcquireNativeQmdSession(" in engine_registry and
+                "qmd_sessions.erase(process)" in engine_registry and
+                "NativeGpuChannelRegistry::AcquireNativeQmdSession(" in puller and
+                "ProcessNativeComputeQmd(" in puller and
+                "session->scheduler.Signal(" in puller and
+                "rasterizer->SignalFence(" in puller and
+                "IsFullyMappedRange(addr, sizeof(data))" in puller and
+                "IsCurrent(channel, ticket)" in puller,
+                "Ampere QMD3 must run on authenticated process session with real mapped fence handling")
         require("class NativeQmdScheduler" in qmd_header and
                 "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
                 "std::unordered_map<Address, State> states;" in qmd_header and
