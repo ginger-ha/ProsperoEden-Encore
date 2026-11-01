@@ -818,6 +818,15 @@ int main(){
             images.Get(*first_image)->preference[1] == 1 &&
             images.Count() == 2,
             "GSV 429 owns distinct image IDs linked to genuine NVMap backing");
+    require(images.ConfigureWindowPool(*first_image, true) &&
+            images.Get(*first_image)->window_pool &&
+            !images.ConfigureWindowPool(*first_image, true) &&
+            !images.Destroy(*first_image) &&
+            images.ConfigureWindowPool(*first_image, false) &&
+            !images.Get(*first_image)->window_pool,
+            "GSV 314/315 require explicit window alias retirement");
+    require(!images.ConfigureWindowPool(0xffffffffU, true),
+            "GSV native window alias rejects unowned image IDs");
     require(!images.Destroy(0) && !images.Destroy(0xffffffffU) &&
             images.Destroy(*first_image) &&
             !images.Get(*first_image).has_value() &&

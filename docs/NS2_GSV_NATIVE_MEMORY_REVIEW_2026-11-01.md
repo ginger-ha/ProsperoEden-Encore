@@ -102,3 +102,11 @@ teardown drains image VA mappings, pools and native backing in this order.
 This does not provide video decode or a VI2 present/layer consumer: metadata
 and real GMMU mappings alone cannot produce first Switch 2 video output.
 No fictitious Vulkan image or completed graphics fence is emitted.
+
+## Native window alias ownership (TIPC 314/315)
+
+TIPC 314/315 now toggle a strict alias flag on native NVMap-backed 429 images.
+Window-linked images cannot be destroyed prematurely; repeated alias creation
+or release is rejected. The native video image pools used by 426/427/428 are
+separate. The real VI2 presenter and verified display-fence handoff are still
+not connected: an alias flag does not mean a frame has reached the compositor.
