@@ -115,3 +115,12 @@ The video GMMU mapping owner also checks the actual address-space object,
 not just an FD integer: a recycled FD cannot inherit a previous mapping or
 release that mapping. Pool admission rejects image offsets beyond the 32-bit
 TIPC descriptor and image sizes/strides that are not 4K-mappable.
+
+## Shared GSV native/video image IDs
+
+Native 429 and pool 911 now draw from one monotonic 64-bit guest image ID
+counter rather than separate or artificial high-bit ranges. A native image
+may be created with its assigned ID, preserving bounded ownership and
+rejecting reused, stale or exhausted IDs. A destroyed image never makes its
+ID available to a new pool. Host C++ cases cover assigned IDs and default
+sequential synthetic fixtures.

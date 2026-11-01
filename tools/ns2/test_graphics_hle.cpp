@@ -882,6 +882,16 @@ int main(){
     require(!CalculateNativeVideoImageLayout(video, 2),
             "GSV video image pools reject unreviewed format flags");
 
+    NativeImageLedger coordinated;
+    const auto requested = coordinated.Create(16, 0x10000,
+                                             *image_requirements, preferences, 42);
+    const auto automatic = coordinated.Create(16, 0x10000,
+                                              *image_requirements, preferences);
+    require(requested && *requested == 42 && automatic && *automatic == 43 &&
+            !coordinated.Create(16, 0x10000, *image_requirements, preferences, 42) &&
+            !coordinated.Create(16, 0x10000, *image_requirements, preferences, 41),
+            "GSV native and video pool IDs never reuse or alias guest handles");
+
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
             generic->backend==static_cast<u8>(Tegra::PTEKind::GENERIC_16BX2),

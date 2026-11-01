@@ -64,7 +64,7 @@ def main()->int:
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (
         'CalculateNativeVideoImageLayout(preference, count)',
-        'm_video_pools.Add(m_next_video_image_id, count,',
+        'm_video_pools.Add(static_cast<u32>(m_next_image_id),',
         'm_native_memory.Get(backing)',
         'session && session->process == m_process',
         'handle->Duplicate(true)',
@@ -104,8 +104,9 @@ def main()->int:
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (
-        'm_native_images.Create(backing, handle->size,',
+        'm_native_images.Create(',
         'm_native_images.Destroy(packet[2])',
+        'static_cast<u32>(m_next_image_id)',
         'handle->Duplicate(true)',
         'FreeHandle(\n                image->backing, true)',
         'for (const auto& [image_id, image] : m_native_images.Records())',
