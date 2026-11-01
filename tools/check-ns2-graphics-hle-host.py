@@ -28,6 +28,19 @@ def main()->int:
     if not all(f.is_file() for f in EXPECTED):
         print("NS2 graphics HLE overlay incomplete",file=sys.stderr)
         return 2
+    # The real research-only supervisor, not just the standalone protocol,
+    # handles creation/bind/destruction; no synthetic GPU work is advertised.
+    supervisor=ROOT/"vendor/encore-active/ns2-runtime/graphics_supervisor/core/hle/service/am/service/graphics_supervisor.cpp"
+    text=supervisor.read_text()
+    for command, method in ((111,"CreateNativeMemory"),(112,"DestroyNativeMemory"),(114,"BindNativeMemory")):
+        assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    assert 'm_native_memory.ValidateBind(' in text
+    assert 'table.QueryInfo(&info, &page, cursor)' in text
+    assert 'NativeMemoryError(m_native_memory.Bind(' in text
+    assert 'm_native_memory.Destroy(' in text
+    assert 'GpuContextReady()' in text
+    assert 'ResultNotImplemented.raw' in text
+    assert 'ResultInvalidCurrentMemory' in text
     compiler=shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         print("C++20 compiler missing",file=sys.stderr)

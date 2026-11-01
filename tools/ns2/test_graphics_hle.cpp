@@ -708,6 +708,47 @@ int main(){
             bounded.Count()==WP::MaxMappings,
             "4K mapping table exhaustion is deterministic");
 
+    // Native-memory objects are bounded descriptors. They do not allocate
+    // Vulkan images and must not fabricate a completed GPU operation.
+    P::NativeMemoryLedger native_memory;
+    auto [created, first_memory] = native_memory.Create(0x4000);
+    require(created == P::NativeMemoryStatus::Success && first_memory == 1 &&
+            native_memory.Count() == 1, "GSV 111 allocates first owned descriptor");
+    auto [created_two, second_memory] = native_memory.Create(0x2000);
+    require(created_two == P::NativeMemoryStatus::Success && second_memory == 2,
+            "GSV 111 IDs are distinct and monotonic");
+    require(native_memory.Create(0).first == P::NativeMemoryStatus::InvalidSize &&
+            native_memory.Create(0x1001).first == P::NativeMemoryStatus::InvalidSize &&
+            native_memory.Create((12ULL << 30) + 0x1000).first == P::NativeMemoryStatus::InvalidSize,
+            "GSV 111 refuses empty, unaligned and oversized host requests");
+    require(native_memory.ValidateBind(first_memory, 0x8000, 0x3000) ==
+                P::NativeMemoryStatus::Success,
+            "GSV 114 validates owned descriptor and in-bounds guest range");
+    require(native_memory.ValidateBind(first_memory, 0x8001, 0x3000) ==
+                P::NativeMemoryStatus::InvalidAddress &&
+            native_memory.ValidateBind(first_memory, 0x8000, 0x5000) ==
+                P::NativeMemoryStatus::InvalidSize &&
+            native_memory.ValidateBind(first_memory, 0xfffffffffffff000ULL, 0x2000) ==
+                P::NativeMemoryStatus::InvalidAddress,
+            "GSV 114 prevents misaligned, oversized or wrapped binding");
+    require(native_memory.Bind(first_memory, 0x8000, 0x3000) ==
+                P::NativeMemoryStatus::Success &&
+            native_memory.Get(first_memory)->bound &&
+            native_memory.Get(first_memory)->guest_address == 0x8000,
+            "GSV 114 commits a validated ownership binding");
+    require(native_memory.Bind(first_memory, 0x9000, 0x1000) ==
+                P::NativeMemoryStatus::AlreadyBound,
+            "GSV 114 cannot silently rebind an existing native-memory object");
+    require(native_memory.Destroy(first_memory) == P::NativeMemoryStatus::Success &&
+            !native_memory.Get(first_memory).has_value() &&
+            native_memory.ValidateBind(first_memory, 0x8000, 0x1000) ==
+                P::NativeMemoryStatus::InvalidHandle &&
+            native_memory.Destroy(first_memory) == P::NativeMemoryStatus::InvalidHandle,
+            "GSV 112 releases exact resource and rejects stale handles");
+    require(native_memory.Destroy(second_memory) == P::NativeMemoryStatus::Success &&
+            native_memory.Count() == 0,
+            "GSV native-memory resources survive independent destroy order");
+
     const auto generic=N::SelectNativeMemoryKind(6,6);
     require(generic && generic->selected==6 &&
             generic->backend==static_cast<u8>(Tegra::PTEKind::GENERIC_16BX2),
