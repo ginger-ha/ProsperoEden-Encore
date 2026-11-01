@@ -165,10 +165,40 @@ inline std::string ResolveFirmwarePath(SwitchFamily family) {
         "ns2/firmware", "switch2/firmware", "ns2", "switch2",
         "firmware/switch2-extracted", "firmware", "firmware/firmware"};
     const auto check_explicit = [&](std::string_view name) -> std::string {
-        fs::path p = root / name;
-        if (valid(p)) return p.string();
-        if (valid(p / "firmware")) return (p / "firmware").string();
-        return {};
+        const fs::path p = root / name;
+        if (!StorageDirectory(p)) return {};
+        const auto inspect_leaf = [&](const fs::path& leaf) -> std::string {
+            if (!valid(leaf)) return {};
+            if (DetectFirmwareFormat(leaf) == FirmwareFormat::Zip) return {};
+            return leaf.string();
+        };
+        // Prefer already imported firmware over a ZIP left in the same directory.
+        if (auto found = inspect_leaf(p); !found.empty()) return found;
+        for (std::string_view wrapper : {"firmware", "ns1-extracted", "ns2-extracted"}) {
+            if (auto found = inspect_leaf(p / wrapper); !found.empty()) return found;
+        }
+        // Every ZIP is staged into an isolated deterministic imported-* child.
+        // Only inspect one bounded level; never follow symlink directories.
+        std::error_code ec;
+#if defined(__PROSPERO__)
+        const auto children = ReadNativeDirectory(p, ec);
+#else
+        std::vector<fs::directory_entry> children;
+        for (fs::directory_iterator it{p, fs::directory_options::skip_permission_denied, ec}, end;
+             !ec && it != end && children.size() < 128; it.increment(ec))
+            children.push_back(*it);
+#endif
+        if (!ec) for (const auto& child : children) {
+            const auto sub = child.path();
+            const auto n = sub.filename().string();
+            if (!StorageDirectory(sub) || n.rfind("encore-imported-", 0) != 0) continue;
+            if (auto found = inspect_leaf(sub); !found.empty()) return found;
+            for (const auto& wrapper : {"firmware", "ns2-extracted", "ns1-extracted"}) {
+                if (auto found = inspect_leaf(sub / wrapper); !found.empty()) return found;
+            }
+        }
+        return valid(p) && DetectFirmwareFormat(p) == FirmwareFormat::Zip
+            ? p.string() : std::string{};
     };
     if (family == SwitchFamily::Switch1) {
         for (auto name : ns1) {
