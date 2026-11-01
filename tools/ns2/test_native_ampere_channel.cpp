@@ -41,6 +41,28 @@ int main() {
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
     assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     assert(channel_registry.BindGraphicsEngine(&native,&graphics_engine,2));
+    // Class 0xC7C0 is independently authenticated; a native process alone
+    // or graphics class 0xC797 must not impersonate the Compute engine.
+    int compute_engine{};
+    int alternate_compute_engine{};
+    assert(!channel_registry.CaptureComputeTicket(&compute_engine));
+    assert(!channel_registry.BindComputeEngine(&legacy,&compute_engine,0));
+    assert(!channel_registry.BindComputeEngine(&native,nullptr,0));
+    assert(!channel_registry.BindComputeEngine(&native,&compute_engine,8));
+    assert(channel_registry.BindComputeEngine(&native,&compute_engine,1));
+    assert(channel_registry.BindComputeEngine(&native,&compute_engine,4));
+    assert(!channel_registry.BindComputeEngine(&another,&compute_engine,1));
+    assert(!channel_registry.CaptureComputeTicket(&alternate_compute_engine));
+    const auto native_compute=channel_registry.CaptureComputeTicket(&compute_engine);
+    assert(native_compute &&
+           native_compute->channel_generation==first_ticket->channel_generation);
+    assert(channel_registry.IsComputeCurrent(&compute_engine,*native_compute));
+    channel_registry.UnbindComputeSubchannel(&native,&compute_engine,1);
+    assert(channel_registry.CaptureComputeTicket(&compute_engine));
+    channel_registry.UnbindComputeSubchannel(&native,&compute_engine,4);
+    assert(!channel_registry.CaptureComputeTicket(&compute_engine));
+    assert(!channel_registry.IsComputeCurrent(&compute_engine,*native_compute));
+    assert(channel_registry.BindComputeEngine(&native,&compute_engine,1));
     assert(!channel_registry.CaptureTicket(&legacy));
     assert(!channel_registry.CaptureTicket(nullptr));
     assert(!channel_registry.IsNative(&legacy));
@@ -52,6 +74,8 @@ int main() {
     assert(other_ticket && other_ticket->process==&other &&
            other_ticket->generation!=first_ticket->generation);
     process_registry.Unregister(&first);
+    assert(!channel_registry.IsComputeCurrent(&compute_engine,*native_compute));
+    assert(!channel_registry.CaptureComputeTicket(&compute_engine));
     assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
     assert(!channel_registry.IsNative(&native));
@@ -69,6 +93,12 @@ int main() {
            reopened->channel_generation!=first_ticket->channel_generation);
     assert(channel_registry.IsCurrent(&native,*reopened));
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
+    assert(!channel_registry.CaptureComputeTicket(&compute_engine));
+    assert(channel_registry.BindComputeEngine(&native,&compute_engine,3));
+    const auto reopened_compute=channel_registry.CaptureComputeTicket(&compute_engine);
+    assert(reopened_compute &&
+           reopened_compute->channel_generation==reopened->channel_generation &&
+           !channel_registry.IsComputeCurrent(&compute_engine,*native_compute));
     assert(channel_registry.BindGraphicsEngine(&native,&graphics_engine,3));
     assert(channel_registry.CaptureGraphicsTicket(&graphics_engine));
     assert(!channel_registry.IsGraphicsCurrent(&graphics_engine,*active_engine));
@@ -77,6 +107,8 @@ int main() {
     assert(!channel_registry.CaptureTicket(&native));
     assert(!channel_registry.IsCurrent(&native,*reopened));
     assert(!channel_registry.CaptureGraphicsTicket(&graphics_engine));
+    assert(!channel_registry.CaptureComputeTicket(&compute_engine));
+    assert(!channel_registry.IsComputeCurrent(&compute_engine,*reopened_compute));
     // A channel may be reused by the SAME process generation. In-flight
     // pipelines from the prior bind must still be rejected.
     assert(channel_registry.Bind(&native,&first));
