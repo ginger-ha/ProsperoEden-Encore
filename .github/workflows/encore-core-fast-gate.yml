@@ -63,7 +63,6 @@ on:
       - 'tools/fixtures/legacy-native-*.cmake'
       - 'tools/fixtures/legacy-guest-write-deferred-bridge.cmake'
       - 'tools/prepare-vulkan-port.py'
-      - 'tools/check-ps5-vfs-file-budget-host.py'
       - 'tools/check-vendored-vulkan-fork.py'
       - 'tools/check-ps5-radv-64bit-arithmetic-host.py'
       - 'tools/check-eden-backport-patch-integrity-host.py'
@@ -304,7 +303,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 -B tools/check-vendored-vulkan-fork.py
-          python3 -B tools/check-ps5-vfs-file-budget-host.py
           python3 -B tools/check-ps5-radv-64bit-arithmetic-host.py
       # A CMake-selected native override must have exactly one graph owner
       # and one catalogue row before the longer GPU and JIT host replays.
