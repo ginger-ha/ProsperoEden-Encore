@@ -60,6 +60,40 @@ def inspect(archive: Path, output: Path | None = None) -> None:
             raise ValueError("Unknown system-program inventory file")
         if digest(read("firmware/ncm-system-programs.bin")) != inventory.get("sha256"):
             raise ValueError("System-program inventory checksum mismatch")
+        # NCM's `keys` are composite content-index records (ID/version/type/
+        # installType), NOT AES, NCA, title decryption or prod.keys material.
+        # Verify these records against the system-program list, do not export
+        # or pass them to the emulator's cryptographic KeyManager.
+        ncm_records = inventory.get("keys")
+        if not isinstance(ncm_records, list) or len(ncm_records) != len(entries) or \
+                inventory.get("total") != len(entries):
+            raise ValueError("NCM inventory count/keys disagree with program entries")
+        expected_index = set()
+        for entry in entries:
+            title = entry.get("title")
+            version = entry.get("version")
+            if not isinstance(title, str) or not TITLE_ID.fullmatch(title.removeprefix("0x")) or \
+                    not isinstance(version, int) or isinstance(version, bool):
+                raise ValueError("Invalid title/version in system-program records")
+            if (title.lower(), version) in expected_index:
+                raise ValueError("Duplicate title/version in system-program records")
+            expected_index.add((title.lower(), version))
+        actual_index = set()
+        for record in ncm_records:
+            if not isinstance(record, dict) or set(record) != {"id", "version", "type", "installType"}:
+                raise ValueError("Expected NCM index record, not cryptographic key material")
+            if not isinstance(record["id"], str) or not TITLE_ID.fullmatch(
+                    record["id"].removeprefix("0x")):
+                raise ValueError("Invalid NCM content identifier")
+            if any(not isinstance(record[field], int) or isinstance(record[field], bool)
+                   for field in ("version", "type", "installType")):
+                raise ValueError("Invalid NCM content record attributes")
+            key = (record["id"].lower(), record["version"])
+            if key in actual_index:
+                raise ValueError("Duplicate NCM content-index key")
+            actual_index.add(key)
+        if expected_index != actual_index:
+            raise ValueError("NCM inventory keys do not match system-program title/version records")
         verified = {
             name: read(name) for name in (
                 "firmware/.ns2jb-firmware-dump.json",
@@ -108,7 +142,8 @@ def inspect(archive: Path, output: Path | None = None) -> None:
             raise ValueError("Unknown member(s) in system-code archive")
         print(f"NS2_SYSTEM_CODE_DUMP_PASS captured={len(seen)} "
               f"complete_pairs={len(seen)-len(missing_main)} missing_main={len(missing_main)} "
-              f"verified_files={len(verified)} firmware_nca=0 runtime_ready=NO")
+              f"verified_files={len(verified)} ncm_index_keys={len(ncm_records)} "
+              f"crypto_keys=0 firmware_nca=0 runtime_ready=NO")
         if missing_main:
             print("MISSING_MAIN_TITLE_IDS " + ", ".join(missing_main))
         if output is None:
