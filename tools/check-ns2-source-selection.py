@@ -147,6 +147,9 @@ def main() -> int:
         # Do not call destructive GMMU release again on retry or teardown.
         require("bool gmmu_released{};" in gpu_worker_header and
                 "bool nvmap_released{};" in gpu_worker_header and
+                "std::weak_ptr<void> nvmap_lifetime;" in gpu_worker_header and
+                "region.nvmap_released = true;" in gpu_worker_source and
+                "region.nvmap_lifetime.expired()" in gpu_worker_source and
                 "dense->second.gmmu_released = true;" in gpu_worker_source and
                 "const bool released = (physical && dense->second.gmmu_released) ||"
                     in gpu_worker_source and
