@@ -322,9 +322,9 @@ fixture = r"""
 #include <unistd.h>
 #include "game_files.h"
 
-SIZING
-NACP
-COVERS
+__ENCORE_SIZING_OWNER__
+__ENCORE_NACP_OWNER__
+__ENCORE_COVERS_OWNER__
 
 int main() {
     namespace fs = std::filesystem;
@@ -401,7 +401,8 @@ int main() {
     fs::remove_all(root);
     std::puts("EXTRACTED_BASE_FOOTPRINT_AND_ARTWORK_PASS");
 }
-""".replace("SIZING", sizing).replace("NACP", nacp).replace("COVERS", covers)
+""".replace("__ENCORE_SIZING_OWNER__", sizing).replace(
+    "__ENCORE_NACP_OWNER__", nacp).replace("__ENCORE_COVERS_OWNER__", covers)
 with tempfile.TemporaryDirectory(prefix="encore-extracted-library-") as temp:
     cpp = Path(temp) / "test.cpp"
     cpp.write_text(fixture)
