@@ -68,7 +68,15 @@ release_cmake = (ROOT / "headless/CMakeLists.txt").read_text()
 assert 'set(EDEN_SHARED_NS2_KERNEL_HEAP ON)' in release_cmake
 assert 'ns2-runtime/process/core/core.cpp' in release_cmake
 print("NS2_SHARED_RELEASE_F07_ISOLATION_PASS", f"new_release_sources={len(ns2_shared_release_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners
+ns2_shared_audio_owners = {
+    "vendor/encore-active/ns2-runtime/audio/core/hle/service/audio/audio.cpp",
+    "vendor/encore-active/ns2-runtime/audio/core/hle/service/audio/nx2_audio_user_client.h",
+}
+assert ns2_shared_audio_owners <= all_owners, sorted(ns2_shared_audio_owners-all_owners)
+assert not ns2_shared_audio_owners & (research_owners | hygiene_owners | ns2_shared_release_owners)
+assert 'set(EDEN_SHARED_NS2_AUDIO ON)' in release_cmake
+print("NS2_SHARED_AUDIO_F07_ISOLATION_PASS", f"new_release_sources={len(ns2_shared_audio_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
