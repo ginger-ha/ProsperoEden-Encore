@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -182,10 +183,15 @@ inline bool Import(const fs::path& archive, const fs::path& target, std::string*
     for (const auto& file : files) {
         const fs::path relative=file.name;
         const fs::path dest=stage/relative;
-        if (!ExtractEntry(zip,file,dest)) {ok=false;break;}
+        if (!ExtractEntry(zip,file,dest)) {
+            std::fprintf(stderr, "EDEN_FIRMWARE_ZIP_ENTRY_FAILED file=%s method=%u expanded=%u\\n",
+                         file.name.c_str(), unsigned(file.method), file.expanded);
+            ok=false;break;
+        }
     }
     if (ok && !fs::exists(target,ec)) {
         fs::rename(stage,target,ec);
+        if (ec) std::fprintf(stderr, "EDEN_FIRMWARE_ZIP_RENAME_FAILED code=%d\\n", ec.value());
         ok=!ec;
     } else ok=false;
     if (!ok) {
