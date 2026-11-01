@@ -102,6 +102,9 @@ assert 'layout.SetGlobal(ns2_previous_layout_global);' in shared_core
 assert shared_core.count('RestoreNs2MemoryLayout();') == 2
 assert shared_core.index('kernel.Shutdown();') < shared_core.index('RestoreNs2MemoryLayout();', shared_core.index('kernel.Shutdown();'))
 assert 'ns2_memory_layout_override = false;' in shared_core
+assert 'Eden::NS2::SvcTrace::ResetForTitle();' in load
+assert shared_core.count('Eden::NS2::SvcTrace::ResetForTitle();') == 2
+assert shared_core.index('kernel.Shutdown();') < shared_core.index('Eden::NS2::SvcTrace::ResetForTitle();', shared_core.index('kernel.Shutdown();'))
 assert 'bool extended_memory_layout' not in shared_core
 # Real aud:u manager bridge is additive and shares maintained NS1 audio HLE.
 audio_root = ROOT / 'vendor/encore-active/ns2-runtime/audio/core/hle/service/audio'

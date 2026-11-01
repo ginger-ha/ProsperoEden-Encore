@@ -50,6 +50,15 @@ assert 'result = ResultInvalidCurrentMemory;' in src
 assert 'SetArg64(args, 0, result.raw);' in src
 assert 'else if (process.Is64Bit())' in src and 'Call64(system, imm, args);' in src
 assert 'active_pid.load(std::memory_order_acquire) == pid' in pid
+assert 'inline void ResetForTitle() noexcept' in pid
+assert 'active_pid.store(0, std::memory_order_release)' in pid
+core = (vendor / "ns2-runtime/process/core/core.cpp").read_text()
+load = core.split('SystemResultStatus Load(System& system', 1)[1].split('InitializeKernel(system);', 1)[0]
+assert 'Eden::NS2::SvcTrace::ResetForTitle();' in load
+assert core.count('Eden::NS2::SvcTrace::ResetForTitle();') == 2
+shutdown = core.split('void ShutdownMainProcess()', 1)[1].split('bool IsShuttingDown()', 1)[0]
+assert shutdown.index('kernel.Shutdown();') < shutdown.index('Eden::NS2::SvcTrace::ResetForTitle();')
+assert shutdown.index('Eden::NS2::SvcTrace::ResetForTitle();') < shutdown.index('RestoreNs2MemoryLayout();')
 assert 'GpuAccessibleMask = 0x20' in helper
 compiler = shutil.which("clang++-18") or shutil.which("clang++") or shutil.which("g++")
 assert compiler, "C++20 host compiler unavailable"
@@ -80,6 +89,17 @@ int main() {
     assert(IsActive(123));
     Unregister(123);
     assert(!IsActive(123));
+    Register(123);
+    assert(IsActive(123));
+    ResetForTitle();
+    assert(!IsActive(123) && !Next(123).has_value());
+    // The next guest kernel can recycle the same process ID; it stays
+    // unauthorized until the NS2 ExeFS loader explicitly registers it.
+    assert(!IsActive(123));
+    Register(123);
+    assert(IsActive(123) && Next(123).has_value());
+    ResetForTitle();
+    assert(!IsActive(123) && !Next(123).has_value());
 }
 """
 with tempfile.TemporaryDirectory(prefix="encore-ns2-gpu-access-") as d:
@@ -90,4 +110,4 @@ with tempfile.TemporaryDirectory(prefix="encore-ns2-gpu-access-") as d:
                     "-I", str(base), "-I", str(vendor / "ns2-helpers/include"),
                     str(p / "test.cpp"), "-o", str(exe)], check=True)
     subprocess.run([str(exe)], check=True)
-print("ENCORE_NS2_GPU_ACCESS_SVC_HOST_PASS pid=exact mask=0x20 alignment=4k overflow=guarded ns1=unchanged")
+print("ENCORE_NS2_GPU_ACCESS_SVC_HOST_PASS pid=exact mask=0x20 alignment=4k overflow=guarded ns1=unchanged stale_pid=blocked")
