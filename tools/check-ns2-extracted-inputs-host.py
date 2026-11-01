@@ -70,13 +70,37 @@ def main() -> None:
             pass
         else:
             raise AssertionError("Existing import was overwritten")
+        # Exercise the exact shipping failure probe on both ACID signature
+        # prefixes without supplying protected Nintendo data.
+        def access_fixture(name: str, prefix: int, fac_offset: int) -> Path:
+            image = bytearray(0x1000)
+            image[:4] = b"META"
+            image[0x78:0x7c] = (0x200).to_bytes(4, "little")
+            image[0x7c:0x80] = (0x600).to_bytes(4, "little")
+            base = 0x200 + prefix
+            image[base:base+4] = b"ACID"
+            image[base+0x20:base+0x24] = fac_offset.to_bytes(4, "little")
+            image[base+0x24:base+0x28] = (0x2c).to_bytes(4, "little")
+            p = root / name
+            p.write_bytes(image)
+            return p
+        ns1 = access_fixture("valid-ns1.npdm", 0x200, 0x240)
+        ns2 = access_fixture("valid-ns2.npdm", 0x300, 0x340)
+        bad_fac = access_fixture("invalid-ns2-fac.npdm", 0x300, 0x5f0)
         cpp = root / "npdm.cpp"
         cpp.write_text("""#include "extracted_npdm_identity.h"
 #include <cassert>
 int main(int argc, char** argv) {
-    assert(argc == 3);
+    assert(argc == 6);
     assert(Eden::ExtractedNpdm::TitleId(argv[1]) == 0x0400000000000019ULL);
     assert(Eden::ExtractedNpdm::TitleId(argv[2]) == 0);
+    const auto one = Eden::ExtractedNpdm::ProbeAccess(argv[3]);
+    const auto two = Eden::ExtractedNpdm::ProbeAccess(argv[4]);
+    const auto broken = Eden::ExtractedNpdm::ProbeAccess(argv[5]);
+    assert(one.header_ok && one.acid_found && !one.extended && one.fac_valid);
+    assert(two.header_ok && two.acid_found && two.extended && two.fac_valid);
+    assert(broken.header_ok && broken.acid_found && broken.extended &&
+           !broken.fac_valid);
 }""")
         binary = root / "check-npdm"
         subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
@@ -85,9 +109,10 @@ int main(int argc, char** argv) {
         invalid = root / "bad.npdm"
         invalid.write_bytes(b"META" + b"0" * 36)
         subprocess.run([str(binary),
-                        str(dest / "0400000000000019/main.npdm"), str(invalid)],
+                        str(dest / "0400000000000019/main.npdm"), str(invalid),
+                        str(ns1), str(ns2), str(bad_fac)],
                        check=True, timeout=10)
-    print("NS2_EXTRACTED_INPUTS_HOST_PASS validated=1 partial=1 npdm_aci0=1 overwrite=0")
+    print("NS2_EXTRACTED_INPUTS_HOST_PASS validated=1 partial=1 npdm_aci0=1 acid_ns1=1 acid_ns2=1 invalid_fac=1 overwrite=0")
 
 
 if __name__ == "__main__":
