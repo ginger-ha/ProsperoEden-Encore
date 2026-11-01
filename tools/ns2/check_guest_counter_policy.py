@@ -24,7 +24,13 @@ assert "Eden::GuestCounter::SelectProgram(metadata.IsSwitch2(), Common::g_cpu_ca
 assert loader.index("Eden::GuestCounter::SelectProgram(") > loader.index("metadata.Reload(npdm)")
 assert loader.index("Eden::GuestCounter::SelectProgram(") < loader.index("is_loaded = true")
 assert "option(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL" in cmake
-assert "N76 requires PS5 NS2 research metadata+A64 (non-release)" in cmake
+assert "EDEN_SHARED_NS2_GUEST_COUNTER" in cmake
+assert "if(EDEN_NS2_GUEST_COUNTER_EXPERIMENTAL OR EDEN_SHARED_NS2_GUEST_COUNTER)" in cmake
+assert "foreach(n76_target IN ITEMS core common eden-headless)" in cmake
+main=(root/"headless/main.cpp").read_text()
+assert "Eden::GuestCounter::SelectProgram(false, Common::g_cpu_caps.tsc_frequency);" in main
+assert main.index("Eden::GuestCounter::SelectProgram(false, Common::g_cpu_caps.tsc_frequency);") < main.index("loaded = system.Load(window, guest, params);")
+assert "if(EDEN_NS2_EXEFS_EXPERIMENTAL OR EDEN_SHARED_NS2_EXEFS)" in cmake
 assert "n76_core_sources" in cmake
 program=r"""
 #include <cassert>
