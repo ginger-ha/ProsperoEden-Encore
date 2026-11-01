@@ -391,6 +391,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # renderer still keeps up to 8 idle layers without a device-wide stall.
     blit_name = 'vulkan_blit_screen.cpp'
     blit = expected[blit_name].read_text()
+    generated_blit = actual[blit_name].read_text()
     native_layer_policy = (
         "    // The compositor reads exactly framebuffers.size() layers. Preserve a\n"
         "    // bounded high-water reserve so transient HUD layer shrink/growth does\n"
@@ -417,12 +418,17 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert blit.count(native_layer_policy) == 1, 'PS5 bounded Vulkan layer policy moved'
     assert blit.count(native_retirement) == 1, 'PS5 layer retirement policy moved'
     assert blit.count('WaitIdle(device);') >= 1, 'PS5 layer GPU fence guard absent'
-    baseline_blit = blit.replace(native_layer_policy, baseline_layer_policy)
-    baseline_blit = baseline_blit.replace(native_retirement, baseline_retirement)
-    blit_path = temp / 'normalized-vendor-present-layers' / blit_name
-    blit_path.parent.mkdir(parents=True, exist_ok=True)
-    blit_path.write_text(baseline_blit)
-    normalized_expected[blit_name] = blit_path
+    if blit != generated_blit:
+        # Older reviewed generator versions emitted the pre-high-water branch.
+        # Current generator reproduces the native change verbatim: do not
+        # normalize away a fix the generator already owns.
+        baseline_blit = blit.replace(native_layer_policy, baseline_layer_policy)
+        baseline_blit = baseline_blit.replace(native_retirement, baseline_retirement)
+        assert baseline_blit == generated_blit, 'Unexpected Vulkan presentation delta'
+        blit_path = temp / 'normalized-vendor-present-layers' / blit_name
+        blit_path.parent.mkdir(parents=True, exist_ok=True)
+        blit_path.write_text(baseline_blit)
+        normalized_expected[blit_name] = blit_path
 
     mismatches=[name for name in sorted(actual) if not filecmp.cmp(actual[name],normalized_expected.get(name, expected[name]),shallow=False)]
     if mismatches:
