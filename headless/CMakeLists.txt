@@ -2553,11 +2553,18 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)
         message(FATAL_ERROR "Missing native NS2 DMA channel ownership or puller")
     endif()
     get_target_property(eden_ns2_dispatch_sources video_core SOURCES)
-    list(FIND eden_ns2_dispatch_sources "engines/puller.cpp" eden_ns2_puller_idx)
-    if(eden_ns2_puller_idx EQUAL -1)
-        message(FATAL_ERROR "Pinned Maxwell puller changed; re-audit native DMA overlay")
+    # G20 already replaced Eden's relative engines/puller.cpp with the
+    # versioned Encore normal/dev GPU command processor. The research NS2
+    # overlay must replace THAT exact owner, never append a second Puller.
+    if(NOT DEFINED EDEN_MAINTAINED_GPU_PULLER OR
+       NOT EXISTS "${EDEN_MAINTAINED_GPU_PULLER}")
+        message(FATAL_ERROR "Missing G20 maintained GPU puller selected before NS2")
     endif()
-    list(REMOVE_ITEM eden_ns2_dispatch_sources "engines/puller.cpp")
+    list(FIND eden_ns2_dispatch_sources "${EDEN_MAINTAINED_GPU_PULLER}" eden_ns2_puller_idx)
+    if(eden_ns2_puller_idx EQUAL -1)
+        message(FATAL_ERROR "Pinned G20 GPU puller changed; re-audit native Ampere dispatch")
+    endif()
+    list(REMOVE_ITEM eden_ns2_dispatch_sources "${EDEN_MAINTAINED_GPU_PULLER}")
     list(APPEND eden_ns2_dispatch_sources "${EDEN_NS2_NATIVE_GPU_PULLER}")
     set_property(TARGET video_core PROPERTY SOURCES "${eden_ns2_dispatch_sources}")
     # Research-only header and .cpp must be the SAME Puller class to keep
