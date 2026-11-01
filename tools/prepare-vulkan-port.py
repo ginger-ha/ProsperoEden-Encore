@@ -4658,7 +4658,7 @@ apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
     "}\n"
     "\n"
     "template <class P>\n"
-    "void TextureCache<P>::PrepareImage(\n",
+    "void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool invalidate) {\n",
     "        ScaleUp(aliased_image);\n"
     "        CopyImage(image_id, aliased->id, aliased->copies);\n"
     "    }\n"
@@ -4674,7 +4674,7 @@ apply_reviewed_delta("vulkan-cache/video_core/texture_cache/texture_cache.h",
     "}\n"
     "\n"
     "template <class P>\n"
-    "void TextureCache<P>::PrepareImage(\n",
+    "void TextureCache<P>::PrepareImage(ImageId image_id, bool is_modification, bool invalidate) {\n",
     "F07 alias revision publication after copy 2/2")
 
 # F07 P0.4: the pooled staging span may be rounded up to the next
