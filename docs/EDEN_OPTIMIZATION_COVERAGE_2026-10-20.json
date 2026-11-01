@@ -4481,6 +4481,16 @@
       "reviewed_source_git_blob": "116e1d4bb7181c0f44e1910f5f8f1eb53ca14a61",
       "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
       "evidence": "Bounded read-only META/ACI0 NPDM Title ID fallback for extracted NS1/NS2 library identity. Exact U87 SOURCE contract and CI-invoked synthetic valid/invalid NPDM host witness. This is a source review, not a measured shader/JIT/HUD optimization, PS5 runtime compatibility proof or console FPS claim."
+    },
+    {
+      "path": "headless/firmware_zip_import.h",
+      "disposition": "reviewed_without_new_code_edit",
+      "contract_id": "U88",
+      "prior_status": "SOURCE",
+      "proof_ref": "tools/check-firmware-zip-native-host.py",
+      "reviewed_source_git_blob": "6bcdd0158269bbce565fdbdef1d9c0ba31637b72",
+      "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
+      "evidence": "U88 read-only source review of native ZIP32 firmware staging: bounded archive/expanded size, path traversal and symlink refusal, CRC validation, atomic stage/rename, no overwrite. CI invokes synthetic host witness tools/check-firmware-zip-native-host.py; source review only, not firmware FW13.60 runtime qualification, shader/JIT/HUD optimization or console FPS proof."
     }
   ],
   "inventoried_including_pinned": 538,
@@ -4518,6 +4528,7 @@
     "vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc.h",
     "vendor/encore-active/eden-core/src/core/file_sys/romfs_factory.cpp",
     "vendor/encore-active/eden-core/src/core/hle/service/aoc/addon_content_manager.cpp",
-    "headless/extracted_npdm_identity.h"
+    "headless/extracted_npdm_identity.h",
+    "headless/firmware_zip_import.h"
   ]
 }
