@@ -4471,6 +4471,16 @@
       "reviewed_source_git_blob": "c329c6ba2c60c2641046f282c412567ada8c4aac",
       "proof_ref": "tools/check-extracted-aoc-layout-host.py",
       "evidence": "Native aoc:u guest enumeration of packaged and extracted DLC IDs. Documented in docs/EXTRACTED_AOC_INSTALLATION_REVIEW_2026-10-31.md. Host-only proof, no claimed console performance or native build."
+    },
+    {
+      "path": "headless/extracted_npdm_identity.h",
+      "disposition": "reviewed_without_new_code_edit",
+      "contract_id": "U87",
+      "prior_status": "SOURCE",
+      "proof_ref": "tools/check-ns2-extracted-inputs-host.py",
+      "reviewed_source_git_blob": "116e1d4bb7181c0f44e1910f5f8f1eb53ca14a61",
+      "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
+      "evidence": "Bounded read-only META/ACI0 NPDM Title ID fallback for extracted NS1/NS2 library identity. Exact U87 SOURCE contract and CI-invoked synthetic valid/invalid NPDM host witness. This is a source review, not a measured shader/JIT/HUD optimization, PS5 runtime compatibility proof or console FPS claim."
     }
   ],
   "inventoried_including_pinned": 538,
@@ -4507,6 +4517,7 @@
     "vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc_paths.h",
     "vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc.h",
     "vendor/encore-active/eden-core/src/core/file_sys/romfs_factory.cpp",
-    "vendor/encore-active/eden-core/src/core/hle/service/aoc/addon_content_manager.cpp"
+    "vendor/encore-active/eden-core/src/core/hle/service/aoc/addon_content_manager.cpp",
+    "headless/extracted_npdm_identity.h"
   ]
 }

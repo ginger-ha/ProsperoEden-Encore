@@ -56,7 +56,7 @@ assert extracted_aoc_owners <= all_owners, sorted(extracted_aoc_owners - all_own
 assert not extracted_aoc_owners & (research_owners | hygiene_owners)
 owners=all_owners-research_owners-hygiene_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
-assert len(owners)==515, ("F07 reviewed shipping source owner drift",len(owners))
+assert len(owners)==516, ("F07 reviewed shipping source owner drift",len(owners))
 print("NS2_F07_TRIAGE_ISOLATION_PASS", f"unreviewed_research_sources={len(research_owners)}",
       "separate_shared_warning_headers=2")
 entries=STATE["handled_paths"]
