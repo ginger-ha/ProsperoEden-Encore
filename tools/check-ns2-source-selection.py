@@ -334,7 +334,8 @@ def main() -> int:
                 "LockForMapDeviceAddressSpace" in worker_hle_cpp and
                 "Kernel::KMemoryState::FlagCanAlignedDeviceMap" in worker_hle_cpp and
                 "Kernel::KMemoryState::FlagReferenceCounted" in worker_hle_cpp and
-                "KMemoryAttribute::GpuAccessible" not in worker_hle_cpp and
+                "KMemoryAttribute::GpuAccessible" in worker_hle_cpp and
+                "EDEN_SHARED_NS2_GPU_ACCESS_SVC" in CMAKE and
                 "UnlockForDeviceAddressSpace" in worker_hle_cpp and
                 "CreateHandle(size, handle)" in worker_hle_cpp and
                 "handle->dupes == 1" in worker_hle_cpp and
