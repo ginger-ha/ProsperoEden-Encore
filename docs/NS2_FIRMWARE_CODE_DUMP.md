@@ -9,6 +9,14 @@ The supplied `firmware.zip` is a `ns2jb-system-code-dump`, with
 `040.../main` (`NSO0`), `040.../main.npdm` (`META`/`ACI0`),
 `040.../code-info.bin` per system-program ID.
 
+The `inventory.keys` array has 90 records with `id`, `version`, `type`
+and `installType`. These **NCM index keys are not cryptographic keys**.
+Every record's ID/version matches one manifest program; every extracted
+`main.npdm` ACI0 title ID matches its program ID (90/90). The import and
+metadata inventory are usable without `prod.keys`; no titlekey, AES header
+key or NCA decryption key is available in this JSON. Existing NCA
+decrypt/boot paths still use legitimate `keys/prod.keys`.
+
 The JSON says `complete: true` and `captured: 90`, but those describe the
 *dump process*, not an installable or entirely executable firmware:
 87/90 have both `main` and `main.npdm`; 3 have `main.npdm`
@@ -31,7 +39,7 @@ python3 tools/ns2/prepare_firmware_dump.py firmware.zip
 python3 tools/ns2/prepare_firmware_dump.py firmware.zip --output ns2-extracted
 ```
 
-The first command checks all manifest SHA-256 values, program signatures,
+The first command checks all NCM index records, manifest SHA-256 values, program signatures,
 the declared missing files and archive paths. The second creates a **new**
 `ns2-extracted` folder without modifying the original zip, keys or existing
 firmware. It strips Apple metadata and ensures no symlink/path traversal.
@@ -50,7 +58,8 @@ Upload that directory by FTP to:
 ```
 
 Keep existing `/data/prosperoeden/firmware/*.nca` files in place and
-unchanged, with your own `keys/prod.keys`. Do not mix system-code files
+unchanged, with your own `keys/prod.keys` where encrypted NCA support is
+required. **The extracted system-code inventory itself needs no prod.keys**. Do not mix system-code files
 into `roms/`. Do not FTP an unexpanded ZIP into `firmware/`.
 
 ## Runtime boundary
