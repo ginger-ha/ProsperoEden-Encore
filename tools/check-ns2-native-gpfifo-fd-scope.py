@@ -17,7 +17,7 @@ ampere_3d_bind = bind_source.split(
     "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[0]
 ampere_dma_bind = bind_source.split(
     "if (engine_id == static_cast<EngineID>(0xc7b5)) {", 1)[1].split(
-    "switch (engine_id)", 1)[0]
+    "\n        return;\n    }\n", 1)[0]
 binding_write = "bound_engines[method_call.subchannel] = engine_id;"
 
 required_puller = (
