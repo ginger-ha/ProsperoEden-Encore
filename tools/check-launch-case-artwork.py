@@ -282,8 +282,13 @@ assert library.index("if (!scan.empty() && !artwork.missing) {") < library.index
 assert "const Rect footer" in back_fallback, "Back footer removed"
 assert "if (c.textures.switch_rear_footer() != 0)" in back_fallback
 assert "shell.y + shell.h - top" in library
-assert "s.press({Key::r1, Key::r1});" in (
-    root / "headless/prosperoeden/host/preview_main.cpp").read_text()
+# The fallback fixture must reach the same eleventh Library title as the
+# retail-scan fixture. R1 now switches main tabs and cannot select this title.
+preview = (root / "headless/prosperoeden/host/preview_main.cpp").read_text()
+fallback = preview.split('if (const char* missing = std::getenv("PE_PREVIEW_LIBRARY_FALLBACK")', 1)[1].split(
+    'if (const char* library_only', 1)[0]
+assert 's.press({Key::right, Key::right, Key::right, Key::right, Key::right,' in fallback
+assert 's.press({Key::r1, Key::r1});' not in fallback
 assert 's.shoot("03-library-back-zoom-pan");' in (
     root / "headless/prosperoeden/host/preview_main.cpp").read_text()
 assert "RADIO_INPUT_L2" in (root / "headless/prosperoeden/radio_input.h").read_text()
