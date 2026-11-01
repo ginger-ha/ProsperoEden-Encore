@@ -82,6 +82,7 @@
     "ns2-runtime/cpu6/core/hardware_properties.h",
     "ns2-runtime/cpu6/dynarmic/interface/exclusive_monitor.h",
     "ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp",
+    "ns2-runtime/gpu_dispatch/video_core/macro_turing.h",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.cpp",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.h",
     "ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker.cpp",
