@@ -341,11 +341,11 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     n56_file.parent.mkdir(parents=True, exist_ok=True)
     n56_file.write_text(n56_baseline)
     normalized_expected[n56_name] = n56_file
-    # N3m: the live NS2 GPU pipeline is strictly research-only. Normalize
-    # exactly three PINNED, macro-guarded additions and then require every
-    # remaining byte to equal the generated Switch 1 Vulkan source.
-    # This is NOT an exemption from vendor parity: an unexpected code change
-    # outside these pinned blocks still fails the original full diff.
+    # N3m: the opt-in NS2 GPU pipeline is now reproduced exactly by the
+    # maintained Vulkan generator. Retain the three pinned source hashes as
+    # independent proof, then compare the COMPLETE generated C++ byte-for-byte
+    # against the vendor (after the separate N56 driver-cache normalization).
+    # Never strip these source blocks from parity: doing so would mask drift.
     n3m = normalized_expected[n56_name].read_text()
     n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n'
     assert n3m.count(n3m_flag) == 3, 'NS2 pipeline compile gates drifted'
@@ -376,15 +376,11 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         'CaptureNs2GraphicsShaderFromGpu(' in pinned[1]), 'NS2 dispatch must use GMMU'
     assert 'CreateNs2GraphicsShaderEnvironment(' in pinned[2] and (
         'IsGraphicsCurrent(maxwell3d, *ticket)' in pinned[2]), 'NS2 pipeline owner drift'
-    n3m = n3m.replace(pinned[0], '', 1)
-    n3m = n3m.replace(
-        pinned[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\n', 1)
-    n3m = n3m.replace(pinned[2], '', 1)
-    assert n3m_flag not in n3m, 'Native shader research source remained in release baseline'
-    n3m_file = temp / 'normalized-vendor-n3m' / n56_name
-    n3m_file.parent.mkdir(parents=True, exist_ok=True)
-    n3m_file.write_text(n3m)
-    normalized_expected[n56_name] = n3m_file
+    # The generator owns the guarded NS2 blocks as well as NS1; every byte
+    # must match the pinned vendor after only the existing N56 normalization.
+    generated_n3m = actual[n56_name].read_text()
+    assert generated_n3m.count(n3m_flag) == 3, 'NS2 generator gates missing'
+    assert generated_n3m == n3m, 'NS2 generated Vulkan source differs from pinned vendor'
 
     # N57's optional ASTC methods are owned by these SAME vendor Vulkan TUs.
     # Reverse only exact reviewed additions, then require original F07 SHA
