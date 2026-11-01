@@ -7,6 +7,15 @@ ROOT = Path(__file__).resolve().parent.parent
 BASE = ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices"
 source = (BASE / "nvhost_gpu.cpp").read_text()
 header = (BASE / "nvhost_gpu.h").read_text()
+native_puller = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/engines/puller.cpp").read_text()
+required_puller = (
+    "engine_id == static_cast<EngineID>(0xc797)",
+    "CallNative3D(dma_pusher,method_call.method,",
+    "CallNative3D(dma_pusher,method,",
+    "native_3d->Execute(",
+    "native_macro_method=method",
+    "engine.draw_manager.DrawDeferred(engine)",
+)
 
 required_cpp = (
     "bool nvhost_gpu::UsesNativeAbi(DeviceFD fd) const {",
@@ -17,12 +26,6 @@ required_cpp = (
     "NativeGpuChannelRegistry::Instance().Bind(channel_state.get(), owner->process)",
     "if (!opened || opened->process != owner->process)",
     "NativeGpuChannelRegistry::Instance().Unbind(channel_state.get());",
-    "engine_id == static_cast<EngineID>(0xc797)",
-    "CallNative3D(dma_pusher,method_call.method,",
-    "CallNative3D(dma_pusher,method,",
-    "native_3d->Execute(",
-    "native_macro_method=method",
-    "engine.draw_manager.DrawDeferred(engine)",
     "NvResult nvhost_gpu::AllocateObjectContext(IoctlAllocObjCtx& params, DeviceFD fd)",
     "NvResult nvhost_gpu::SubmitGPFIFOImpl(IoctlSubmitGpfifo& params, Tegra::CommandList&& entries, DeviceFD fd)",
     "const bool native = UsesNativeAbi(fd);",
@@ -39,6 +42,8 @@ required_header = (
 checks = [
     (all(s in source for s in required_cpp), "native source uses exact caller FD"),
     (all(s in header for s in required_header), "native header exposes caller FD"),
+    (all(s in native_puller for s in required_puller),
+     "actual research Puller owns authenticated native 3D/Turing macro dispatch"),
     ("UsesNativeAbi()" not in source + header, "no unscoped native ABI call"),
     (source.count("return SubmitGPFIFOImpl(params, std::move(entries), fd);") == 2,
      "both GPFIFO submit paths propagate FD"),
