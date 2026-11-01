@@ -627,26 +627,19 @@ const char* eden_startup_error() {
             // decryption keys and must never be passed to KeyManager.
             // Discovery is read-only, independent of prod.keys. Do not claim
             // a functional HOS runtime from this probe.
-            const auto extracted_dump = [&]() -> std::string {
-                const auto is_regular = [](const std::filesystem::path& file) {
-                    std::error_code ec;
-                    const auto status = std::filesystem::symlink_status(file, ec);
-                    return !ec && std::filesystem::is_regular_file(status) &&
-                           !std::filesystem::is_symlink(status);
-                };
-                for (const auto& root : {std::filesystem::path(firmware),
-                                         std::filesystem::path(firmware) / "ns2-extracted",
-                                         std::filesystem::path(firmware) / "firmware"}) {
-                    if (is_regular(root / ".ns2jb-firmware-dump.json") &&
-                        is_regular(root / "firmware-dump-named.json") &&
-                        is_regular(root / "ncm-system-programs.bin"))
-                        return root.string();
-                }
-                return {};
-            }();
+            const std::string extracted_dump = Eden::HasExtractedSystemCode(Eden::Ns2FirmwarePath())
+                ? Eden::Ns2FirmwarePath() : std::string{};
+            const std::string ns2_keys = Eden::Ns2KeysPath();
+            if (!extracted_dump.empty()) {
+                std::fprintf(stderr,
+                    "EDEN_STORAGE_NS2 firmware=%s keys_dir=%s runtime=research_only\\n",
+                    extracted_dump.c_str(), ns2_keys.c_str());
+            }
             if (!extracted_dump.empty())
                 std::fprintf(stderr, "EDEN_NS2_NCM_INVENTORY_DISCOVERED root=%s crypto_keys=none_imported status=research_only\n",
                              extracted_dump.c_str());
+            std::fprintf(stderr, "EDEN_STORAGE_NS1 firmware=%s keys_dir=%s\n",
+                         firmware.c_str(), keys.c_str());
             Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys);
             FileSys::RealVfsFilesystem vfs;
             const auto prod = vfs.OpenFile(std::string{keys} + "/prod.keys", FileSys::OpenMode::Read);
