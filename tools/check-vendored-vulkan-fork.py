@@ -341,6 +341,51 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     n56_file.parent.mkdir(parents=True, exist_ok=True)
     n56_file.write_text(n56_baseline)
     normalized_expected[n56_name] = n56_file
+    # N3m: the live NS2 GPU pipeline is strictly research-only. Normalize
+    # exactly three PINNED, macro-guarded additions and then require every
+    # remaining byte to equal the generated Switch 1 Vulkan source.
+    # This is NOT an exemption from vendor parity: an unexpected code change
+    # outside these pinned blocks still fails the original full diff.
+    n3m = normalized_expected[n56_name].read_text()
+    n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\\n'
+    assert n3m.count(n3m_flag) == 3, 'NS2 pipeline compile gates drifted'
+    def n3m_hash(data):
+        value = 0xcbf29ce484222325
+        for byte in data.encode('ascii'):
+            value = ((value ^ byte) * 0x100000001b3) & 0xffffffffffffffff
+        return f'{value:016x}'
+    marker_positions = (
+        n3m.index(n3m_flag),
+        n3m.index(n3m_flag, n3m.index('GraphicsPipeline* PipelineCache::CurrentGraphicsPipeline()')),
+        n3m.index(n3m_flag, n3m.index('std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline()')),
+    )
+    marker_hashes = (
+        '6d290bcca80076a4',
+        '07f605ea23426e28',
+        '3f9e28a2403298cb',
+    )
+    pinned = []
+    for start, digest in zip(marker_positions, marker_hashes):
+        end = n3m.index('#endif\\n', start) + len('#endif\\n')
+        fragment = n3m[start:end]
+        assert n3m_hash(fragment) == digest, 'Unreviewed NS2 renderer code drift'
+        pinned.append(fragment)
+    assert '#else\\n    if (!RefreshStages(graphics_key.unique_hashes)) {\\n#endif\\n' in pinned[1], (
+        'NS1 RefreshStages branch was not preserved')
+    assert 'CaptureGraphicsTicket(maxwell3d)' in pinned[1] and (
+        'CaptureNs2GraphicsShaderFromGpu(' in pinned[1]), 'NS2 dispatch must use GMMU'
+    assert 'CreateNs2GraphicsShaderEnvironment(' in pinned[2] and (
+        'IsGraphicsCurrent(maxwell3d, *ticket)' in pinned[2]), 'NS2 pipeline owner drift'
+    n3m = n3m.replace(pinned[0], '', 1)
+    n3m = n3m.replace(
+        pinned[1], '    if (!RefreshStages(graphics_key.unique_hashes)) {\\n', 1)
+    n3m = n3m.replace(pinned[2], '', 1)
+    assert n3m_flag not in n3m, 'Native shader research source remained in release baseline'
+    n3m_file = temp / 'normalized-vendor-n3m' / n56_name
+    n3m_file.parent.mkdir(parents=True, exist_ok=True)
+    n3m_file.write_text(n3m)
+    normalized_expected[n56_name] = n3m_file
+
     # N57's optional ASTC methods are owned by these SAME vendor Vulkan TUs.
     # Reverse only exact reviewed additions, then require original F07 SHA
     # and full generated-source byte parity. No generator files or exemptions.
