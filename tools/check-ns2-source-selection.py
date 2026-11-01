@@ -142,6 +142,17 @@ def main() -> int:
         supervisor_source = (ROOT / "vendor/encore-active/ns2-runtime/graphics_supervisor/core/hle/service/am/service/graphics_supervisor.cpp").read_text()
         gpu_session_source = (service_dir / "gpu_session.cpp").read_text()
         gpu_worker_source = (service_dir / "gpu_worker.cpp").read_text()
+        gpu_worker_header = (service_dir / "gpu_worker.h").read_text()
+        # Sparse 215 may release the VA before physical retirement succeeds.
+        # Do not call destructive GMMU release again on retry or teardown.
+        require("bool gmmu_released{};" in gpu_worker_header and
+                "bool nvmap_released{};" in gpu_worker_header and
+                "dense->second.gmmu_released = true;" in gpu_worker_source and
+                "const bool released = (physical && dense->second.gmmu_released) ||"
+                    in gpu_worker_source and
+                "if (mapping.sparse && dense != m_dense_regions.end() &&"
+                    in gpu_worker_source,
+                "Native sparse 215 release must be retry-safe through teardown")
         nvdrv_source = (ROOT / "vendor/encore-active/ns2-runtime/nvdrv_gpu/core/hle/service/nvdrv/devices/nvhost_gpu.cpp").read_text()
         for owner, source in (("gpu_session", gpu_session_source),
                               ("gpu_worker", gpu_worker_source),
