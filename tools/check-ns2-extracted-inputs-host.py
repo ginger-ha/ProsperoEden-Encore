@@ -48,7 +48,10 @@ def main() -> None:
         put("firmware-dump-named.json",
             json.dumps({"complete": True, "counts": {"captured": len(entries)},
                         "inventory": {"rawFile": "ncm-system-programs.bin",
-                                      "sha256": hashlib.sha256(inventory).hexdigest()},
+                                      "sha256": hashlib.sha256(inventory).hexdigest(),
+                                      "total": len(entries),
+                                      "keys": [{"id": e["title"], "version": e["version"],
+                                                "type": 1, "installType": 1} for e in entries]},
                         "entries": entries}).encode())
         archive = root / "firmware.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as z:
