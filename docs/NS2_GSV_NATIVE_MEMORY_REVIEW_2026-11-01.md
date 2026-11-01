@@ -110,3 +110,8 @@ Window-linked images cannot be destroyed prematurely; repeated alias creation
 or release is rejected. The native video image pools used by 426/427/428 are
 separate. The real VI2 presenter and verified display-fence handoff are still
 not connected: an alias flag does not mean a frame has reached the compositor.
+
+The video GMMU mapping owner also checks the actual address-space object,
+not just an FD integer: a recycled FD cannot inherit a previous mapping or
+release that mapping. Pool admission rejects image offsets beyond the 32-bit
+TIPC descriptor and image sizes/strides that are not 4K-mappable.

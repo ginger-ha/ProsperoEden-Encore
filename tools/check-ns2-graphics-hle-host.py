@@ -74,6 +74,8 @@ def main()->int:
         'as->MapNativeImage(image->backing, image->offset,',
         'it->second.address_space->UnmapNative4K(',
         'm_video_mappings.erase(it)',
+        'it->second.address_space == as',
+        'const auto as = FindRegisteredGpuAddressSpace(packet[3]);',
         'nvmap.UnpinHandle(pool->backing)',
         'm_video_pools.Remove(pool->first_id)',
         'for (const auto& [key, mapping] : m_video_mappings)',
