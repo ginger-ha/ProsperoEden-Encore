@@ -1871,7 +1871,7 @@ target_compile_definitions(eden-headless PRIVATE
 target_link_libraries(eden-headless PRIVATE core eden-pad)
 add_library(eden-metadata STATIC "${EDEN_PORT_DIR}/metadata_bridge.cpp")
 target_include_directories(eden-metadata PUBLIC "${EDEN_PORT_DIR}" PRIVATE "${PROJECT_SOURCE_DIR}/src")
-target_link_libraries(eden-metadata PUBLIC core stb)
+target_link_libraries(eden-metadata PUBLIC core stb PRIVATE ZLIB::ZLIB)
 target_compile_options(eden-metadata PRIVATE -fno-rtti -Wall -Wextra -Werror -Wno-unused-parameter)
 if(PS5_NATIVE)
     target_compile_options(eden-metadata PRIVATE -femulated-tls)
