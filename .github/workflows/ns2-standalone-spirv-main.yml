@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'tools/ns2/test_ampere_real_spirv.cpp'
+      - 'tools/ns2/test_ampere_vulkan_module.cpp'
+      - 'tools/check-ns2-spirv-host.py'
   workflow_dispatch:
 
 permissions:
