@@ -2,6 +2,7 @@
 """Static source-owner guard for research NS2 CMake overlays, not a native build."""
 from __future__ import annotations
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -333,7 +334,8 @@ def main() -> int:
                 "LockForMapDeviceAddressSpace" in worker_hle_cpp and
                 "Kernel::KMemoryState::FlagCanAlignedDeviceMap" in worker_hle_cpp and
                 "Kernel::KMemoryState::FlagReferenceCounted" in worker_hle_cpp and
-                "KMemoryAttribute::GpuAccessible" not in worker_hle_cpp and
+                "KMemoryAttribute::GpuAccessible" in worker_hle_cpp and
+                "EDEN_SHARED_NS2_GPU_ACCESS_SVC" in CMAKE and
                 "UnlockForDeviceAddressSpace" in worker_hle_cpp and
                 "CreateHandle(size, handle)" in worker_hle_cpp and
                 "handle->dupes == 1" in worker_hle_cpp and
@@ -440,7 +442,10 @@ def main() -> int:
                 '"hle/service/nvdrv/devices/nvhost_gpu.cpp" eden_ns2_gpu_idx' in CMAKE and
                 'list(APPEND eden_ns2_nvdrv_sources "${EDEN_NS2_NVDRV_GPU_SOURCE}")' in CMAKE and
                 "EDEN_NS2_NVDRV_GPU_SOURCE" in CMAKE[nvdrv_selection:release_gate] and
-                "UsesNativeAbi() const;" in native_channel_h and
+                "UsesNativeAbi(DeviceFD fd) const;" in native_channel_h and
+                "const auto it = sessions.find(fd);" in native_channel_cpp and
+                "UsesNativeAbi(fd)" in native_channel_cpp and
+                "UsesNativeAbi()" not in native_channel_cpp and
                 "NativeGpuProcessRegistry::Instance().Contains(session->process)" in native_channel_cpp and
                 "if (native && !native_plan)" in native_channel_cpp and
                 "BuildIncrementCommandList(params.fence, native_completion)" in native_channel_cpp and

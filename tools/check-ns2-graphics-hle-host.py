@@ -37,8 +37,7 @@ def main()->int:
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     assert 'm_native_memory.ValidateBind(' in text
     assert 'table.QueryInfo(&info, &page, cursor)' in text
-    # Accept line wrapping only; still require the real Bind result to be
-    # wrapped by NativeMemoryError (not a synthetic success path).
+    # Accept only formatting whitespace; the same native-memory guard is required.
     assert re.search(r'NativeMemoryError\s*\(\s*m_native_memory\.Bind\s*\(', text)
     assert 'm_native_memory.Destroy(' in text
     # GSV 111/112/114 must use real NVMap handle identity and kernel page locks,
@@ -57,6 +56,21 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    assert '{423, &IGraphicsSupervisor::BindNativeGpuMemory' in text
+    for snippet in (
+        'GraphicsSupervisorProtocol::DecodeNativeParentBind(packet)',
+        'session && session->process == m_process',
+        'parent->Duplicate(true)',
+        'nvmap.PinHandle(request->parent, false)',
+        'nvmap.UnpinHandle(request->parent)',
+        'nvmap.FreeHandle(request->parent, true)',
+        'm_native_parents.emplace(request->child, request->parent)',
+        'm_native_parents.find(packet[2])',
+        'BindNativeMemoryBacking(request->child,',
+        'for (const auto& [child, parent] : m_native_parents)',
+    ):
+        assert snippet in text, "Missing real parent GSV 423 lifecycle: " + snippet
+
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
     for snippet in (
