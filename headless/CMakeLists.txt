@@ -2560,7 +2560,17 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)
     list(REMOVE_ITEM eden_ns2_dispatch_sources "engines/puller.cpp")
     list(APPEND eden_ns2_dispatch_sources "${EDEN_NS2_NATIVE_GPU_PULLER}")
     set_property(TARGET video_core PROPERTY SOURCES "${eden_ns2_dispatch_sources}")
+    # Research-only header and .cpp must be the SAME Puller class to keep
+    # DmaPusher ABI consistent in every video_core translation unit.
+    set(EDEN_NS2_GPU_DISPATCH_ROOT
+        "${PORT_ROOT}/vendor/encore-active/ns2-runtime/gpu_dispatch")
+    if(NOT EXISTS "${EDEN_NS2_GPU_DISPATCH_ROOT}/video_core/engines/puller.h" OR
+       NOT EXISTS "${EDEN_NS2_GPU_DISPATCH_ROOT}/video_core/native_ampere_macro_state.h" OR
+       NOT EXISTS "${EDEN_NS2_GPU_DISPATCH_ROOT}/video_core/macro_turing.h")
+        message(FATAL_ERROR "Missing isolated Ampere MME/puller dispatch headers")
+    endif()
     target_include_directories(video_core BEFORE PRIVATE
+        "${EDEN_NS2_GPU_DISPATCH_ROOT}"
         "${EDEN_NS2_NVDRV_GPU_ROOT}" "${EDEN_NS2_NVDRV_ROOT}")
     endif()
 endif()

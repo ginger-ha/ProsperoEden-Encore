@@ -33,7 +33,7 @@ all_owners={p for p in tracked
 # Do not silently count new research source code as already optimized.
 research = json.loads((ROOT/"docs/NS2_RESEARCH_ADDED_SOURCE_OWNERS.json").read_text())
 research_owners={"vendor/encore-active/"+p for p in research["paths"]}
-assert research["schema_version"] == 1 and len(research_owners) == 113
+assert research["schema_version"] == 1 and len(research_owners) == 114
 assert research_owners <= all_owners, sorted(research_owners-all_owners)
 # The two new shared warning-hygiene headers have a separate exact-source
 # verifier and installer. They are not retroactive F07 optimization reviews.
