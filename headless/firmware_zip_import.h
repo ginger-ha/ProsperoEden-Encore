@@ -145,7 +145,11 @@ inline bool ExtractEntry(std::ifstream& zip, const Entry& file, const fs::path& 
                 written+=produced;
                 if (!output_file) {ok=false;break;}
                 if (rc==Z_STREAM_END) {complete=true;break;}
-            } while (inflater.avail_in);
+            // A compressed block may consume all input while filling the
+            // 64 KiB output buffer exactly. zlib can still hold pending
+            // bytes (including the final stream marker); drain once more
+            // with no input instead of silently truncating the file.
+            } while (!complete && (inflater.avail_in || inflater.avail_out == 0));
             if (complete && (remaining || inflater.avail_in)) ok=false;
         }
     }
