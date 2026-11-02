@@ -56,6 +56,14 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # Shared native GPU budget admission owner, usable by both NS1 and NS2.
     # It is additive, never regenerated from the original upstream Vulkan.
     pool_policy='include/video_core/renderer_vulkan/vk_shared_gpu_budget.h'
+    # A common NS1/NS2 SPIR-V reflection primitive. The generator owns both
+    # call sites, but this standalone header has no upstream equivalent.
+    storage_layout='include/video_core/renderer_vulkan/vk_compute_storage_layout.h'
+    assert storage_layout not in actual, 'common storage layout falsely regenerated'
+    assert subprocess.check_output(
+        ['git','hash-object',str(expected[storage_layout])],text=True
+    ).strip() == '5cd2afaabc24c51592df61d952433df6e1e7a342', (
+        'common compute reflection owner drift')
     assert pool_policy not in actual, 'native GPU budget leaked into generator'
     assert subprocess.check_output(
         ['git','hash-object',str(expected[pool_policy])],text=True
@@ -67,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         raise RuntimeError('F07 allocator source parity failed (code %d):\n%s\n%s' % (
             oom_check.returncode, oom_check.stdout, oom_check.stderr))
     assert allocator not in actual, 'generated Vulkan port unexpectedly owns the allocator'
-    assert set(actual)==set(expected)-{helper, allocator, pool_policy}, (
+    assert set(actual)==set(expected)-{helper, allocator, pool_policy, storage_layout}, (
         f'missing: {set(actual)-set(expected)}, extras: {set(expected)-set(actual)}')
     helper_file=expected[helper]
     assert subprocess.check_output(['git','hash-object',str(helper_file)],text=True).strip()==(
