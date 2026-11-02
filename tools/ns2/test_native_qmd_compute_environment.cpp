@@ -186,6 +186,64 @@ int main() {
                tp->image_handles[0].primary_word == 0x12345000U &&
                tp->image_handles[1].primary_word == 0x10000U &&
                !tp->HasResolvedBufferBindings());
+        // Real TIC/TSC entries are 32-byte guest records, not Vulkan views.
+        {
+            using Shader::Ampere::NativeQmdTextureTables;
+            const u64 tic_base = 0x1000000200000ULL;
+            const u64 tsc_base = 0x1000000400000ULL;
+            NativeQmdTextureTables tables{
+                .tic_base = tic_base, .tsc_base = tsc_base,
+                .tic_limit = 0x45000U, .tsc_limit = 0x123U};
+            unsigned tic_reads{}, tsc_reads{};
+            const auto reader = [&](u64 address, void* out, std::size_t bytes) {
+                if (bytes != 32 || !out) return false;
+                auto* words = static_cast<u32*>(out);
+                for (unsigned i = 0; i < 8; ++i) words[i] = 0xabc00000U + i;
+                if (address == tic_base + u64{0x45000} * 32 ||
+                    address == tic_base + u64{0x10000} * 32) {
+                    ++tic_reads; return true;
+                }
+                if (address == tsc_base + u64{0x123} * 32 ||
+                    address == tsc_base) {
+                    ++tsc_reads; return true;
+                }
+                return false;
+            };
+            const auto records = tables.Capture(*tp, reader);
+            assert(records && records->size() == 2 &&
+                   (*records)[0].raw_handle == 0x12345000U &&
+                   (*records)[0].tic_index == 0x45000U &&
+                   (*records)[0].tsc_index == 0x123U &&
+                   (*records)[0].has_sampler &&
+                   (*records)[0].tic_words[0] == 0xabc00000U &&
+                   (*records)[1].tic_index == 0x10000U &&
+                   (*records)[1].tsc_index == 0 &&
+                   tic_reads == 2 && tsc_reads == 2);
+            auto invalid = tables;
+            invalid.tsc_limit = 0x122U;
+            assert(!invalid.Capture(*tp, reader));
+            invalid = tables;
+            invalid.tic_base = 0;
+            assert(!invalid.Capture(*tp, reader));
+            invalid = tables;
+            invalid.tic_base = (u64{1} << 49) - 32;
+            assert(!invalid.Capture(*tp, reader));
+            invalid = tables;
+            invalid.linked_tsc = true;
+            assert(!invalid.Capture(*tp, reader));
+            invalid = tables;
+            invalid.tic_base++;
+            assert(!invalid.Capture(*tp, reader));
+            assert(!tables.Capture(*tp, [&](u64 address, void* out,
+                                            std::size_t bytes) {
+                return address < tsc_base && reader(address, out, bytes);
+            }));
+            auto overflowing = *tp;
+            overflowing.image_handles[0].primary_shift = 31;
+            assert(!tables.Capture(overflowing, reader));
+            const auto none = tables.Capture(*plan, reader);
+            assert(none && none->empty());
+        }
         // A separate sampler/texture word must never be mistaken for a
         // contiguous NS1 TIC/TSC table, even when both source banks match.
         tex.has_secondary = true;
@@ -240,6 +298,23 @@ int main() {
                    Shader::Ampere::NativeQmdImageKind::StorageImage &&
                storage_image->image_handles[0].is_written &&
                storage_image->image_handles[0].primary_word == 0x10000U);
+        {
+            Shader::Ampere::NativeQmdTextureTables tables{
+                .tic_base = 0x1000000200000ULL,
+                .tsc_base = 0, .tic_limit = 0x10000U, .tsc_limit = 0};
+            unsigned reads{};
+            const auto records = tables.Capture(*storage_image,
+                [&](u64 addr, void* out, std::size_t size) {
+                    if (size != 32 ||
+                        addr != tables.tic_base + u64{0x10000} * 32)
+                        return false;
+                    std::memset(out, 0x7f, size);
+                    ++reads; return true;
+                });
+            assert(records && records->size() == 1 &&
+                   !(*records)[0].has_sampler &&
+                   (*records)[0].is_written && reads == 1);
+        }
         image.count = 0;
         textured.image_descriptors.clear();
         textured.image_descriptors.push_back(image);
