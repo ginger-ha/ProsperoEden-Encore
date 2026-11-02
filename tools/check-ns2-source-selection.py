@@ -378,6 +378,9 @@ def main() -> int:
         # inside cache-lock ordering. Keep native-only staging fail-closed.
         require(
             "guest_descriptor_queue.AcquireKnownEmpty(uses_descriptor_buffer);" in native_vk_pipeline and
+            "U97 native typed descriptor buffer binding index" in native_vk_port and
+            "const u32 buffer_index{};\n            cmdbuf.SetDescriptorBufferOffsetsEXT(" in native_vk_pipeline and
+            "0, buffer_index, descriptor_buffer_offset);" in native_vk_pipeline and
             "const auto preflight_guest = [&]" in native_vk_rasterizer and
             "guest_descriptor_queue.PreflightExactGuestDraw(" in native_vk_rasterizer and
             "descriptor_buffer_ring.PreflightFrameReuse(scheduler)" in native_vk_rasterizer and
