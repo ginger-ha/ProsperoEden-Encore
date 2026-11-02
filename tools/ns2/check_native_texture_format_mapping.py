@@ -195,6 +195,7 @@ for owner in (
     assert "unsupported native Compute TIC header" not in native_owner, owner
 assert "bool NativeQmdTicMatchesShaderType(" in native_env
 assert "bool NativeQmdTypedImageLayoutMatches(" in native_env
+assert "else if (tic_msaa)" in native_env and "Buffer images likewise cannot be multisampled" in native_env, "native buffer/storage MSAA guard missing"
 for owner in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",

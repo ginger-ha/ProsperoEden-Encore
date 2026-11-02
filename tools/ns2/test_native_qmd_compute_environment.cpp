@@ -1014,6 +1014,37 @@ int main() {
         layout.texture_descriptors[0].is_multisample = false;
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, msaa_view));
         assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
+        // Storage/image-buffer SPIR-V reflection has no multisample bit.
+        // The native path must not create a mismatched VkImageView for it.
+        Shader::Info storage_layout{};
+        Shader::ImageDescriptor storage_desc{};
+        storage_desc.count = 1;
+        storage_desc.is_written = true;
+        storage_desc.type = Shader::TextureType::Color2DRect;
+        storage_layout.image_descriptors.push_back(storage_desc);
+        auto storage_typed = *typed;
+        storage_typed[0].kind = NativeQmdImageKind::StorageImage;
+        storage_typed[0].is_written = true;
+        storage_typed[0].sampler.reset();
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        Shader::Info buffer_layout{};
+        Shader::TextureBufferDescriptor buffer_desc{};
+        buffer_desc.count = 1;
+        buffer_layout.texture_buffer_descriptors.push_back(buffer_desc);
+        auto buffer_typed = *typed;
+        buffer_typed[0].kind = NativeQmdImageKind::TextureBuffer;
+        buffer_typed[0].sampler.reset();
+        buffer_typed[0].tic.header_version.Assign(TICHeaderVersion::OneDBuffer);
+        buffer_typed[0].tic.texture_type.Assign(TextureType::Texture1DBuffer);
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            buffer_layout, buffer_typed));
+        buffer_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            buffer_layout, buffer_typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2D;
