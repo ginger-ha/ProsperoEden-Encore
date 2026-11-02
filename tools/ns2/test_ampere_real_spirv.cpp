@@ -114,17 +114,7 @@ int main(int argc,char** argv) {
             !compute.PipelineMetadataReady() &&
             compute.words.size()>5 && compute.words[0]==0x07230203U,
             "Ampere Compute CFG/IR -> actual SPIR-V failed");
-    {
-        const auto output=std::string(argv[1])+"-compute.spv";
-        std::ofstream file{output,std::ios::binary|std::ios::trunc};
-        Require(bool(file),"cannot write Compute SPIR-V");
-        file.write(reinterpret_cast<const char*>(compute.words.data()),
-                   static_cast<std::streamsize>(compute.words.size()*sizeof(u32)));
-        file.close();
-        Require(bool(file),"could not flush Compute SPIR-V");
-        std::printf("SPIR-V emitted: %s (%zu words)\\n",
-                    output.c_str(),compute.words.size());
-    }
+
     // Exercise the production-facing QMD3 metadata environment with the
     // ACTUAL reviewed Maxwell CFG/IR/SPIR-V compiler. The earlier synthetic
     // source has no native 49-bit CBUF metadata, so it cannot prove this ABI.
@@ -163,6 +153,19 @@ int main(int argc,char** argv) {
             real_qmd_spirv.words.size()>5 &&
             real_qmd_spirv.words[0]==0x07230203U,
             "native QMD3 metadata failed real Ampere IR/SPIR-V emission");
+    // The real host Vulkan shader-module/pipeline/queue test consumes THIS
+    // QMD3-backed compiler output, rather than the earlier mock source.
+    {
+        const auto output=std::string(argv[1])+"-compute.spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write Compute SPIR-V");
+        file.write(reinterpret_cast<const char*>(real_qmd_spirv.words.data()),
+                   static_cast<std::streamsize>(real_qmd_spirv.words.size()*sizeof(u32)));
+        file.close();
+        Require(bool(file),"could not flush Compute SPIR-V");
+        std::printf("QMD3 SPIR-V emitted: %s (%zu words)\\n",
+                    output.c_str(),real_qmd_spirv.words.size());
+    }
     // Distinct workgroups, CB metadata and program ownership must be carried
     // through this real compiler; no guest execution is asserted here.
     std::vector<u32> baseline_direct;
