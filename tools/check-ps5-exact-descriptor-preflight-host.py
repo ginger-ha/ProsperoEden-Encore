@@ -2,8 +2,9 @@
 """Source-extracted F01 descriptor capacity parity and shader-reselection regression.
 
 Compile the actual generated PreflightExactGuestDraw method together with
-all six maintained native graphics/compute reselect checks. Compare with the
-old >1024-only helper on a near-full queue. No PS5 FPS claim is implied.
+all six maintained Switch 1 graphics/compute reselect checks. Also guard the
+separate experimental NS2 Compute preflight before its cache lock.
+Compare with the old >1024-only helper on a near-full queue. No PS5 FPS claim is implied.
 """
 from pathlib import Path
 import shutil
@@ -52,11 +53,22 @@ compute = native[compute_start:]
 loop_tag = "for (unsigned preflight = 0; preflight != 2; ++preflight) {"
 check_tag = ("if (pipeline->HasDescriptorEntries() &&\n"
              "            guest_descriptor_queue.PreflightExactGuestDraw(")
-assert native.count("PreflightExactGuestDraw(") == 6
+# Six original graphical/Maxwell-compute reselect checks are invariant.
+# The seventh checked-in call belongs ONLY to the authenticated NS2 QMD3
+# dispatch and must execute before buffer_cache.mutex is acquired.
+native_start = native.index("bool RasterizerVulkan::DispatchNativeCompute(")
+native_end = native.index("void RasterizerVulkan::DispatchCompute(", native_start)
+native_compute = native[native_start:native_end]
+assert native.count("PreflightExactGuestDraw(") == 7
+assert native_compute.count("PreflightExactGuestDraw(") == 1
+assert native_compute.index("PreflightExactGuestDraw(") < native_compute.index(
+    "std::scoped_lock lock{buffer_cache.mutex};")
+assert "if (!registry.IsComputeCurrent(kepler_compute, *ticket))" in native_compute
 assert native.count("if (!pipeline->HasDescriptorEntries() ||") == 2
 assert native.count(check_tag) == 4
 assert "PreflightLargeGuestDraw(" not in native
-assert generator.count("PreflightExactGuestDraw(") == 7
+assert generator.count("PreflightExactGuestDraw(") == 8
+assert "U96 native compute preflights GPU worker waits before BufferCache lock" in generator
 
 def extract(source, start, open_brace):
     depth = 0
