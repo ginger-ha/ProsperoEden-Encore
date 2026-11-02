@@ -56,6 +56,13 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    # NX2 VI2 display polling uses explicit, known empty acknowledgements.
+    # Do not blanket-ack unknown service commands or fake guest frames.
+    for number in (51, 104, 105):
+        assert '{'+str(number)+',&IVi2Session::AcknowledgeDisplayPoll' in text
+    assert 'void AcknowledgeDisplayPoll(HLERequestContext& ctx)' in text
+    assert 'rb.Push(ResultSuccess.raw);' in text
+    assert 'rb.Push(Kernel::ResultNotImplemented.raw)' in text
     # VI2 must connect real process-owned 429 image window aliases to the
     # existing display compositor, not return synthetic present success.
     for command, method in ((301,"InitializeDisplayContext"),
