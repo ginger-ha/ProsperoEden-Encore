@@ -82,6 +82,26 @@ int main() {
     assert(!Tegra::DecodeNativeComputeLaunch(zero_block));
     const auto decoded=Tegra::DecodeNativeComputeLaunch(qmd);
     assert(decoded && decoded->constant_buffers[0].enabled);
+    // Device limits are stricter than the Ampere 1024-thread QMD bound.
+    // Validate the same policy without a PS5/Vulkan driver at host time.
+    Tegra::NativeComputeDeviceLimits limits{
+        {65535,65535,65535},{1024,1024,64},1024,65536};
+    assert(Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_grid[1]=3; // actual grid Y = 4
+    assert(!Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_grid[1]=65535;
+    limits.max_block[2]=1; // actual CTA Z = 2
+    assert(!Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_block[2]=64;
+    limits.max_invocations=255; // actual CTA = 8 * 16 * 2 = 256
+    assert(!Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_invocations=1024;
+    limits.max_shared_bytes=0x31f; // actual dynamic shared = 0x320
+    assert(!Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_shared_bytes=0x320;
+    assert(Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
+    limits.max_invocations=0;
+    assert(!Tegra::NativeComputeLaunchWithinDeviceLimits(*decoded,limits));
     assert(decoded->constant_buffers[0].gpu_address==0x1000012340000ULL);
     MockMappedGpu memory{};
     memory.address=decoded->constant_buffers[0].gpu_address;
