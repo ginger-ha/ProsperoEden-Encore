@@ -93,3 +93,27 @@ assert "if (address >= (1ULL << 40))" in legacy
 
 print("NS2_NATIVE_TEXTURE_GMMU_SHARED_PASS mapping=49bit whole_span=1"
       " no_native_vulkan_publication=1 ns1_legacy_guard=unchanged")
+
+# P2.2.2 native-only typed cache accessor overlay. Never mutate the pinned
+# upstream sources, shipping Eden backports or the original Maxwell ABI.
+overlay = vendor / "encore-active/eden-vulkan/vulkan-cache/video_core/texture_cache"
+header = (overlay / "texture_cache_base.h").read_text()
+impl = (overlay / "texture_cache.h").read_text()
+upstream_header = (vendor / "sources/eden/src/video_core/texture_cache/texture_cache_base.h").read_text()
+backport_header = (vendor / "encore-active/eden-backports/src/video_core/texture_cache/texture_cache_base.h").read_text()
+native_gate = "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)"
+for sym in ("AcquireNativeImageView", "AcquireNativeSampler"):
+    assert sym in header and sym in impl, sym
+    assert sym not in upstream_header and sym not in backport_header, sym
+assert native_gate in header and native_gate in impl
+assert "channel_state->image_views.try_emplace(descriptor)" in impl
+assert "slot_images[view.image_id].flags & ImageFlagBits::Remapped" in impl
+assert "CreateImageView(descriptor)" in impl
+assert "PrepareImageView(pair->second, is_written, false)" in impl
+assert "return FindSampler(descriptor, true);" in impl
+assert "SamplerId TextureCache<P>::FindSampler(" in impl
+assert "ImageViewId TextureCache<P>::VisitImageView(" in impl
+assert "return false; // no unbacked image/sampler descriptor publication" in (
+    vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
+print("NS1_NS2_NATIVE_TEXTURE_CACHE_TYPED_OVERLAY_PASS owner=one"
+      " upstream=immutable backports=immutable dispatch_images=closed")
