@@ -145,7 +145,27 @@ assert not post_f07_launcher_handoff_owners & (
 )
 print("ENCORE_SHARED_LOADER_F07_ISOLATION_PASS",
       f"new_shipping_headers={len(post_f07_launcher_handoff_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners
+# This generated PS5/NS2-only typed cache ABI postdates the frozen F07
+# 518-source optimization audit. Keep it visible and independently guarded,
+# never reclassify it as previously optimized Switch 1 source code.
+post_f07_ns2_typed_cache_owners = {
+    "vendor/encore-active/eden-vulkan/vulkan-cache/video_core/texture_cache/texture_cache_base.h",
+}
+assert post_f07_ns2_typed_cache_owners <= all_owners, sorted(
+    post_f07_ns2_typed_cache_owners-all_owners)
+assert not post_f07_ns2_typed_cache_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners |
+    post_f07_native_vulkan_owners | post_f07_shared_compute_owners |
+    post_f07_launcher_handoff_owners
+)
+cache_header = (ROOT / next(iter(post_f07_ns2_typed_cache_owners))).read_text()
+assert "AcquireNativeImageView(const TICEntry& descriptor" in cache_header
+assert "AcquireNativeSampler(const TSCEntry& descriptor)" in cache_header
+assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in cache_header
+print("NS2_POST_F07_TYPED_CACHE_ABI_ISOLATION_PASS",
+      f"new_native_headers={len(post_f07_ns2_typed_cache_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners-post_f07_ns2_typed_cache_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"

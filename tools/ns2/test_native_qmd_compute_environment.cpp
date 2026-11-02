@@ -528,7 +528,9 @@ int main() {
         // Match flattened SPIR-V layout before touching guest TIC/TSC:
         // texture buffers, image buffers, samples, writable storage images.
         Shader::Info layout{};
-        layout.texture_descriptors.push_back(Shader::TextureDescriptor{.count = 1});
+        Shader::TextureDescriptor sampled_description{};
+        sampled_description.count = 1;
+        layout.texture_descriptors.push_back(sampled_description);
         assert(NativeQmdImageLayoutMatches(layout, textured));
         layout.texture_descriptors[0].count = 2;
         assert(!NativeQmdImageLayoutMatches(layout, textured));
@@ -540,14 +542,18 @@ int main() {
         assert(!NativeQmdImageLayoutMatches(layout, textured));
         textured.image_handles[0].is_written = false;
         Shader::Info mixed_info{};
-        mixed_info.texture_buffer_descriptors.push_back(
-            Shader::TextureBufferDescriptor{.count = 1});
-        mixed_info.image_buffer_descriptors.push_back(
-            Shader::ImageBufferDescriptor{.is_written = true, .count = 1});
-        mixed_info.texture_descriptors.push_back(
-            Shader::TextureDescriptor{.count = 1});
-        mixed_info.image_descriptors.push_back(
-            Shader::ImageDescriptor{.is_written = true, .count = 1});
+        Shader::TextureBufferDescriptor texture_buffer_description{};
+        texture_buffer_description.count = 1;
+        mixed_info.texture_buffer_descriptors.push_back(texture_buffer_description);
+        Shader::ImageBufferDescriptor image_buffer_description{};
+        image_buffer_description.is_written = true;
+        image_buffer_description.count = 1;
+        mixed_info.image_buffer_descriptors.push_back(image_buffer_description);
+        mixed_info.texture_descriptors.push_back(sampled_description);
+        Shader::ImageDescriptor storage_description{};
+        storage_description.is_written = true;
+        storage_description.count = 1;
+        mixed_info.image_descriptors.push_back(storage_description);
         NativeQmdResourcePlan mixed_plan{};
         mixed_plan.requires_tic_tsc = true;
         mixed_plan.image_handles = {
