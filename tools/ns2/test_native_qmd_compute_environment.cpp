@@ -779,6 +779,49 @@ int main() {
         const auto image = guest_tables.CaptureAdmissible(
             textured, read_guest, admit);
         assert(image && image->size() == 1 && admissions == 1);
+
+        // P4.2: a valid GPU process does NOT authorize arbitrary TIC/TSC
+        // table indices or an overhanging 32-byte record at the 49-bit VA
+        // ceiling. The same decoder is used for the initial snapshot and
+        // the locked post-compile recheck; these are real rejection paths.
+        auto invalid_table = guest_tables;
+        invalid_table.tic_base = 0;
+        assert(!invalid_table.Capture(textured, read_guest));
+        invalid_table = guest_tables;
+        ++invalid_table.tic_base; // no partial 32-byte TIC reads
+        assert(!invalid_table.Capture(textured, read_guest));
+        invalid_table = guest_tables;
+        invalid_table.tsc_base = u64{1} << 49;
+        assert(!invalid_table.Capture(textured, read_guest));
+        invalid_table = guest_tables;
+        invalid_table.tsc_base = (u64{1} << 49) - 16; // TSC crosses GMMU VA
+        assert(!invalid_table.Capture(textured, read_guest));
+        invalid_table = guest_tables;
+        invalid_table.tic_base = (u64{1} << 49) - 32;
+        invalid_table.tic_limit = 1;
+        auto next_tic = textured;
+        next_tic.image_handles[0].primary_word = 1;
+        // Index 1 is outside the 49-bit VA even though the base is valid.
+        assert(!invalid_table.Capture(next_tic, read_guest));
+        invalid_table = guest_tables;
+        assert(!invalid_table.Capture(next_tic, read_guest)); // TIC limit 0
+        auto next_sampler = textured;
+        next_sampler.image_handles[0].primary_word = 1U << 20;
+        assert(!guest_tables.Capture(next_sampler, read_guest)); // TSC limit 0
+        auto overflow_handle = textured;
+        overflow_handle.image_handles[0].primary_shift = 31;
+        overflow_handle.image_handles[0].primary_word = 3;
+        assert(!guest_tables.Capture(overflow_handle, read_guest)); // >u32
+        invalid_table = guest_tables;
+        invalid_table.linked_tsc = true;
+        assert(!invalid_table.Capture(next_tic, read_guest));
+        // An empty image layout is legal only when NO TIC/TSC are needed.
+        NativeQmdResourcePlan no_textures{};
+        const auto empty_captured = guest_tables.Capture(no_textures, read_guest);
+        assert(empty_captured && empty_captured->empty());
+        no_textures.requires_tic_tsc = true;
+        assert(!guest_tables.Capture(no_textures, read_guest));
+
         assert((*image)[0].has_sampler && (*image)[0].tic_index == 0);
         // Decoding admitted bytes must not invent Vulkan resources.
         // A malformed/writable/mismatched TSC must fail before the cache.
