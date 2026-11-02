@@ -188,3 +188,20 @@ for path in (
         "return false; // no unbacked image/sampler descriptor publication"), path
 print("NS2_TIC_TSC_LOCKED_SNAPSHOT_PASS same_channel=required snapshot=second_read"
       " before_publication=1")
+
+# A real TICEntry/TSCEntry decode boundary follows guest admission; it
+# produces no Vulkan objects. The existing fail-closed dispatch remains.
+assert "struct NativeQmdTypedTextureRecord" in native_env
+assert "DecodeAdmitted(const NativeQmdResourcePlan& plan," in native_env
+assert "std::memcpy(&entry.tic, src.tic_words.data(), sizeof(entry.tic))" in native_env
+assert "std::memcpy(&sampler, src.tsc_words.data(), sizeof(sampler))" in native_env
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    bridge = (vendor / path).read_text()
+    assert bridge.index("tables.CaptureAdmissible(") < bridge.index(
+        "tables.DecodeAdmitted(") < bridge.index("tables.MatchesSnapshot("), path
+    assert "return false; // no unbacked image/sampler descriptor publication" in bridge
+print("NS2_TYPED_TIC_TSC_DECODE_PASS real_cache_ABI=1"
+      " retained_vk_objects=0 native_image_dispatch=closed")

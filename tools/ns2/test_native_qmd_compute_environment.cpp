@@ -594,6 +594,28 @@ int main() {
             textured, read_guest, admit);
         assert(image && image->size() == 1 && admissions == 1);
         assert((*image)[0].has_sampler && (*image)[0].tic_index == 0);
+        // Decoding admitted bytes must not invent Vulkan resources.
+        // A malformed/writable/mismatched TSC must fail before the cache.
+        const auto typed = guest_tables.DecodeAdmitted(textured, *image);
+        assert(typed && typed->size() == 1 &&
+               (*typed)[0].tic.Address() == texture_va &&
+               (*typed)[0].sampler.has_value() &&
+               (*typed)[0].kind == NativeQmdImageKind::SampledTexture &&
+               !(*typed)[0].is_written);
+        auto corrupted_record = *image;
+        corrupted_record[0].is_written = true;
+        assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
+        corrupted_record = *image;
+        corrupted_record[0].has_sampler = false;
+        assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
+        corrupted_record = *image;
+        corrupted_record[0].tsc_words.fill(0);
+        assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
+        corrupted_record = *image;
+        corrupted_record[0].tic_words.fill(0);
+        assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
+        assert(!guest_tables.DecodeAdmitted(textured, {}));
+        assert(guest_tables.DecodeAdmitted(textured, *image));
         // TIC/TSC can mutate in guest memory independently of the channel
         // epoch. Do not accept a mixed or stale descriptor-table snapshot.
         assert(guest_tables.MatchesSnapshot(textured, *image, read_guest));
