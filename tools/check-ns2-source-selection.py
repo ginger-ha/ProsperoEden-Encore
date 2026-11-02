@@ -313,7 +313,7 @@ def main() -> int:
                 "ReadNs2GpuShader, &memory" in pipeline_source.read_text() and
                 "CompileReviewedNativeGraphicsSpirv(" in pipeline_source.read_text() and
                 "registry.CaptureTicket(process)" in pipeline_source.read_text() and
-                pipeline_source.read_text().count("registry.IsCurrent(*session)") == 7 and
+                pipeline_source.read_text().count("registry.IsCurrent(*session)") == 10 and
                 "CompileCapturedNs2ComputeSpirvFromReader(" in pipeline_source.read_text() and
                 "CaptureNativeComputeShader(" in pipeline_source.read_text() and
                 "CreateComputeOwned(" in pipeline_source.read_text() and
