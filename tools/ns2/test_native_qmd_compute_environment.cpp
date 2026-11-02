@@ -737,6 +737,20 @@ int main() {
         pitch_tic.pitch_high.Assign(0xffff);
         pitch_tic.height_minus_1.Assign(0xffff);
         assert(!Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
+        // ImageInfo allocates six faces per cube. A guest-sized cube that
+        // fits the old single-face budget must be rejected before u32 math.
+        TICEntry cube_tic = tic;
+        cube_tic.texture_type.Assign(TextureType::TextureCubemap);
+        cube_tic.width_minus_one.Assign(1023);
+        cube_tic.height_minus_1.Assign(1023);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(cube_tic));
+        cube_tic.width_minus_one.Assign(4095);
+        cube_tic.height_minus_1.Assign(4095);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(cube_tic));
+        cube_tic.texture_type.Assign(TextureType::TextureCubeArray);
+        cube_tic.depth_minus_1.Assign(1);
+        cube_tic.height_minus_1.Assign(2047);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(cube_tic));
         TSCEntry tsc{};
         tsc.mag_filter.Assign(TextureFilter::Nearest);
         tsc.min_filter.Assign(TextureFilter::Linear);

@@ -73,6 +73,7 @@ assert "bool NativeQmdContiguousGpuSpan(" in native_header
 assert "sampler.min_lod_clamp.Value() > sampler.max_lod_clamp.Value()" in native_header, "native TSC LOD order guard missing"
 assert "tic.IsPitchLinear()" in native_header and "!tic.pitch_high.Value()" in native_header, "native pitch image admission guard missing"
 assert "u64{tic.pitch_high.Value()} * 32U * tic.Height() > ~u32{0}" in native_header, "native pitch 32-bit overflow guard missing"
+assert "const bool cubes =" in native_header and "const u64 layers = (u64{tic.BaseLayer()} + 1) * (cubes ? 6U : 1U);" in native_header, "native cube face budget guard missing"
 assert "bool SameBufferBindings(const NativeQmdResourcePlan& other)" in native_header
 assert "image_handles.size() != other.image_handles.size()" in native_header
 assert "a.primary_shift != b.primary_shift" in native_header
