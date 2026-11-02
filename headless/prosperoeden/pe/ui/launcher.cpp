@@ -988,8 +988,17 @@ void Launcher::draw_launch(Canvas &c)
         // the authentic scan automatically resumes priority if retried.
         // The texture may still be decoding even when "missing" is false.
         // Never suppress reconstruction until an actual GPU texture exists.
-        if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)
-            return;
+        if (!retail.empty()) {
+            const Cover decoded = c.textures.cover(retail, 760.0f);
+            // A genuine face has priority. Its async decode is not a
+            // failure: don't allocate a redundant 660x1056 composition
+            // during the first seconds just because the GPU copy is queued.
+            // If the file is missing or the decode is unreasonably slow,
+            // restore the opaque procedural fallback after bounded wait.
+            if (decoded.texture != 0 ||
+                (!decoded.missing && seconds < 4.0f))
+                return;
+        }
         if ((page != 0 && !provisional) ||
             (page == 0 && attempted) || failures >= 3u) return;
         if (seconds < retry_after) return;
