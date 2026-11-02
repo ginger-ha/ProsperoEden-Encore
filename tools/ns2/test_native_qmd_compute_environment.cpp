@@ -212,6 +212,21 @@ int main() {
         textured.texture_descriptors.clear();
         textured.texture_descriptors.push_back(tex);
         assert(!env.BuildResourcePlan(textured));
+        tex.secondary_shift_left = 4;
+        tex.secondary_cbuf_offset = 6; // unaligned secondary word
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        assert(!env.BuildResourcePlan(textured));
+        tex.secondary_cbuf_offset = 8;
+        tex.size_shift = 32; // invalid index stride
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        assert(!env.BuildResourcePlan(textured));
+        tex.size_shift = 2;
+        tex.count = 257; // native preflight handle budget
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        assert(!env.BuildResourcePlan(textured));
         textured.texture_descriptors.clear();
         Shader::ImageDescriptor image{};
         image.cbuf_index = 0;
