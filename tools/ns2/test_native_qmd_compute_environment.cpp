@@ -406,6 +406,38 @@ int main() {
                (addr==0x1000012345000ULL && bytes==0x40);
     }));
     assert(mapped_spans==2);
+    // Mutable native CBUF descriptors can change during shader compilation
+    // without making either GPU address unmapped. Compare every binding,
+    // including write rights and known-size admission, before Vulkan use.
+    assert(plan->SameBufferBindings(*plan));
+    auto changed_plan = *plan;
+    changed_plan.uniform_buffers[0].gpu_address += 0x1000;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.uniform_buffers[0].bytes += 4;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    ++changed_plan.uniform_buffers[0].qmd_index;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.storage_buffers[0].gpu_address += 0x1000;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.storage_buffers[0].bytes += 16;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.storage_buffers[0].is_written =
+        !changed_plan.storage_buffers[0].is_written;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.storage_buffers[0].known_size = false;
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.storage_buffers.clear();
+    assert(!plan->SameBufferBindings(changed_plan));
+    changed_plan = *plan;
+    changed_plan.uses_global_memory = !changed_plan.uses_global_memory;
+    assert(!plan->SameBufferBindings(changed_plan));
     // A corrupt CBUF/SSBO range at the end of the 49-bit GMMU must fail
     // before the renderer stages even one Vulkan buffer descriptor.
     auto overflowing_plan = *plan;

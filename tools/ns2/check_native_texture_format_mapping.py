@@ -70,6 +70,20 @@ native_header = (vendor / (
 )).read_text()
 compute = (vendor / "encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
 assert "bool NativeQmdContiguousGpuSpan(" in native_header
+assert "bool SameBufferBindings(const NativeQmdResourcePlan& other)" in native_header
+for owner_path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    code = (vendor / owner_path).read_text()
+    assert "const auto before_binding = resource_owner->BuildResourcePlan(*compiled.info);" in code
+    assert "bool current_after_staging = false;" in code
+    assert code.count("resources->SameBufferBindings(") == 2, owner_path
+    assert code.index("bool current_after_staging = false;") < code.index(
+        "RetainNativeComputeUntilGpuTick(", code.index("bool current_after_staging = false;"))
+print("NS2_NATIVE_QMD_MUTABLE_BUFFER_SNAPSHOT_PASS pre_stage=1 post_stage=1"
+      " post_stage_throw=retained")
+
 assert "CaptureAdmissible(const NativeQmdResourcePlan&" in native_header
 assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in compute
 assert "for (u64 delta = 4096" not in compute, "duplicated GMMU guard reappeared"
