@@ -18,7 +18,7 @@ textures_source = (root / "headless/prosperoeden/pe/ui/textures.cpp").read_text(
 assert '#include "pe/ui/case_media_selection.hpp"' in renderer
 # A missing retail-file path must fall back to composition, not empty ink.
 assert 'if (artwork.texture != 0)' in renderer
-assert '(scan.empty() || artwork.missing)' in launcher
+assert 'const bool use_composed = artwork.texture == 0 && composed_page != 0;' in launcher
 # An existing provisional page is rendered IN PLACE, and never counted as a
 # third allocation. It stays valid if a transient FBO creation fails.
 assert 'std::uint32_t existing = 0' in textures_header
