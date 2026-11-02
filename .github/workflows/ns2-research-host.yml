@@ -33,6 +33,8 @@ jobs:
           persist-credentials: false
           submodules: true
           fetch-depth: 1
+      - name: P2.2 reject invalid TIC texture format aliases (source/host)
+        run: python3 -B tools/ns2/check_native_texture_format_mapping.py
       - name: Host Boost headers
         run: |
           sudo apt-get update -qq
