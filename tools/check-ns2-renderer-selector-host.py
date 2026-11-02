@@ -31,6 +31,8 @@ def main():
             "project(NS2ShaderSelector LANGUAGES CXX)\n"
             f'file(WRITE "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp" "int n() {{return 1;}}\\n")\n'
             f'add_library(video_core STATIC "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp")\n'
+            f'add_library(core STATIC "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp")\n'
+            f'set(PORT_BUILD_DIR "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}")\n'
             f'set(PORT_ROOT "{ROOT.as_posix()}")\n'
         )
         for name in ("NATIVE","VULKAN","AMPERE","METADATA","GPU_SESSION","NVDRV"):
