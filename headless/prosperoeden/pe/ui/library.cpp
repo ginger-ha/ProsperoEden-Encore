@@ -15,6 +15,7 @@
 #include <cctype>
 #include <sstream>
 #include <exception>
+#include <stdexcept>
 #include <iterator>
 #include <new>
 #include <string>
@@ -620,6 +621,11 @@ void Launcher::finish_home_media()
 
     try {
         Game enriched = home_media_scan_.get();
+        // A worker response belongs strictly to the request that launched
+        // it. Do not publish a zero/wrong TitleID into Home, Recents or the
+        // library during an overlapping selection or failed lookup.
+        if (!enriched.title_id || enriched.title_id != home_media_scan_title_id_)
+            throw std::runtime_error{"stale Home media identity"};
         if (enriched.artwork_changed) {
             textures_.invalidate(enriched.cover);
             textures_.invalidate(enriched.hero);
@@ -715,6 +721,8 @@ void Launcher::finish_selected_media()
         return;
     try {
         Game enriched = media_scan_.get();
+        if (!enriched.title_id || enriched.title_id != media_scan_title_id_)
+            throw std::runtime_error{"stale library media identity"};
         if (enriched.artwork_changed) {
             textures_.invalidate(enriched.cover);
             textures_.invalidate(enriched.hero);

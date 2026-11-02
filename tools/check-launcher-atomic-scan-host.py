@@ -156,6 +156,7 @@ int main() {
         enriched.description = "Real title metadata";
         std::promise<Game> found;
         home.home_media_scan_ = found.get_future();
+        home.home_media_scan_title_id_ = 0x777;
         found.set_value(enriched);
         home.finish_home_media();
         assert(home.games_[0].box_back == "rear.webp");
@@ -171,8 +172,21 @@ int main() {
         std::promise<Game> no_identity;
         home.home_media_scan_ = no_identity.get_future();
         no_identity.set_value(zero);
+        home.home_media_scan_title_id_ = 0x777;
         home.finish_home_media();
         assert(home.games_[2].box_front.empty());
+        // An unrelated, even valid, TitleID cannot contaminate the active
+        // Home or the library when a worker returns a stale response.
+        Game wrong = enriched;
+        wrong.title_id = 0x888;
+        wrong.cover = "wrong.webp";
+        std::promise<Game> stale;
+        home.home_media_scan_ = stale.get_future();
+        home.home_media_scan_title_id_ = 0x777;
+        stale.set_value(wrong);
+        home.finish_home_media();
+        assert(home.games_[2].cover.empty());
+        assert(home.home_.last_cover == "icon.webp");
     }
     // Duplicate installations of the same TitleID must all inherit Nlib
     // artwork. Never distribute an invalid zero ID to unrelated ROMs.
@@ -195,6 +209,7 @@ int main() {
         nlib.screenshots = {"mkw-shot.webp"};
         std::promise<Game> done;
         copies.media_scan_ = done.get_future();
+        copies.media_scan_title_id_ = 0x123;
         done.set_value(nlib);
         copies.finish_selected_media();
         assert(copies.games_[0].box_back == "mkw-back.webp");
@@ -209,9 +224,22 @@ int main() {
         copies.games_.push_back(zero);
         std::promise<Game> invalid;
         copies.media_scan_ = invalid.get_future();
+        copies.media_scan_title_id_ = 0x123;
         invalid.set_value(zero);
         copies.finish_selected_media();
         assert(copies.games_[3].cover == "bad.webp");
+        assert(copies.home_syncs == 2);
+        // The worker accidentally reports another *valid* title: refuse
+        // before invalidating its textures or touching the matching game.
+        Game spoof = nlib;
+        spoof.title_id = 0x456;
+        spoof.box_front = "wrong.webp";
+        std::promise<Game> bad_title;
+        copies.media_scan_ = bad_title.get_future();
+        copies.media_scan_title_id_ = 0x123;
+        bad_title.set_value(spoof);
+        copies.finish_selected_media();
+        assert(copies.games_[2].box_front.empty());
         assert(copies.home_syncs == 2);
     }
     // Fresh discovery is pending: the UI cannot declare "No ROM" until

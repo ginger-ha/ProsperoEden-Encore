@@ -71,6 +71,12 @@ native_header = (vendor / (
 compute = (vendor / "encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
 assert "bool NativeQmdContiguousGpuSpan(" in native_header
 assert "bool SameBufferBindings(const NativeQmdResourcePlan& other)" in native_header
+assert "bool ForEachCapturedRecord(const NativeQmdResourcePlan& plan," in native_header
+snapshot_body = native_header.split("MatchesSnapshot(", 1)[1].split(
+    "    // Transcode already admitted snapshot bytes", 1)[0]
+assert "ForEachCapturedRecord(" in snapshot_body
+assert "const auto fresh = Capture(" not in snapshot_body
+assert "std::vector<NativeQmdImageTableRecord> captured;" in native_header
 for owner_path in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",

@@ -746,6 +746,35 @@ int main() {
         assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
         assert(!guest_tables.DecodeAdmitted(textured, {}));
         assert(guest_tables.DecodeAdmitted(textured, *image));
+        // The second TIC/TSC read is now a streaming, allocation-free
+        // comparison under TextureCache's channel mutex. A duplicate
+        // descriptor must read both records, but a mismatch in the first
+        // must stop before reading the second.
+        auto duplicate_plan = textured;
+        duplicate_plan.image_handles.push_back(textured.image_handles[0]);
+        const auto duplicated = guest_tables.Capture(duplicate_plan, read_guest);
+        assert(duplicated && duplicated->size() == 2);
+        unsigned rereads{};
+        const auto counted_read = [&](u64 addr, void* dst, std::size_t bytes) {
+            ++rereads;
+            return read_guest(addr, dst, bytes);
+        };
+        assert(guest_tables.MatchesSnapshot(duplicate_plan, *duplicated, counted_read));
+        assert(rereads == 4); // two TICs + two TSCs
+        auto stale_first = *duplicated;
+        stale_first[0].tic_words[0] ^= 1;
+        rereads = 0;
+        assert(!guest_tables.MatchesSnapshot(duplicate_plan, stale_first, counted_read));
+        assert(rereads == 2); // early reject; no second descriptor lookup
+        rereads = 0;
+        assert(!guest_tables.MatchesSnapshot(duplicate_plan, *image, counted_read));
+        assert(rereads == 0); // mismatched span never touches guest memory
+        auto oversize_plan = duplicate_plan;
+        oversize_plan.image_handles.resize(257, textured.image_handles[0]);
+        rereads = 0;
+        assert(!guest_tables.MatchesSnapshot(
+            oversize_plan, std::vector<NativeQmdImageTableRecord>(257), counted_read));
+        assert(rereads == 0);
         // TIC/TSC can mutate in guest memory independently of the channel
         // epoch. Do not accept a mixed or stale descriptor-table snapshot.
         assert(guest_tables.MatchesSnapshot(textured, *image, read_guest));
