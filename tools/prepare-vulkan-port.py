@@ -21,6 +21,23 @@ def adapt(relative, destination, replacements):
 
 adapt('src/core/frontend/emu_window.h', 'include/core/frontend/emu_window.h',
       [('    Xcb,', '    Xcb,\n    PS5,')])
+
+# Keep the versioned rasterizer class ABI in sync with the native NS2 QMD
+# implementation. The new entry point is unavailable in Switch 1 builds.
+adapt('src/video_core/renderer_vulkan/vk_rasterizer.h',
+      'include/video_core/renderer_vulkan/vk_rasterizer.h', [
+    ("namespace Tegra {\n\nnamespace Engines {",
+     "namespace Tegra {\n\n"
+     "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n"
+     "struct NativeComputeLaunch;\n"
+     "#endif\n\nnamespace Engines {"),
+    ("    void DispatchCompute() override;",
+     "    void DispatchCompute() override;\n"
+     "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n"
+     "    // Separate NS2 QMD3 path: never reuse Switch 1 Kepler compute state.\n"
+     "    bool DispatchNativeCompute(const Tegra::NativeComputeLaunch& launch);\n"
+     "#endif"),
+])
 adapt('src/video_core/renderer_vulkan/vk_rasterizer.cpp', 'vulkan_rasterizer.cpp', [
     # DMA extent width contract: avoid u32 wrap before buffer-cache lookup.
     ("    const u32 buffer_size = static_cast<u32>(buffer_operand.pitch * buffer_operand.height);", "    // Widen before multiplying, then respect the u32 buffer-cache span.\n    const u64 buffer_size_wide = static_cast<u64>(buffer_operand.pitch) * buffer_operand.height;\n    if (buffer_size_wide > static_cast<u64>(~u32{0})) {\n        return false;\n    }\n    const u32 buffer_size = static_cast<u32>(buffer_size_wide);"),
