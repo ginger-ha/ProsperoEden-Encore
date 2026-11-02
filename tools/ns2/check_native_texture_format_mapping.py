@@ -81,7 +81,8 @@ for filename in (
     assert "tables.CaptureAdmissible(" in source, filename
     assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in source, filename
     assert "const VideoCommon::ImageInfo info{tic};" in source, filename
-    assert source.index("PixelFormat::Invalid)") < source.index(
+    admission = source.split("[this](const Tegra::Texture::TICEntry& tic) {", 1)[1]
+    assert admission.index("PixelFormat::Invalid)") < admission.index(
         "const VideoCommon::ImageInfo info{tic};"), filename
     assert "return false; // no unbacked image/sampler descriptor publication" in source
 
