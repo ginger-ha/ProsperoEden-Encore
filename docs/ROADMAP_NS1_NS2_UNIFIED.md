@@ -19,7 +19,7 @@ Le mode sans build PS5 reste en vigueur. Les deux workflows de build complet et 
 | Moteur NS1 | Base fonctionnelle historiquement sur BOTW; FC27 a encore crashs/saccades et HUD à contrôler | Pas de succès FC27 vérifié pour le nouveau code |
 | Boot NS2 | Parsing, TitleID, chemins extraits, capacités, partie HLE en place | MKW/Bananza restent sans première image invitée confirmée |
 | GPU buffers communs | SSBO array walker unique NS1/NS2 avec 32 slots, générateur et vendor cohérents | CI hôte du dernier SHA à confirmer; textures Ampere non terminées |
-| Compute NS2 | Capture QMD3 → SPIR-V → VkComputePipeline pour les cas admissibles | Images TIC/TSC, global memory, CBUF indirect, pipeline-cache natif manquants |
+| Compute NS2 | Capture QMD3 → SPIR-V → VkComputePipeline buffer-only; LRU natif borné à 12 avec vie GPU protégée (source/hôte) | Images TIC/TSC Vulkan, global memory, CBUF indirect et qualification PS5 manquants |
 | GPU 3D NS2 | Sous-composants Ampere / MME présents | Rendu réel, task/mesh, stages et synchronisation non prouvés |
 | Mémoire et VRAM | GMMU, NVMap, sparse/ASTC et contrôles hôte partiels | Résidence physique 12 GiB et premières images sur PS5 non prouvées |
 | HLE / synchronisation | Nombreux services et correctifs IPC, VI2, scheduler | Pas de chemin complet invités → VI2 → frame certifié |
@@ -55,6 +55,14 @@ Ces jalons ne sont **pas** des estimations de délais; chacun se ferme uniquemen
 
 **Priorité immédiate :** fermer P0.1, établir la cartographie des responsabilités communes (P0.2/P0.3), puis terminer TIC/TSC + mémoire/VI2 pour atteindre une frame GPU NS2 réellement présentable.
 
-## P2.3 — Optimisation native Compute revue (2026-11-02)
+## P2.6a — Réutilisation native Compute revue (2026-11-02)
 
 Le fournisseur Vulkan conserve désormais au plus **12 pipelines Compute Ampere** compilés sous leur propriétaire `PipelineCache`, avec clef comprenant **processus + génération du processus + époque du canal + hash et comparaison complète du SPIR-V**. Les dispatchs ont des `shared_ptr` indépendants retenus jusqu'au retrait GPU ; l'éviction LRU ne libère jamais une ressource encore retenue par une commande. Les shaders dépassant 65 536 mots SPIR-V restent sans cache. Les échecs de création ne sont jamais mémorisés, et une saturation mémoire du cache ne doit pas faire échouer un dispatch valide. Ce changement ne touche pas le cache Maxwell/NS1. Le générateur Vulkan est synchronisé avec les sources du vendor, sans supprimer la comparaison intégrale. **Qualification PS5 encore manquante.**
+
+## Micro-jalons vérifiés sans build PS5 (2026-11-02)
+
+- **P2.6a — hôte validé :** l'implémentation LRU Compute et le garde de provenance N56/U92 sont validés sur [`43f595b`](https://github.com/niakw/ProsperoEden-Encore/commit/43f595bd51f665f240e4cf17f29b56e34715ee63) / vendor [`32a0ac1`](https://github.com/niakw/Prospero.Eden-Encore-vendor/commit/32a0ac1bbdea56c5daa19c077c0bd6792844f935) par [NS2 host #41521143542](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41521143542). La mesure NS1/NS2 et les essais GPU réels restent ouverts.
+- **P3.4a/b — preview/source validées :** la navigation entre onglets conserve les derniers jeux et l'illustration. Les protections de volumes absents au premier scan sont intégrées ; [preview #41524761665](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41524761665) verte sur `664b7f0`. L'indisponibilité d'un **fichier** (EIO, EACCES, ENODEV) ne doit plus cacher les autres titres : source [`f31a1bc`](https://github.com/niakw/ProsperoEden-Encore/commit/f31a1bc21c37977e977d34073c4de1509e5e71aa). Le témoin de refus exact en O0/O2 a été activé dans le preflight [`329b2b8`](https://github.com/niakw/ProsperoEden-Encore/commit/329b2b80d9b99bdb855f96b894fed32cfe092f06) ; résultats CI encore à qualifier sur ce SHA. P3.4 global attend toujours la console.
+- **P4.2a — hôte validé :** nouveaux cas négatifs GMMU 49 bits, pages 4 KiB et translation physique disjointe [`155f633`](https://github.com/niakw/ProsperoEden-Encore/commit/155f633cb5b4ecce0115e3b5ad127dac48444bdf), [NS2 host #41525695461](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41525695461) réussi en Clang/GCC. OOM GPU, fences et consoles restent ouverts.
+
+**Dernier code observé lors de ce relevé :** parent `329b2b80d9b99bdb855f96b894fed32cfe092f06`, gitlink vendor `32a0ac1bbdea56c5daa19c077c0bd6792844f935`. Aucun build PS5 activé. Pour les statuts de CI et la checklist opposable, conserver l'[issue #15](https://github.com/niakw/ProsperoEden-Encore/issues/15) comme source vivante.
