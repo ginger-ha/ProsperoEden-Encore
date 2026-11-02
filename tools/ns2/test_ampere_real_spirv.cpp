@@ -13,6 +13,7 @@
 #define CANNOT_EXPLICITLY_INSTANTIATE
 #include "common/settings.h"
 #include "shader_recompiler/frontend/ampere/renderer_spirv_bridge.h"
+#include "shader_recompiler/frontend/ampere/native_qmd_compute_environment.h"
 #include "video_core/ns2_shader_spirv_compile.h"
 #include "core/hle/service/nvdrv/devices/native_gpu_process_registry.h"
 #include "shader_recompiler/frontend/ampere/ir_bridge.h"
@@ -124,6 +125,46 @@ int main(int argc,char** argv) {
         std::printf("SPIR-V emitted: %s (%zu words)\\n",
                     output.c_str(),compute.words.size());
     }
+    // Exercise the production-facing QMD3 metadata environment with the
+    // ACTUAL reviewed Maxwell CFG/IR/SPIR-V compiler. The earlier synthetic
+    // source has no native 49-bit CBUF metadata, so it cannot prove this ABI.
+    Tegra::NativeQmdScheduler::Descriptor native_qmd{};
+    native_qmd[8]=0x80;
+    native_qmd[12]=3; native_qmd[13]=4; native_qmd[14]=5;
+    native_qmd[18]=0x30U | (2U<<16);
+    native_qmd[19]=4U | (8U<<16);
+    native_qmd[20]=1U; // Enabled CBUF0.
+    native_qmd[32]=0x12340000U;
+    native_qmd[33]=0x10000U | (1U<<19); // GPU VA above 40 bits, 16 bytes.
+    native_qmd[48]=0x100000U; native_qmd[49]=0x10000U;
+    const auto launch=Tegra::DecodeNativeComputeLaunch(native_qmd);
+    Require(launch && launch->constant_buffers[0].gpu_address==0x1000012340000ULL,
+            "QMD3 Compute compiler lost native CBUF upper address bits");
+    GuestFixture cbuf_guest{};
+    cbuf_guest.address=launch->constant_buffers[0].gpu_address;
+    cbuf_guest.bytes.resize(16);
+    cbuf_guest.bytes[0]=0x78; cbuf_guest.bytes[1]=0x56;
+    cbuf_guest.bytes[2]=0x34; cbuf_guest.bytes[3]=0x12;
+    auto native_qmd_context=std::make_unique<NativeQmdComputeEnvironment>(
+        *launch,ReadGuest,&cbuf_guest,
+        std::make_unique<SyntheticSource>(Shader::Stage::Compute));
+    Require(native_qmd_context->ReadCbufValue(0,0)==0x12345678 &&
+            (native_qmd_context->WorkgroupSize()==std::array<u32,3>{2,4,8}),
+            "real QMD context must provide 49-bit mapped CBUF and workgroups");
+    auto qmd_image=BuildMaxwellShaderImage(
+        header,code,static_cast<u32>(Shader::Stage::Compute));
+    auto qmd_compiler_env=NativeMaxwellEnvironment::CreateComputeOwned(
+        std::move(native_qmd_context),std::move(qmd_image));
+    Require(bool(qmd_compiler_env) && qmd_compiler_env->StartAddress()==0x50,
+            "native QMD environment did not enter compiler CFG");
+    const auto real_qmd_spirv=CompileReviewedNativeComputeSpirv(
+        *qmd_compiler_env,host,profile,Shader::RuntimeInfo{});
+    Require(real_qmd_spirv.ComputeMetadataReady() &&
+            real_qmd_spirv.words.size()>5 &&
+            real_qmd_spirv.words[0]==0x07230203U,
+            "native QMD3 metadata failed real Ampere IR/SPIR-V emission");
+    // Distinct workgroups, CB metadata and program ownership must be carried
+    // through this real compiler; no guest execution is asserted here.
     std::vector<u32> baseline_direct;
     for (bool dispatcher:{false,true}) {
         const auto compiled=CompileReviewedNativeVertexSpirv(
