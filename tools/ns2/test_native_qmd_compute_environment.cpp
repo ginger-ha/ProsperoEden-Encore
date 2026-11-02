@@ -465,6 +465,7 @@ int main() {
         using Shader::Ampere::NativeQmdImageHandle;
         using Shader::Ampere::NativeQmdImageKind;
         using Shader::Ampere::NativeQmdResourcePlan;
+        using Shader::Ampere::NativeQmdImageLayoutMatches;
         using Shader::Ampere::NativeQmdTextureTables;
         constexpr u64 texture_va = (u64{1} << 40) + 0x4000;
         constexpr u64 physical_va = (u64{1} << 41) + 0x8000;
@@ -524,6 +525,49 @@ int main() {
         sampled.kind = NativeQmdImageKind::SampledTexture;
         sampled.primary_word = 0;
         textured.image_handles.push_back(sampled);
+        // Match flattened SPIR-V layout before touching guest TIC/TSC:
+        // texture buffers, image buffers, samples, writable storage images.
+        Shader::Info layout{};
+        layout.texture_descriptors.push_back(Shader::TextureDescriptor{.count = 1});
+        assert(NativeQmdImageLayoutMatches(layout, textured));
+        layout.texture_descriptors[0].count = 2;
+        assert(!NativeQmdImageLayoutMatches(layout, textured));
+        layout.texture_descriptors[0].count = 1;
+        textured.image_handles[0].kind = NativeQmdImageKind::StorageImage;
+        assert(!NativeQmdImageLayoutMatches(layout, textured));
+        textured.image_handles[0].kind = NativeQmdImageKind::SampledTexture;
+        textured.image_handles[0].is_written = true;
+        assert(!NativeQmdImageLayoutMatches(layout, textured));
+        textured.image_handles[0].is_written = false;
+        Shader::Info mixed_info{};
+        mixed_info.texture_buffer_descriptors.push_back(
+            Shader::TextureBufferDescriptor{.count = 1});
+        mixed_info.image_buffer_descriptors.push_back(
+            Shader::ImageBufferDescriptor{.is_written = true, .count = 1});
+        mixed_info.texture_descriptors.push_back(
+            Shader::TextureDescriptor{.count = 1});
+        mixed_info.image_descriptors.push_back(
+            Shader::ImageDescriptor{.is_written = true, .count = 1});
+        NativeQmdResourcePlan mixed_plan{};
+        mixed_plan.requires_tic_tsc = true;
+        mixed_plan.image_handles = {
+            NativeQmdImageHandle{.kind = NativeQmdImageKind::TextureBuffer},
+            NativeQmdImageHandle{.kind = NativeQmdImageKind::ImageBuffer,
+                                 .is_written = true},
+            NativeQmdImageHandle{.kind = NativeQmdImageKind::SampledTexture},
+            NativeQmdImageHandle{.kind = NativeQmdImageKind::StorageImage,
+                                 .is_written = true},
+        };
+        assert(NativeQmdImageLayoutMatches(mixed_info, mixed_plan));
+        std::swap(mixed_plan.image_handles[0], mixed_plan.image_handles[2]);
+        assert(!NativeQmdImageLayoutMatches(mixed_info, mixed_plan));
+        std::swap(mixed_plan.image_handles[0], mixed_plan.image_handles[2]);
+        mixed_plan.image_handles[1].is_written = false;
+        assert(!NativeQmdImageLayoutMatches(mixed_info, mixed_plan));
+        mixed_plan.image_handles[1].is_written = true;
+        mixed_plan.image_handles.pop_back();
+        assert(!NativeQmdImageLayoutMatches(mixed_info, mixed_plan));
+        assert(NativeQmdImageLayoutMatches(layout, textured));
         const auto read_guest = [&](u64 addr, void* dst, std::size_t bytes) {
             if (!dst || bytes != 32) return false;
             if (addr == guest_tables.tic_base) {
@@ -592,6 +636,16 @@ int main() {
         tsc = valid_sampler;
         tsc.reduction_filter.Assign(static_cast<SamplerReduction>(3));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        tsc.wrap_u.Assign(WrapMode::MirrorOnceBorder);
+        assert(!NativeQmdSamplerSupported(tsc));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        tsc.wrap_v.Assign(WrapMode::MirrorOnceBorder);
+        assert(!NativeQmdSamplerSupported(tsc));
+        tsc = valid_sampler;
+        tsc.wrap_p.Assign(WrapMode::MirrorOnceBorder);
+        assert(!NativeQmdSamplerSupported(tsc));
         tsc = valid_sampler;
         assert(NativeQmdSamplerSupported(tsc));
         tic.msaa_mode.Assign(static_cast<MsaaMode>(7));

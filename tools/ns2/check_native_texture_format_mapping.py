@@ -131,3 +131,27 @@ for path in (
     assert "u64{info.layer_stride} * info.resources.layers > u32_limit" in start, path
     assert "if (!bytes) return false;" in start, path
 print("NS2_NATIVE_TIC_U32_LAYOUT_BOUNDS_PASS no_truncated_view_offset=1")
+
+# Both native rasterizer variants must check the reflection-to-TIC/TSC
+# ownership order BEFORE capturing or publishing guest image descriptors.
+native_env = (vendor / (
+    "encore-active/ns2-runtime/ampere/shader_recompiler/"
+    "frontend/ampere/native_qmd_compute_environment.h"
+)).read_text()
+assert "bool NativeQmdImageLayoutMatches(" in native_env
+assert "NativeQmdImageKind::TextureBuffer" in native_env
+assert "NativeQmdImageKind::ImageBuffer" in native_env
+assert "NativeQmdImageKind::SampledTexture" in native_env
+assert "NativeQmdImageKind::StorageImage" in native_env
+assert "wrap_ok(sampler.wrap_u.Value())" in native_env
+assert "wrap_ok(sampler.wrap_v.Value())" in native_env
+assert "wrap_ok(sampler.wrap_p.Value())" in native_env
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    owner = (vendor / path).read_text()
+    guard = "NativeQmdImageLayoutMatches(*compiled.info, *resources)"
+    assert owner.index(guard) < owner.index("tables.CaptureAdmissible("), path
+print("NS2_NATIVE_SPIRV_IMAGE_LAYOUT_OWNER_PASS order=4 rights=verified"
+      " unsound_wrap=refused native_image_dispatch=closed")
