@@ -341,28 +341,39 @@ void flat_retail_sleeve(Canvas& c, const Game& game, const Rect& shell,
     reconstructed_paper(c, paper);
     const Cover artwork = scan.empty() ? Cover{} : c.textures.cover(
         scan, std::max(paper.w, paper.h) * texture_scale);
-    if (!scan.empty() && !artwork.missing) {
-        // A real scan always wins once it decodes. While it is pending,
+    if (artwork.texture != 0) {
+        // A real scan wins only after it is actually decoded. While pending,
         // the paper underneath remains opaque, with no fake dark panel.
         // Both printed faces are shown in full: never crop titles or logos.
-        if (artwork.texture != 0) {
-            const float source = std::max(0.01f, artwork.aspect);
-            const float target = paper.w / paper.h;
+        const float source = std::max(0.01f, artwork.aspect);
+        const float target = paper.w / paper.h;
+        if (!rear) {
+            // Original NS1 and NS2 fronts are printed edge-to-edge. UV crop
+            // preserves their proportions while removing the large blank
+            // side gutters previously produced by aspect-fit presentation.
+            Rect uv{0.0f, 0.0f, 1.0f, 1.0f};
+            if (source > target) {
+                uv.w = target / source;
+                uv.x = (1.0f - uv.w) * 0.5f;
+            } else if (source < target) {
+                uv.h = source / target;
+                uv.y = (1.0f - uv.h) * 0.5f;
+            }
+            c.list.image(artwork.texture, paper, uv,
+                         Color::rgb(0xffffff, tween::cubic_out(artwork.age / 0.22f)));
+        } else {
+            // Preserve every word and logo on a genuine printed back.
             Rect fitted = paper;
             if (source > target) {
                 fitted.h = paper.w / source;
                 fitted.y += (paper.h - fitted.h) * 0.5f;
             } else if (source < target) {
                 fitted.w = paper.h * source;
-                fitted.x += rear ? paper.w - fitted.w : (paper.w - fitted.w) * 0.5f;
+                fitted.x += paper.w - fitted.w;
             }
-            // Full UVs plus aspect-fit dimensions preserve the entire print.
             c.list.image(artwork.texture, fitted, {0.0f, 0.0f, 1.0f, 1.0f},
-                         Color::rgb(0xffffff,
-                                    tween::cubic_out(artwork.age / 0.22f)));
+                         Color::rgb(0xffffff, tween::cubic_out(artwork.age / 0.22f)));
         }
-        // A pending scan is not assumed missing; it can replace the paper
-        // without any change of dimensions when its async decode finishes.
     } else {
         // Empty OR confirmed-unreadable retail media: preserve the shared
         // 440x704 composition rather than leaving a permanently blank sleeve.
