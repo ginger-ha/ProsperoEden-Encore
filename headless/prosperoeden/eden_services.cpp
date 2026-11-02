@@ -862,8 +862,13 @@ bool FetchCaseFace(const std::vector<std::string>& candidates,
             continue;
         }
         ++attempts;
-        const auto response = Common::Net::MakeRequest(
-            "https://images.launchbox-app.com", "/" + filename);
+        // Current LaunchBox metadata has both legacy UUID files and newer
+        // r2_ files hosted on the GamesDB image CDN. Trying the legacy host
+        // for an r2_ image made genuine NS2 boxes silently disappear.
+        const bool r2 = filename.rfind("r2_", 0) == 0;
+        const char* image_host = r2 ? "https://gamesdb-images.launchbox.gg" :
+                                     "https://images.launchbox-app.com";
+        const auto response = Common::Net::MakeRequest(image_host, "/" + filename);
         if (!response) {
             ++transport_failures;
             std::fprintf(stderr, "EDEN_CASE_CDN status=network-failed file=%s attempt=%zu side=%s\n",
@@ -991,7 +996,11 @@ unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
         std::fprintf(stderr, "EDEN_CASE_LOOKUP title=%016llX status=no-match name=%s alternate=%s index_entries=%zu\n",
                      static_cast<unsigned long long>(title_id), name.c_str(),
                      alternate_name.c_str(), index.size());
-        return FetchKnownNs2Front(title_id, cancel) ? 1u : 0u;
+        // A retailer product photo is NOT a flat box scan: its white
+        // surrounding canvas was rendered as the physical jacket front.
+        // Keep the true extracted icon/hero for procedural fallback rather
+        // than writing a counterfeit "box-front" from a shop photo.
+        return 0u;
     }
     std::fprintf(stderr,
                  "EDEN_CASE_LOOKUP title=%016llX status=match front=%zu back=%zu spine=%zu scenes=%zu/%zu/%zu\n",
@@ -1023,9 +1032,8 @@ unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
     }
     bool all_ready = true;
     unsigned changed_faces = 0;
-    const bool both_faces_cached_at_start =
-        ValidNlibTga(CaseFacePath(title_id, "front")) &&
-        ValidNlibTga(CaseFacePath(title_id, "back"));
+    // NS2 games may have a real front and spine but NO uploaded back.
+    // Their spine must not depend on the existence of a back scan.
     for (int side = 0; side < 6; ++side) {
         if (cancel && cancel->load(std::memory_order_acquire)) {
             // Aborted title switch must not lock the next attempt out for
@@ -1037,12 +1045,6 @@ unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
         // can be followed by its spine in the SAME background enrichment;
         // otherwise the 5-minute retry could leave a complete paper wrap
         // without its printed spine until the next launcher session.
-        if (side == 2 && !both_faces_cached_at_start &&
-            (!ValidNlibTga(CaseFacePath(title_id, "front")) ||
-             !ValidNlibTga(CaseFacePath(title_id, "back")))) {
-            all_ready = false;
-            continue; // still fetch real scenic media for the missing back
-        }
         if (side >= 3 && ValidNlibTga(CaseFacePath(title_id, "back")))
             continue; // authentic back never needs a constructed collage
         const auto candidates = LocaleCaseCandidates(selected->second[side], language_choice, side);
@@ -2144,6 +2146,18 @@ pe::ui::BoxArt EdenServices::box_art(std::uint64_t title_id) {
             int width = 0, height = 0, channels = 0;
             bool valid = false;
             if (std::strcmp(ext, "tga") == 0) {
+                // Old NS2 emergency covers were product photos, not flat
+                // retail scans. Do not render their white studio canvas
+                // as a genuine paper face; the worker can replace the cache
+                // with region-ranked GamesDB artwork when it becomes ready.
+                if (std::strcmp(side, "front") == 0) {
+                    std::ifstream provenance(path + ".source");
+                    std::string origin;
+                    if (provenance) std::getline(provenance, origin);
+                    if (origin.rfind("https://www.powerplanetonline.com", 0) == 0 ||
+                        origin.rfind("https://www.euronics.ee", 0) == 0)
+                        continue;
+                }
                 // Generated scans use uncompressed BGRA TGA. Check the whole
                 // payload, then use the SAME header convention as load_tga().
                 // Format sniffing through stbi_info can reject a usable TGA.
