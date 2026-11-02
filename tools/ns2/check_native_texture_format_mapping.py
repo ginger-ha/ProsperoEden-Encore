@@ -61,3 +61,34 @@ for filename in (
 
 print("NS2_NATIVE_TIC_PIXEL_FORMAT_MAP_PASS shared=95 rejected=10 explicit_depth=7"
       " ns1_vulkan_unchanged=1 no_native_image_binding_claim=1")
+
+# P2.2 common owner boundary: Compute buffers and TIC image preflight must
+# share the SAME full-span 49-bit GMMU guard. No false Vulkan publication.
+native_header = (vendor / (
+    "encore-active/ns2-runtime/ampere/shader_recompiler/"
+    "frontend/ampere/native_qmd_compute_environment.h"
+)).read_text()
+compute = (vendor / "encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
+assert "bool NativeQmdContiguousGpuSpan(" in native_header
+assert "CaptureAdmissible(const NativeQmdResourcePlan&" in native_header
+assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in compute
+assert "for (u64 delta = 4096" not in compute, "duplicated GMMU guard reappeared"
+for filename in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    source = (vendor / filename).read_text()
+    assert "tables.CaptureAdmissible(" in source, filename
+    assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in source, filename
+    assert "const VideoCommon::ImageInfo info{tic};" in source, filename
+    assert source.index("PixelFormat::Invalid)") < source.index(
+        "const VideoCommon::ImageInfo info{tic};"), filename
+    assert "return false; // no unbacked image/sampler descriptor publication" in source
+
+# Legacy NS1 still uses its own 40-bit verification. It is not silently
+# widened without a corresponding Maxwell regression suite.
+legacy = (vendor / "sources/eden/src/video_core/texture_cache/util.cpp").read_text()
+assert "if (address >= (1ULL << 40))" in legacy
+
+print("NS2_NATIVE_TEXTURE_GMMU_SHARED_PASS mapping=49bit whole_span=1"
+      " no_native_vulkan_publication=1 ns1_legacy_guard=unchanged")
