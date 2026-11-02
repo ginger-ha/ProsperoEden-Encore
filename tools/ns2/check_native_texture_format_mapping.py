@@ -70,6 +70,7 @@ native_header = (vendor / (
 )).read_text()
 compute = (vendor / "encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
 assert "bool NativeQmdContiguousGpuSpan(" in native_header
+assert "sampler.min_lod_clamp.Value() > sampler.max_lod_clamp.Value()" in native_header, "native TSC LOD order guard missing"
 assert "bool SameBufferBindings(const NativeQmdResourcePlan& other)" in native_header
 assert "image_handles.size() != other.image_handles.size()" in native_header
 assert "a.primary_shift != b.primary_shift" in native_header

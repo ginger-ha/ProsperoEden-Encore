@@ -726,6 +726,19 @@ int main() {
         tsc.min_filter.Assign(TextureFilter::Linear);
         tsc.mipmap_filter.Assign(TextureMipmapFilter::None);
         assert(NativeQmdSamplerSupported(tsc));
+        // The shared Vulkan Sampler uses guest LOD clamps for mipmapped
+        // textures. Reject inverted guest LODs rather than emitting an
+        // invalid VkSamplerCreateInfo; filter=None has fixed Vulkan LODs.
+        TSCEntry inverted_lod = tsc;
+        inverted_lod.mipmap_filter.Assign(TextureMipmapFilter::Linear);
+        inverted_lod.min_lod_clamp.Assign(0x100);
+        inverted_lod.max_lod_clamp.Assign(0x80);
+        assert(!NativeQmdSamplerSupported(inverted_lod));
+        inverted_lod.max_lod_clamp.Assign(0x100);
+        assert(NativeQmdSamplerSupported(inverted_lod));
+        inverted_lod.max_lod_clamp.Assign(0x80);
+        inverted_lod.mipmap_filter.Assign(TextureMipmapFilter::None);
+        assert(NativeQmdSamplerSupported(inverted_lod));
         const TSCEntry valid_sampler = tsc;
         const auto mapper = [&](u64 addr) -> std::optional<u64> {
             if (addr < texture_va || addr - texture_va >= 8192)
@@ -949,6 +962,14 @@ int main() {
                (*typed)[0].sampler.has_value() &&
                (*typed)[0].kind == NativeQmdImageKind::SampledTexture &&
                !(*typed)[0].is_written);
+        // Replay must also refuse a forged captured TSC with inverted LODs.
+        auto invalid_lod_snapshot = *image;
+        TSCEntry bad_lod = tsc;
+        bad_lod.mipmap_filter.Assign(TextureMipmapFilter::Nearest);
+        bad_lod.min_lod_clamp.Assign(0x200);
+        bad_lod.max_lod_clamp.Assign(0x100);
+        std::memcpy(invalid_lod_snapshot[0].tsc_words.data(), &bad_lod, sizeof(bad_lod));
+        assert(!guest_tables.DecodeAdmitted(textured, invalid_lod_snapshot));
         // P2.2: native shader reflection must use the dimensions of the
         // SAME typed TIC before acquiring any shared Vulkan cache slot.
         layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
