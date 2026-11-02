@@ -84,6 +84,15 @@ for owner_path in (
     code = (vendor / owner_path).read_text()
     assert "const auto before_binding = resource_owner->BuildResourcePlan(*compiled.info);" in code
     assert "bool current_after_staging = false;" in code
+    assert "auto native_compute_retirement = SCOPE_GUARD {" in code
+    assert "native_recording_started = true;" in code
+    assert "native_compute_retirement.Cancel();" in code
+    assert code.index("native_recording_started = true;") < code.index(
+        "if (!pipeline->ConfigureNative(")
+    assert code.index("native_compute_retirement.Cancel();") < code.rindex(
+        "RetainNativeComputeUntilGpuTick(")
+    # Return-false or exceptions after staging use the same timeline owner.
+    assert "Scope retirement also handles this rejection" in code
     assert code.count("resources->SameBufferBindings(") == 2, owner_path
     assert code.index("bool current_after_staging = false;") < code.index(
         "RetainNativeComputeUntilGpuTick(", code.index("bool current_after_staging = false;"))
