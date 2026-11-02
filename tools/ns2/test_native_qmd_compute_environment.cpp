@@ -190,7 +190,9 @@ int main() {
         {
             using Shader::Ampere::NativeQmdTextureTables;
             const u64 tic_base = 0x1000000200000ULL;
-            const u64 tsc_base = 0x1000000400000ULL;
+            // Keep the fixture sampler pool beyond the largest tested TIC span.
+            // The old 4 MiB spacing aliased TIC[0x10000] to TSC[0].
+            const u64 tsc_base = 0x1000002000000ULL;
             NativeQmdTextureTables tables{
                 .tic_base = tic_base, .tsc_base = tsc_base,
                 .tic_limit = 0x45000U, .tsc_limit = 0x123U};
