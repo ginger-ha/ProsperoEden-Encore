@@ -197,6 +197,17 @@ def main() -> int:
             'backend=missing' in puller and
             'return false;\n            });' in puller,
             "Native QMD3 must capture real mapped Ampere shader under GPU epoch without forging Vulkan execution")
+        require(
+            "constexpr bool NativeComputePlainRegister(" in qmd_header and
+            "Tegra::NativeComputePlainRegister(reg)" in puller and
+            "Tegra::NativeComputePlainRegister(method)" in puller and
+            "engine.regs.reg_array[reg] = value;" in puller and
+            "engine.regs.reg_array[method] = values.back();" in puller and
+            "case 0x6cU: case 0x6dU:" in qmd_header and
+            "case 0xaeU: case 0xafU: case 0xb0U:" in qmd_header and
+            "case 0x107U:" in qmd_header and
+            "case 0x6c3U:" in qmd_header,
+            "Ampere Compute plain-register fast path must retain QMD/upload/semaphore side effects")
         # The EglantinePS5 shader audit found dropped last-lane vertex
         # varyings and truncated NVN2 compute storage binding arrays. These
         # independently produce missing geometry/black or jumping textures.
