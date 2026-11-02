@@ -645,10 +645,10 @@ endif()
         "        if (!size || !AddressSpaceContains(*current_page_table, addr, size)) return nullptr;"
     )
     native_span_guard = (
-        "        // AudioOut can request its initial guest buffer before the process\\n"
-        "        // page table is installed. Never dereference a missing table: the\\n"
-        "        // GuestMemory fallback performs a checked ReadBlockUnsafe instead.\\n"
-        "        if (!size || current_page_table == nullptr ||\\n"
+        "        // AudioOut can request its initial guest buffer before the process\n"
+        "        // page table is installed. Never dereference a missing table: the\n"
+        "        // GuestMemory fallback performs a checked ReadBlockUnsafe instead.\n"
+        "        if (!size || current_page_table == nullptr ||\n"
         "            !AddressSpaceContains(*current_page_table, addr, size)) return nullptr;"
     )
     native_walk_old = "        if (!AddressSpaceContains(*current_page_table, addr, size)) {"
