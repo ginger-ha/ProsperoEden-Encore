@@ -837,11 +837,10 @@ void Launcher::draw_launch(Canvas &c)
 {
     const float t = tween::clamp01(launch_.progress());
     const float seconds = theme::kLaunchSeconds * t;
-    const float fade = tween::cubic_in_out(
-        (seconds - theme::kLaunchSeconds + 0.35f) / 0.35f);
+    // No fade to black: the Vulkan loading surface reuses this EXACT final
+    // launcher picture until the guest actually presents its first frame.
     const float appear = tween::cubic_out(seconds / 0.25f);
-    const float leave = 1.0f - tween::cubic_in_out(
-        (seconds - theme::kLaunchSeconds + 0.45f) / 0.45f);
+    const float leave = 1.0f; // Hold the jacket/hero, never a second empty loader.
 
     // Use exactly the full-bleed Hero asset already shown for this title on
     // Home (Nlib banner, then screenshot). No menu cards, duplicate text or
@@ -1174,8 +1173,6 @@ void Launcher::draw_launch(Canvas &c)
                       theme::kBlue.with_alpha(pulse));
     }
     c.list.pop_opacity();
-    if (fade > 0.0f)
-        c.list.rounded_rect(kScreen, 0.0f, Color{0.0f, 0.0f, 0.0f, fade});
 }
 
 void Launcher::draw(gfx::DrawList &list)
