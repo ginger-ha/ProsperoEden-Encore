@@ -51,9 +51,10 @@ renderer = (root / "vendor/encore-active/eden-vulkan/vulkan_renderer.cpp").read_
 oracle = (root / "vendor/encore-active/eden-vulkan-oracles/vulkan_loading.inc").read_text()
 renderer_header = (root / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/renderer_vulkan.h").read_text()
 generator = (root / "tools/prepare-vulkan-port.py").read_text()
-assert frontend.count("glReadPixels(") == 1
+assert frontend.count("glReadPixels(") == 2  # dev BMP capture + one production handoff
+assert "glReadPixels(0, 0, width, height, GL_RGBA,\n                                         GL_UNSIGNED_BYTE, snapshot.rgba.data());" in frontend
 assert frontend.count("LaunchHandoff::Publish(") == 1
-assert frontend.index("batch.draw(list, viewport,") < frontend.index("glReadPixels(") < frontend.index("display.swap()")
+assert frontend.index("batch.draw(list, viewport,") < frontend.index("snapshot.rgba.data());") < frontend.index("display.swap()")
 assert "handoff_captured = true;" in frontend
 assert "handoff_captured && launcher.done()" not in frontend  # capture is single-use
 assert "if (!handoff_captured && launcher.done() &&" in frontend
