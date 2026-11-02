@@ -39,7 +39,7 @@ assert "key==Key::r1?1:-1" in switch_keys
 # True scanned faces must take precedence over any composited fallback.
 render = method(library, "void flat_retail_sleeve(", "// ONE physical shell: narrow top/bottom")
 assert 'const std::string& scan = rear ? game.box_back : game.box_front;' in render
-assert render.index("if (!scan.empty() && !artwork.missing)") < render.index("flat_composed_ink(c, game, paper, rear)")
+assert render.index("if (artwork.texture != 0)") < render.index("flat_composed_ink(c, game, paper, rear)")
 front = method(library, "void flat_front_fallback(", "void flat_back_fallback(")
 back = method(library, "void flat_back_fallback(", "// Static sleeve used")
 for attr in ("game.hero","game.cover","game.screenshots","game.name","reconstructed_cover"):
@@ -104,7 +104,7 @@ for token in ("constexpr float kCaseShellAspect = 454.0f / 730.0f;",
     assert token in library, token
 assert "flat_composed_ink(c, game, paper, rear);" in render
 assert "selected ? 1.025f : 1.0f" not in library
-assert "if (!scan.empty() && !artwork.missing) {" in render
+assert "if (artwork.texture != 0) {" in render
 assert "if (artwork.texture != 0)" in render
 assert "reconstructed_paper(c, paper);" in render
 assert "if (rear)\\n                flat_back_fallback(c, game, paper);" not in render
