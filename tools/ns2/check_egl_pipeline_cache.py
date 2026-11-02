@@ -144,8 +144,13 @@ reconstructed = reconstructed.replace(runtime_info_include, '', 1)
 factory_begin = reconstructed.index(native_factory_start)
 factory_end = reconstructed.index('#endif\n', factory_begin) + len('#endif\n')
 native_factory = reconstructed[factory_begin:factory_end]
-assert n3m_hash(native_factory) == 'd659eec2b32bde1b', (
-    'U92 native Compute factory differs from authenticated owner')
+# P2.3 reviewed native Compute cache: U92's original unique-owner fragment
+# (d659eec2b32bde1b) was replaced by the bounded 12-entry, timeline-retained
+# shared-owner factory in vendor 32a0ac1. Exact FNV-1a covers the full new
+# fragment after U94's independently pinned compiler wrapper is removed.
+# The pre-existing full NS1 N56 Git-blob guard below remains unchanged.
+assert n3m_hash(native_factory) == '06856dfb8eed020b', (
+    'U92/P2.3 native Compute factory differs from authenticated owner')
 factory_boundary = native_factory + '\nComputePipeline* PipelineCache::CurrentComputePipeline() {'
 assert reconstructed.count(factory_boundary) == 1, (
     'U92 native Compute factory moved outside reviewed boundary')
