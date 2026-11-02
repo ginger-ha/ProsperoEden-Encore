@@ -168,6 +168,74 @@ int main() {
            !plan->requires_memory_layout && !plan->requires_tic_tsc &&
            memory.reads==4);
     assert(plan->HasResolvedBufferBindings());
+    // P2.2: reflected TIC/TSC handle words must be read from the native QMD
+    // CBUF, in the shared cache descriptor order. This is NOT an image binding.
+    {
+        auto textured = shader_info;
+        Shader::TextureDescriptor tex{};
+        tex.cbuf_index = 0;
+        tex.cbuf_offset = 0;
+        tex.count = 2;
+        tex.size_shift = 2;
+        textured.texture_descriptors.push_back(tex);
+        const auto tp = env.BuildResourcePlan(textured);
+        assert(tp && tp->requires_tic_tsc &&
+               tp->image_handles.size() == 2 &&
+               tp->image_handles[0].kind ==
+                   Shader::Ampere::NativeQmdImageKind::SampledTexture &&
+               tp->image_handles[0].primary_word == 0x12345000U &&
+               tp->image_handles[1].primary_word == 0x10000U &&
+               !tp->HasResolvedBufferBindings());
+        // A separate sampler/texture word must never be mistaken for a
+        // contiguous NS1 TIC/TSC table, even when both source banks match.
+        tex.has_secondary = true;
+        tex.count = 1;
+        tex.shift_left = 3;
+        tex.secondary_cbuf_index = 0;
+        tex.secondary_cbuf_offset = 8;
+        tex.secondary_shift_left = 4;
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        const auto paired = env.BuildResourcePlan(textured);
+        assert(paired && paired->image_handles.size() == 1 &&
+               paired->image_handles[0].has_secondary &&
+               paired->image_handles[0].primary_word == 0x12345000U &&
+               paired->image_handles[0].secondary_word == 0x40U &&
+               paired->image_handles[0].primary_shift == 3 &&
+               paired->image_handles[0].secondary_shift == 4);
+        tex.secondary_cbuf_offset = 16; // four-byte word past QMD CBUF
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        assert(!env.BuildResourcePlan(textured));
+        tex.secondary_cbuf_offset = 8;
+        tex.secondary_shift_left = 32; // undefined shift is invalid
+        textured.texture_descriptors.clear();
+        textured.texture_descriptors.push_back(tex);
+        assert(!env.BuildResourcePlan(textured));
+        textured.texture_descriptors.clear();
+        Shader::ImageDescriptor image{};
+        image.cbuf_index = 0;
+        image.cbuf_offset = 4;
+        image.count = 1;
+        image.is_written = true;
+        textured.image_descriptors.push_back(image);
+        const auto storage_image = env.BuildResourcePlan(textured);
+        assert(storage_image && storage_image->image_handles.size() == 1 &&
+               storage_image->image_handles[0].kind ==
+                   Shader::Ampere::NativeQmdImageKind::StorageImage &&
+               storage_image->image_handles[0].is_written &&
+               storage_image->image_handles[0].primary_word == 0x10000U);
+        image.count = 0;
+        textured.image_descriptors.clear();
+        textured.image_descriptors.push_back(image);
+        assert(!env.BuildResourcePlan(textured));
+        memory.mapped = false;
+        image.count = 1;
+        textured.image_descriptors.clear();
+        textured.image_descriptors.push_back(image);
+        assert(!env.BuildResourcePlan(textured)); // stale GMMU denied
+        memory.mapped = true;
+    }
     unsigned mapped_spans{};
     assert(plan->ValidateGpuMappings([&](u64 addr, std::size_t bytes) {
         ++mapped_spans;
