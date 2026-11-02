@@ -123,6 +123,9 @@ int main() {
     shader_info.storage_buffers_descriptors.push_back({0,0,1,true});
     const auto plan=env.BuildResourcePlan(shader_info);
     assert(plan && plan->uniform_buffers.size()==1 &&
+           plan->uniform_buffers[0].qmd_index==0 &&
+           plan->uniform_buffers[0].gpu_address==memory.address &&
+           plan->uniform_buffers[0].bytes==16 &&
            plan->storage_buffers.size()==1 &&
            plan->storage_buffers[0].gpu_address==0x1000012345000ULL &&
            plan->storage_buffers[0].bytes==0x40 &&
@@ -130,12 +133,27 @@ int main() {
            plan->storage_buffers[0].known_size &&
            !plan->requires_memory_layout && !plan->requires_tic_tsc &&
            memory.reads==4);
+    assert(plan->HasResolvedBufferBindings());
+    unsigned mapped_spans{};
+    assert(plan->ValidateGpuMappings([&](u64 addr, std::size_t bytes) {
+        ++mapped_spans;
+        return (addr==memory.address && bytes==16) ||
+               (addr==0x1000012345000ULL && bytes==0x40);
+    }));
+    assert(mapped_spans==2);
+    assert(!plan->ValidateGpuMappings([](u64, std::size_t) {
+        return false;
+    })); // A mapped QMD is not proof of mapped descriptor targets.
     // Never infer an SSBO size from a high packed tag: the upstream
     // BufferCache must resolve the real memory layout before submission.
     memory.words[3]=1;
     const auto unresolved=env.BuildResourcePlan(shader_info);
     assert(unresolved && unresolved->requires_memory_layout &&
            !unresolved->storage_buffers[0].known_size);
+    assert(!unresolved->HasResolvedBufferBindings() &&
+           !unresolved->ValidateGpuMappings([](u64, std::size_t) {
+               return true;
+           }));
     memory.words[3]=0;
     shader_info.constant_buffer_mask=1U<<9;
     assert(!env.BuildResourcePlan(shader_info));
