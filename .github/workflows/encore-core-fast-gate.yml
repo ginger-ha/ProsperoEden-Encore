@@ -64,6 +64,9 @@ on:
       - 'tools/fixtures/legacy-guest-write-deferred-bridge.cmake'
       - 'tools/prepare-vulkan-port.py'
       - 'tools/check-vendored-vulkan-fork.py'
+      # P0.1: source guards and NS2 code must invalidate Core at this SHA.
+      - 'tools/ns2/**'
+      - 'tools/check-ns2-*.py'
       - 'tools/check-ps5-radv-64bit-arithmetic-host.py'
       - 'tools/check-eden-backport-patch-integrity-host.py'
       - 'headless/backports/**'
@@ -262,6 +265,9 @@ on:
       - 'tools/check-native-sparse-jit-release-selector-host.py'
       - 'tools/prepare-vulkan-port.py'
       - 'tools/check-vendored-vulkan-fork.py'
+      # P0.1: source guards and NS2 code must invalidate Core at this SHA.
+      - 'tools/ns2/**'
+      - 'tools/check-ns2-*.py'
       - 'tools/check-eden-backport-patch-integrity-host.py'
       - 'headless/backports/**'
       - 'vendor/encore-active/eden-backports/manifest.json'
