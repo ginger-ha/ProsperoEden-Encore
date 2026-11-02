@@ -101,8 +101,31 @@ assert shared_ns2_gpu_access_owners <= set(physical_all), sorted(shared_ns2_gpu_
 assert not shared_ns2_gpu_access_owners.intersection(set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners)
 assert 'set(EDEN_SHARED_NS2_GPU_ACCESS_SVC ON)' in kernel_select
 print("ENCORE_SHARED_NS2_GPU_ACCESS_SOURCE_PASS", f"owners={len(shared_ns2_gpu_access_owners)}")
+# Added after the frozen 337-owner source graph: the NS2 native Vulkan
+# rasterizer ABI declaration. It is part of the PS5-only experimental bridge,
+# not evidence of a historical F07 optimization or a Switch 1 code change.
+post_f07_native_vulkan_owners = {
+    "eden-vulkan/include/video_core/renderer_vulkan/vk_rasterizer.h",
+}
+assert post_f07_native_vulkan_owners <= set(physical_all), (
+    "Missing experimental Vulkan ABI owner",
+    sorted(post_f07_native_vulkan_owners - set(physical_all)),
+)
+assert not post_f07_native_vulkan_owners.intersection(
+    set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
+    shared_ns2_gpu_access_owners
+)
+native_rasterizer_header = (active / next(iter(post_f07_native_vulkan_owners))).read_text()
+assert native_rasterizer_header.count("DispatchNativeCompute(") == 1
+assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in native_rasterizer_header
+assert "[[nodiscard]] bool DispatchNativeCompute(const Tegra::NativeComputeLaunch& launch) override;" in native_rasterizer_header
+assert 'file(COPY "${EDEN_ACTIVE_VULKAN}/" DESTINATION "${PORT_BUILD_DIR}")' in (
+    root / "headless/vulkan.cmake"
+).read_text()
+print("ENCORE_POST_F07_NATIVE_VULKAN_ABI_PASS", f"owners={len(post_f07_native_vulkan_owners)}")
 physical = [p for p in physical_all
-            if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners | shared_ns2_gpu_access_owners]
+            if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
+            shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {
