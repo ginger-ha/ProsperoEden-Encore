@@ -61,6 +61,8 @@ struct Game {
     std::vector<std::string> screenshots;
     std::string intro, description, publisher, developer, release_date, categories;
     int max_players = 0;
+    Game() = default;
+    Game(std::string file_, bool docked_) : file(std::move(file_)), docked(docked_) {}
 };
 enum class Cue { error };
 namespace sys {
