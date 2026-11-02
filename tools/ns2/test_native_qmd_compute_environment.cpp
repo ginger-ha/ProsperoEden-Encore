@@ -723,9 +723,11 @@ int main() {
         assert(NativeQmdSamplerSupported(tsc));
         tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.msaa_mode.Assign(static_cast<MsaaMode>(10));
-        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.msaa_mode.Assign(static_cast<MsaaMode>(11));
+        tic.msaa_mode.Assign(MsaaMode::Msaa4x2_VC8);
+        assert(guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(MsaaMode::Msaa4x2_VC24);
+        assert(guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(static_cast<MsaaMode>(12));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tic.msaa_mode.Assign(MsaaMode::Msaa2x2_VC4);
         assert(guest_tables.CaptureAdmissible(textured, read_guest, admit));

@@ -231,3 +231,13 @@ for path in (
     assert "fence_manager.SignalFence([pipeline = std::move(pipeline)] {})" not in code
 print("NS2_NATIVE_COMPUTE_GPU_TICK_RETENTION_PASS no_immediate_release=1"
       " cancelled_submit=retained successful_submit=retained")
+
+# All TIC MSAA sample-counts accepted by native admission must be
+# understood by the existing shared Maxwell texture/Vulkan helpers.
+maxwell_msaa = (vendor / "sources/eden/src/video_core/renderer_vulkan/maxwell_to_vk.cpp").read_text()
+cache_samples = (vendor / "sources/eden/src/video_core/texture_cache/samples_helper.h").read_text()
+for name in ("Msaa4x2_VC8", "Msaa4x2_VC24"):
+    assert ("case MsaaMode::" + name + ":") in native_env
+    assert ("MsaaMode::" + name + ":") in maxwell_msaa
+    assert ("MsaaMode::" + name + ":") in cache_samples
+print("NS2_MSAA_VC8_VC24_SHARED_MAPPING_PASS sample_count=8")
