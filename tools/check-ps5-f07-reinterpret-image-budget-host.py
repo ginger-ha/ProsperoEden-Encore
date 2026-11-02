@@ -370,15 +370,21 @@ assert "F07 avoid native MSAA GPU completion probe without matching image key" i
 assert "F07 skip MSAA GPU probe when every scratch image is checked out" in generator
 assert "sampled_completed_tick" in gc_acquire
 assert gc_acquire.index("if (scratch.key != key)") < gc_acquire.index("KnownGpuTick()")
-assert "if (msaa_scratch_images.empty() && pending_resolve_shadows.empty())" in gc_tick
+assert "if (msaa_scratch_images.empty() && pending_resolve_shadows.empty() &&" in gc_tick
+assert "pending_retired_views.empty() && pending_retired_images.empty()" in gc_tick
+assert "pending_resolve_shadows.empty() && pending_retired_views.empty() &&" in gc_tick
+assert "std::erase_if(pending_retired_views, ready);" in gc_tick
+assert "std::erase_if(pending_retired_images, ready);" in gc_tick
+assert gc_tick.index("std::erase_if(pending_retired_views, ready);") < gc_tick.index(
+    "std::erase_if(pending_retired_images, ready);")
 assert "std::all_of(msaa_scratch_images.begin()" in gc_tick
 assert "return scratch.tick == (std::numeric_limits<u64>::max)();" in gc_tick
-assert gc_tick.index("if (msaa_scratch_images.empty() && pending_resolve_shadows.empty())") < gc_tick.index("KnownGpuTick()")
+assert gc_tick.index("if (msaa_scratch_images.empty() && pending_resolve_shadows.empty() &&") < gc_tick.index("KnownGpuTick()")
 assert gc_acquire.count("KnownGpuTick()")==1
 assert gc_tick.count("KnownGpuTick()")==1
 assert "scratch.tick > completed_tick" in gc_acquire
 assert "tick <= completed_tick" in gc_tick
-assert gc_tick.count("is_free(")==2
+assert gc_tick.count("is_free(")==3
 gc_cpp=r"""
 #include <algorithm>
 #include <cassert>
@@ -407,6 +413,10 @@ struct MsaaScratchImage {
     u64 tick{};
     u32 unused_frames{};
 };
+struct PendingGpuResource {
+    u64 tick{};
+    u64 frame{};
+};
 struct Semaphore {
     u64 completed{};
     mutable u32 polls{};
@@ -430,6 +440,9 @@ struct TextureCacheRuntime {
     Allocator memory_allocator{};
     std::vector<MsaaScratchImage> msaa_scratch_images{};
     std::vector<std::pair<u64,int>> pending_resolve_shadows{};
+    std::vector<PendingGpuResource> pending_retired_views{};
+    std::vector<PendingGpuResource> pending_retired_images{};
+    u64 gpu_retire_frame{};
     VkImage AcquireMsaaScratchImage(const VkImageCreateInfo&);
     void TickFrame();
 };
@@ -549,6 +562,24 @@ int main() {
     assert(resolve_only.pending_resolve_shadows.empty());
 #ifdef PS5_NATIVE
     assert(resolve_only.scheduler.semaphore.polls==1);
+    // Resource retirement shares the same GPU completion snapshot: a
+    // view/image-only frame MUST NOT take the old empty-GC fast path.
+    TextureCacheRuntime retirement;
+    retirement.pending_retired_views.push_back({7, 0});
+    retirement.pending_retired_images.push_back({8, 0});
+    retirement.scheduler.semaphore.completed = 7;
+    for (u32 i=0; i<7; ++i) retirement.TickFrame();
+    assert(retirement.pending_retired_views.size()==1);
+    assert(retirement.pending_retired_images.size()==1);
+    retirement.TickFrame();
+    assert(retirement.pending_retired_views.empty());
+    assert(retirement.pending_retired_images.size()==1); // tick 8 not done
+    retirement.scheduler.semaphore.completed = 8;
+    retirement.TickFrame();
+    assert(retirement.pending_retired_images.empty());
+    assert(retirement.scheduler.semaphore.polls==9);
+#else
+    assert(resolve_only.scheduler.is_free_calls==1);
 #endif
     std::puts("F07_MSAA_COMPLETION_SNAPSHOT_PASS");
 }
