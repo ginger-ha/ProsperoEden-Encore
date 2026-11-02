@@ -29,11 +29,29 @@ def once(text: str, old: str, new: str) -> str:
     assert text.count(old) == 1, ("N57 vendor source drift", old[:90])
     return text.replace(old, new)
 
+
+# P2.2 exact additions are removed only for the frozen N57/N73 SHA witness.
+# Every byte of these additions is matched before stripping, and runtime
+# ownership semantics are separately verified by the P2.2 host guard.
+def strip_p22_runtime_header(text: str) -> str:
+    text = once(text, "#include <span>\n#ifdef PS5_NATIVE\n#include <memory>\n#include <vector>\n#endif\n", "#include <span>\n")
+    text = once(text, "    void Finish();\n#ifdef PS5_NATIVE\n    ~TextureCacheRuntime();\n    // Retire shared Vulkan cache ownership only after actual GPU completion.\n    // Image views must retire before their backing images.\n    void RetireGpuImage(Image&& image);\n    void RetireGpuImageView(ImageView&& view);\n#endif\n", "    void Finish();\n")
+    text = once(text, "    std::vector<std::pair<u64, ResolveShadow>> pending_resolve_shadows;\n#ifdef PS5_NATIVE\n    std::vector<std::pair<u64, std::unique_ptr<ImageView>>> pending_retired_views;\n    std::vector<std::pair<u64, std::unique_ptr<Image>>> pending_retired_images;\n#endif\n", "    std::vector<std::pair<u64, ResolveShadow>> pending_resolve_shadows;\n")
+    return text
+
+def strip_p22_runtime_cpp(text: str) -> str:
+    text = once(text, "\n#ifdef PS5_NATIVE\nTextureCacheRuntime::~TextureCacheRuntime() {\n    // Never destroy Vulkan image/view owners with outstanding GPU commands.\n    // Teardown is the only blocking case; frame reclamation remains async.\n    if (!pending_retired_views.empty() || !pending_retired_images.empty()) {\n        scheduler.Finish();\n        pending_retired_views.clear();\n        pending_retired_images.clear();\n    }\n}\n\nvoid TextureCacheRuntime::RetireGpuImage(Image&& image) {\n    const u64 tick = scheduler.CurrentTick();\n    try {\n        pending_retired_images.emplace_back(tick, std::make_unique<Image>(std::move(image)));\n    } catch (...) {\n        // If queue allocation fails, wait before any moved owner can die.\n        scheduler.Finish();\n        throw;\n    }\n}\n\nvoid TextureCacheRuntime::RetireGpuImageView(ImageView&& view) {\n    const u64 tick = scheduler.CurrentTick();\n    try {\n        pending_retired_views.emplace_back(tick, std::make_unique<ImageView>(std::move(view)));\n    } catch (...) {\n        scheduler.Finish();\n        throw;\n    }\n}\n#endif\n\n", "\n")
+    text = once(text, "if (msaa_scratch_images.empty() && pending_resolve_shadows.empty() &&\n        pending_retired_views.empty() && pending_retired_images.empty()) {", "if (msaa_scratch_images.empty() && pending_resolve_shadows.empty()) {")
+    text = once(text, "if (pending_resolve_shadows.empty() && pending_retired_views.empty() &&\n        pending_retired_images.empty() &&\n        std::all_of(msaa_scratch_images.begin(), msaa_scratch_images.end(),", "if (pending_resolve_shadows.empty() &&\n        std::all_of(msaa_scratch_images.begin(), msaa_scratch_images.end(),")
+    text = once(text, "\n#ifdef PS5_NATIVE\n    // Erase image views before images: both own real Vulkan resources.\n    // Frame age alone never proves completion of an outstanding GPU tick.\n    std::erase_if(pending_retired_views, [is_free](const auto& pending) {\n        return is_free(pending.first);\n    });\n    std::erase_if(pending_retired_images, [is_free](const auto& pending) {\n        return is_free(pending.first);\n    });\n#endif", "")
+    return text
+
 def normalized(root: Path) -> dict[str, str]:
     for name, expected in AUXILIARY.items():
         path = root / ASTC / name
         if name == "vk_texture_cache.h":
             n73 = path.read_text()
+            n73 = strip_p22_runtime_header(n73)
             before = "    void Finish();\n"
             extension = (
                 "#ifdef EDEN_NS2_SPARSE_CACHE_PROBE\n"
@@ -60,6 +78,8 @@ def normalized(root: Path) -> dict[str, str]:
     result = {}
     for name, (current_sha, previous_sha) in BASELINE.items():
         text = (root / OWNER / name).read_text()
+        if name == "vk_texture_cache_cost.cpp":
+            text = strip_p22_runtime_cpp(text)
         if name == "vk_texture_cache_cost.cpp":
             # N73 is an additive native runtime probe. Strip its exact source
             # changes before applying N57's original hardcoded SHA oracle.
