@@ -2793,7 +2793,8 @@ if(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
     if(NOT EXISTS "${EDEN_NS2_RASTERIZER_INTERFACE}")
         message(FATAL_ERROR "Missing reviewed native QMD3 RasterizerInterface ABI")
     endif()
-    file(READ "${EDEN_NS2_RASTERIZER_INTERFACE}" eden_ns2_rasterizer_interface_text)
+    file(STRINGS "${EDEN_NS2_RASTERIZER_INTERFACE}" eden_ns2_rasterizer_interface_text
+        REGEX "virtual bool DispatchNativeCompute" LIMIT_COUNT 1)
     if(NOT eden_ns2_rasterizer_interface_text MATCHES
            "virtual bool DispatchNativeCompute\\(const Tegra::NativeComputeLaunch&\\)")
         message(FATAL_ERROR "Reviewed native QMD3 RasterizerInterface ABI changed")
