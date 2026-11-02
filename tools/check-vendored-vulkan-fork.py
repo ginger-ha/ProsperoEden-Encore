@@ -173,6 +173,20 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert expected["vulkan_rasterizer.cpp"].read_text().count(
         table_register_reviewed) == 1, "reviewed TIC/TSC register guard drift"
     raster = raster.replace(table_register_previous, table_register_reviewed)
+    # P2.2: native SPIR-V dimensions must match the same typed TIC
+    # snapshot in both renderer owners before any cache view acquisition.
+    typed_previous = ("            if (!typed_descriptors ||\\n"
+                      "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
+                      "                return false;").replace("\\n", "\n")
+    typed_reviewed = ("            if (!typed_descriptors ||\\n"
+                      "                !Shader::Ampere::NativeQmdTypedImageLayoutMatches(\\n"
+                      "                    *compiled.info, *typed_descriptors) ||\\n"
+                      "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
+                      "                return false;").replace("\\n", "\n")
+    assert raster.count(typed_previous) == 1, "generated native TIC type contract drift"
+    assert expected["vulkan_rasterizer.cpp"].read_text().count(typed_reviewed) == 1, (
+        "reviewed native TIC reflected type contract drift")
+    raster = raster.replace(typed_previous, typed_reviewed)
     raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.

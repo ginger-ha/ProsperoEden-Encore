@@ -181,6 +181,17 @@ assert "bool NativeQmdTicLayoutSupported(" in native_env
 assert native_env.count("NativeQmdTicLayoutSupported(") == 3
 assert "if (!NativeQmdTicLayoutSupported(tic)) return std::nullopt;" in native_env
 assert "if (!NativeQmdTicLayoutSupported(entry.tic)) return std::nullopt;" in native_env
+assert "bool NativeQmdTicMatchesShaderType(" in native_env
+assert "bool NativeQmdTypedImageLayoutMatches(" in native_env
+for owner in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    native_owner = (vendor / owner).read_text()
+    typed_guard = "Shader::Ampere::NativeQmdTypedImageLayoutMatches("
+    assert native_owner.count(typed_guard) == 1, owner
+    assert native_owner.index("const auto typed_descriptors = tables.DecodeAdmitted(") < native_owner.index(typed_guard)
+    assert native_owner.index(typed_guard) < native_owner.index("tables.MatchesSnapshot(")
 assert "bool NativeQmdImageLayoutMatches(" in native_env
 assert "NativeQmdImageKind::TextureBuffer" in native_env
 assert "NativeQmdImageKind::ImageBuffer" in native_env

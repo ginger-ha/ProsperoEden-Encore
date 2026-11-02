@@ -949,6 +949,29 @@ int main() {
                (*typed)[0].sampler.has_value() &&
                (*typed)[0].kind == NativeQmdImageKind::SampledTexture &&
                !(*typed)[0].is_written);
+        // P2.2: native shader reflection must use the dimensions of the
+        // SAME typed TIC before acquiring any shared Vulkan cache slot.
+        layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
+        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
+        layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
+        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        layout.texture_descriptors[0].type = Shader::TextureType::Color2D;
+        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        auto normalized_view = *typed;
+        normalized_view[0].tic.normalized_coords.Assign(1);
+        assert(NativeQmdTypedImageLayoutMatches(layout, normalized_view));
+        layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
+        auto invalid_typed = *typed;
+        invalid_typed[0].sampler.reset();
+        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        invalid_typed = *typed;
+        invalid_typed[0].kind = NativeQmdImageKind::StorageImage;
+        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        invalid_typed = *typed;
+        invalid_typed[0].tic.is_sparse.Assign(1);
+        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        assert(!NativeQmdTypedImageLayoutMatches(layout, {}));
+        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
         auto corrupted_record = *image;
         corrupted_record[0].is_written = true;
         assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
