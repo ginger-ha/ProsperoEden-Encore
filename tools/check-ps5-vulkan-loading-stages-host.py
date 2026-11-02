@@ -7,6 +7,9 @@ two quiet diagnostics per title and resets the stage on window creation.
 """
 from pathlib import Path
 import re
+import shutil
+import subprocess
+import tempfile
 
 source = (Path(__file__).resolve().parents[1] / "headless/graphics.cpp").read_text()
 assert source.count("unsigned vulkan_loading_diagnostic_stage{};") == 1
@@ -86,6 +89,21 @@ assert "  workflow_dispatch:" in research
 assert "  push:" not in research
 assert "    if: ${{ false }}" in research
 assert "    if: ${{ false }}" in release
+# Compile and execute the tiny mailbox owner in host mode: one transfer,
+# bounded dimensions, no stale snapshot and no copied pixels on subsequent
+# Vulkan warm-up ticks. Does not build the PS5 app or GPU runtime.
+compiler = shutil.which("clang++") or shutil.which("g++")
+assert compiler, "host C++20 compiler required for single-loader mailbox test"
+with tempfile.TemporaryDirectory(prefix="encore-single-loader-") as directory:
+    exe = Path(directory) / "test_launch_handoff"
+    subprocess.run(
+        [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
+         "-pthread", "-O2", "-I", str(root / "headless"),
+         str(root / "tools/loader/test_launch_handoff.cpp"), "-o", str(exe)],
+        check=True,
+    )
+    subprocess.run([str(exe)], check=True)
+print("ENCORE_LOADER_MAILBOX_HOST_PASS single_use=1 bounded=1")
 print("ENCORE_SINGLE_LOADER_HANDOFF_SOURCE_PASS build_ps5_blocked=1")
 
 print("ENCORE_VULKAN_LOADING_DIAGNOSTIC_PASS first_guest_frame_not_claimed=1 max_reports=2 reset_per_title=1")
