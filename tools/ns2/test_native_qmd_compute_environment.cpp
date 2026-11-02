@@ -976,6 +976,29 @@ int main() {
         corrupted_record = *image;
         corrupted_record[0].tic_words.fill(0);
         assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
+        // P2.2: a stale/forged raw TIC snapshot must not bypass the same
+        // basic layout restrictions as CaptureAdmissible. Fail closed before
+        // constructing any typed shared-cache view/sampler descriptor.
+        const auto rejects_tic = [&](const TICEntry& candidate) {
+            auto forged = *image;
+            std::memcpy(forged[0].tic_words.data(), &candidate, sizeof(candidate));
+            return !guest_tables.DecodeAdmitted(textured, forged);
+        };
+        auto forged_tic = tic;
+        forged_tic.header_version.Assign(static_cast<TICHeaderVersion>(7));
+        assert(rejects_tic(forged_tic));
+        forged_tic = tic;
+        forged_tic.is_sparse.Assign(1);
+        assert(rejects_tic(forged_tic));
+        forged_tic = tic;
+        forged_tic.res_min_mip_level.Assign(2);
+        assert(rejects_tic(forged_tic));
+        forged_tic = tic;
+        forged_tic.depth_minus_1.Assign(1); // 2D cannot be layered this way
+        assert(rejects_tic(forged_tic));
+        forged_tic = tic;
+        forged_tic.header_version.Assign(TICHeaderVersion::OneDBuffer);
+        assert(rejects_tic(forged_tic));
         assert(!guest_tables.DecodeAdmitted(textured, {}));
         assert(guest_tables.DecodeAdmitted(textured, *image));
         // The second TIC/TSC read is now a streaming, allocation-free
