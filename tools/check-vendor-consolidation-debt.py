@@ -1522,7 +1522,7 @@ vulkan_oracle_sources = {
     "vulkan_loading.inc": "e96a289531ca44282cd1f2e24fea0c2003c9a08b",
     "vulkan_hud_prepare.inc": "36c585ed6726206722450450be7f0c5bb3cafb2d",
     "vulkan_hud_draw.inc": "794563c243b53ecccc4191f2a7de1b7dad0d2b2a",
-    "vulkan_gc_downloads.inc": "77c5ce6e536bfb039e2cbd48795d5f5f0059ebc0",
+    "vulkan_gc_downloads.inc": "f59f02df433d65a89467aab8c4845f3c9e0b03ae",
     "vulkan_download_batch.inc": "f3e36e0432f7026a65620329f79cbbe20e1c898a",
 }
 for filename, expected_git_blob in vulkan_oracle_sources.items():
