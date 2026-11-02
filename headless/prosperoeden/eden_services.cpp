@@ -933,55 +933,9 @@ bool FetchCaseFace(const std::vector<std::string>& candidates,
     return false;
 }
 
-// A small, independently sourced NS2 fallback for titles Nlib/LaunchBox omit.
-// Fetch only allowlisted retail product URLs on the existing media worker.
-bool FetchKnownNs2Front(std::uint64_t id, const std::atomic<bool>* cancel) {
-    const auto* known = Eden::Ns2Catalog::Find(id);
-    if (!known || known->front_host.empty() || known->front_path.empty() ||
-        (cancel && cancel->load(std::memory_order_acquire))) return false;
-    const std::string target = CaseFacePath(id, "front");
-    if (ValidNlibTga(target)) return false;
-    static std::array<std::mutex, 16> locks;
-    std::scoped_lock per_title{locks[id % locks.size()]};
-    if (ValidNlibTga(target)) return false;
-    static std::mutex retry_guard;
-    static std::unordered_map<std::uint64_t, std::chrono::steady_clock::time_point> retry;
-    {
-        std::lock_guard guard{retry_guard};
-        const auto existing = retry.find(id);
-        if (existing != retry.end() && std::chrono::steady_clock::now() < existing->second)
-            return false;
-        retry[id] = std::chrono::steady_clock::now() + std::chrono::minutes(5);
-    }
-    const auto body = Common::Net::MakeRequest(std::string(known->front_host),
-                                                std::string(known->front_path));
-    if (!body || body->size() < 1024 || body->size() > (16u << 20) ||
-        (cancel && cancel->load(std::memory_order_acquire))) {
-        std::fprintf(stderr, "EDEN_NS2_COVER title=%016llX status=unavailable\n",
-                     static_cast<unsigned long long>(id));
-        return false;
-    }
-    if (static_cast<unsigned char>((*body)[0]) != 0xff ||
-        static_cast<unsigned char>((*body)[1]) != 0xd8) return false;
-    int w=0, h=0, channels=0;
-    if (!stbi_info_from_memory(reinterpret_cast<const unsigned char*>(body->data()),
-                               static_cast<int>(body->size()), &w, &h, &channels) ||
-        w < 128 || h < 200 || w > 4096 || h > 4096 ||
-        static_cast<std::uint64_t>(w) * h > 3840u * 2160u) return false;
-    (void)mkdir(Eden::CoversDir().c_str(), 0777);
-    const std::string staged = target + ".new";
-    if (!WriteJpegTga(*body, staged, true) ||
-        std::rename(staged.c_str(), target.c_str()) != 0) {
-        (void)std::remove(staged.c_str());
-        return false;
-    }
-    std::ofstream source(target + ".source", std::ios::trunc);
-    if (source) source << known->front_host << known->front_path << '\n';
-    std::fprintf(stderr, "EDEN_NS2_COVER title=%016llX status=stored bytes=%zu\n",
-                 static_cast<unsigned long long>(id), body->size());
-    return true;
-}
-
+// All physical box scans, NS1 and NS2, come exclusively from the verified
+// region-ranked LaunchBox index. No retail-product-photo fallback is allowed.
+// Missing scans use the same opaque procedural case renderer as NS1.
 unsigned EnsureRetailCase(std::uint64_t title_id, const std::string& name,
                       const std::string& alternate_name, int language_choice,
                       const std::atomic<bool>* cancel) {
