@@ -280,6 +280,9 @@ for symbol in ("RetireGpuImage(Image&& image)", "RetireGpuImageView(ImageView&& 
     block = vk_runtime.split("void TextureCacheRuntime::" + symbol, 1)[1].split(
         "\n}\n", 1)[0]
     assert "scheduler.Finish();" in block, "OOM path must drain submitted GPU work"
+    queue = "pending_retired_images" if "Image&&" in symbol else "pending_retired_views"
+    assert block.index(queue + ".reserve(") < block.index(queue + ".push_back("), (
+        "Vulkan owner must not move before throwing queue growth", queue)
 for site in ("void TextureCache<P>::InvalidateScale(", "void TextureCache<P>::DeleteImage("):
     block = impl.split(site, 1)[1].split("\ntemplate <class P>", 1)[0]
     assert "runtime.RetireGpuImageView(" in block, site
