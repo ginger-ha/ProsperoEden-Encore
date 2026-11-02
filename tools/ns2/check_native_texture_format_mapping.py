@@ -178,7 +178,7 @@ native_env = (vendor / (
 # Capture and typed replay must enforce the EXACT same TIC budget/MSAA
 # admission, not two diverging copies of the field-policy checks.
 assert "bool NativeQmdTicLayoutSupported(" in native_env
-assert native_env.count("NativeQmdTicLayoutSupported(") == 3
+assert native_env.count("NativeQmdTicLayoutSupported(") == 4  # helper + capture + replay + typed layout
 assert "if (!NativeQmdTicLayoutSupported(tic)) return std::nullopt;" in native_env
 assert "if (!NativeQmdTicLayoutSupported(entry.tic)) return std::nullopt;" in native_env
 assert "bool NativeQmdTicMatchesShaderType(" in native_env
