@@ -140,6 +140,16 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert dma.count(native_vk_guard) == 1, "DMA image VkBuffer guard drift"
     assert "if (!buffer)" in raster.split("void RasterizerVulkan::DrawIndirect() {", 1)[1].split(
         "void RasterizerVulkan::DispatchCompute() {", 1)[0], "draw indirect guard drift"
+
+    # P2.3: reconstruct the exact reviewed mutable-QMD CBUF/SSBO
+    # revalidation in the generated rasterizer. Preserve full-file parity:
+    # do not substitute the checked-in implementation as the oracle.
+    qmd_binding_previous = "        scheduler.RequestOutsideRenderPassOperationContext();\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        if (!registry.IsComputeCurrent(kepler_compute, *ticket)) {"
+    qmd_binding_reviewed = "        // The original QMD resource plan was read before shader compilation.\n        // CBUF descriptors are mutable even when both GPU address ranges\n        // remain mapped. Refuse stale/aliased captures before staging Vulkan.\n        const auto before_binding = resource_owner->BuildResourcePlan(*compiled.info);\n        if (!before_binding || !resources->SameBufferBindings(*before_binding) ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket))\n            return false;\n        scheduler.RequestOutsideRenderPassOperationContext();\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        // ConfigureNative may have recorded descriptor closures already.\n        // Validate CBUF bytes one final time after staging; an inconsistent\n        // dispatch must retain its Vulkan owner until those commands retire.\n        bool current_after_staging = false;\n        try {\n            const auto after_binding = resource_owner->BuildResourcePlan(*compiled.info);\n            current_after_staging = after_binding &&\n                resources->SameBufferBindings(*after_binding);\n        } catch (...) {\n            // A guest CBUF may become unmapped while re-reading it. A failed\n            // read is a refused dispatch, never early pipeline destruction.\n        }\n        if (!current_after_staging ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket)) {"
+    assert raster.count(qmd_binding_previous) == 1, "pinned QMD binding path moved"
+    assert expected["vulkan_rasterizer.cpp"].read_text().count(qmd_binding_reviewed) == 1, (
+        "reviewed native QMD mutation protection drifted")
+    raster = raster.replace(qmd_binding_previous, qmd_binding_reviewed)
     raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.
