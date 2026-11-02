@@ -373,6 +373,21 @@ jobs:
               -o "build-ns2-a64/native-qmd3-${cxx//+/}"
             "build-ns2-a64/native-qmd3-${cxx//+/}"
           done
+      - name: Validate QMD3 native Compute shader environment (Clang/GCC UBSan)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -O1 -Wall -Wextra -Werror -fsanitize=undefined \
+              -Ibuild-ns2-a64/fmt/include \
+              -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/encore-active/ns2-runtime/gpu_dispatch \
+              -Ivendor/sources/eden/src \
+              tools/ns2/test_native_qmd_compute_environment.cpp \
+              -o "build-ns2-a64/native-qmd3-environment-${cxx//+/}"
+            UBSAN_OPTIONS=halt_on_error=1 \
+              "build-ns2-a64/native-qmd3-environment-${cxx//+/}"
+          done
       - name: Compile/run native Ampere DMA channel ownership (Clang/GCC)
         shell: bash
         run: |
