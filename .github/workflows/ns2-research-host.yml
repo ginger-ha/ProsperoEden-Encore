@@ -692,6 +692,7 @@ jobs:
             "${cxx}" -std=c++20 -fsyntax-only -Wall -Wextra -Wno-unused-parameter \
               -Ibuild-ns2-a64/fmt/include \
               -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/encore-active/ns2-runtime/gpu_dispatch \
               -Ivendor/encore-active/ns2-runtime/hle \
               -Ivendor/encore-active/ns2-runtime/gpu_access_svc \
               -Ivendor/sources/eden/src \
