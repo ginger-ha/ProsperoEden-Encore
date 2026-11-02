@@ -123,9 +123,28 @@ assert 'file(COPY "${EDEN_ACTIVE_VULKAN}/" DESTINATION "${PORT_BUILD_DIR}")' in 
     root / "headless/vulkan.cmake"
 ).read_text()
 print("ENCORE_POST_F07_NATIVE_VULKAN_ABI_PASS", f"owners={len(post_f07_native_vulkan_owners)}")
+# Common Maxwell/Ampere Compute reflection is maintained after the frozen
+# 337-source audit. Do not silently classify it as NS2-only research.
+shared_compute_owners = {
+    "eden-vulkan/include/video_core/renderer_vulkan/vk_compute_storage_layout.h",
+}
+assert shared_compute_owners <= set(physical_all), (
+    "Missing maintained shared Compute owner", sorted(shared_compute_owners-set(physical_all)))
+assert not shared_compute_owners.intersection(
+    set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
+    shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners
+)
+shared_compute_header = (active / next(iter(shared_compute_owners))).read_text()
+assert "namespace Vulkan::ComputeStorageLayout {" in shared_compute_header
+assert "count > max_bindings - flattened" in shared_compute_header
+assert "std::numeric_limits<std::uint32_t>::max()" in shared_compute_header
+shared_compute_cpp = (active / "eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
+assert '#include "video_core/renderer_vulkan/vk_compute_storage_layout.h"' in shared_compute_cpp
+assert shared_compute_cpp.count("ComputeStorageLayout::ForEach(") == 3
+print("ENCORE_SHARED_COMPUTE_SOURCE_PASS", f"owners={len(shared_compute_owners)}")
 physical = [p for p in physical_all
             if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
-            shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners]
+            shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners | shared_compute_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {

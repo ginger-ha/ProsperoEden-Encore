@@ -106,7 +106,29 @@ assert 'file(COPY "${EDEN_ACTIVE_VULKAN}/" DESTINATION "${PORT_BUILD_DIR}")' in 
     ROOT / "headless/vulkan.cmake"
 ).read_text()
 print("NS2_POST_F07_VULKAN_ABI_ISOLATION_PASS", f"new_native_headers={len(post_f07_native_vulkan_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners
+# The shared Maxwell/Ampere Compute storage walker was added after F07.
+# Preserve the immutable 518-owner audit and independently prove its owner.
+post_f07_shared_compute_owners = {
+    "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_compute_storage_layout.h",
+}
+assert post_f07_shared_compute_owners <= all_owners, sorted(post_f07_shared_compute_owners-all_owners)
+assert not post_f07_shared_compute_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners |
+    post_f07_native_vulkan_owners
+)
+shared_compute_header = (ROOT / next(iter(post_f07_shared_compute_owners))).read_text()
+assert "namespace Vulkan::ComputeStorageLayout {" in shared_compute_header
+assert "count > max_bindings - flattened" in shared_compute_header
+assert "std::numeric_limits<std::uint32_t>::max()" in shared_compute_header
+shared_compute_cpp = (ROOT / "vendor/encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
+assert '#include "video_core/renderer_vulkan/vk_compute_storage_layout.h"' in shared_compute_cpp
+assert shared_compute_cpp.count("ComputeStorageLayout::ForEach(") == 3
+assert "python3 -B tools/check-shared-compute-storage-descriptors-host.py" in (
+    ROOT / ".github/workflows/encore-core-fast-gate.yml"
+).read_text()
+print("NS1_NS2_SHARED_COMPUTE_F07_ISOLATION_PASS", f"new_shared_headers={len(post_f07_shared_compute_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"

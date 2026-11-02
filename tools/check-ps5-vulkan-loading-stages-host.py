@@ -54,7 +54,11 @@ generator = (root / "tools/prepare-vulkan-port.py").read_text()
 assert frontend.count("glReadPixels(") == 2  # dev BMP capture + one production handoff
 assert "glReadPixels(0, 0, width, height, GL_RGBA,\n                                         GL_UNSIGNED_BYTE, snapshot.rgba.data());" in frontend
 assert frontend.count("LaunchHandoff::Publish(") == 1
-assert frontend.index("batch.draw(list, viewport,") < frontend.index("snapshot.rgba.data());") < frontend.index("display.swap()")
+handoff_read = frontend.index("snapshot.rgba.data());")
+# The first swap is the legitimate startup splash. Verify the swap AFTER
+# the completed launcher readback, not the first swap in this source file.
+assert frontend.index("display.swap()") < frontend.index("batch.draw(list, viewport,")
+assert frontend.index("batch.draw(list, viewport,") < handoff_read < frontend.index("display.swap()", handoff_read)
 assert "handoff_captured = true;" in frontend
 assert "handoff_captured && launcher.done()" not in frontend  # capture is single-use
 assert "if (!handoff_captured && launcher.done() &&" in frontend

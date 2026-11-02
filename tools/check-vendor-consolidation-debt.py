@@ -1519,7 +1519,7 @@ print("ENCORE_SCALAR_CANONICAL_INPUTS_PASS", len(scalar_canonical_blobs))
 # The five previous Vulkan injection fragments are retained solely as
 # historical comparison fixtures, never inputs to the shipping renderer.
 vulkan_oracle_sources = {
-    "vulkan_loading.inc": "e96a289531ca44282cd1f2e24fea0c2003c9a08b",
+    "vulkan_loading.inc": "2dbae2a22ac0a7ce17e9b39c9b08ba35d896fc01",
     "vulkan_hud_prepare.inc": "36c585ed6726206722450450be7f0c5bb3cafb2d",
     "vulkan_hud_draw.inc": "794563c243b53ecccc4191f2a7de1b7dad0d2b2a",
     "vulkan_gc_downloads.inc": "f59f02df433d65a89467aab8c4845f3c9e0b03ae",
