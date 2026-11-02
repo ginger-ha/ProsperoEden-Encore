@@ -18,6 +18,8 @@
 #include <iterator>
 #include <new>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 namespace pe::ui
 {
@@ -764,33 +766,47 @@ void Launcher::apply_games(std::vector<Game> games)
                                  library_.selected < static_cast<int>(games_.size()) ?
                                      games_[static_cast<std::size_t>(library_.selected)].file :
                                      std::string{};
-    // A settings/mod rescan may return fresh game metadata before the async
-    // artwork worker has populated its media paths. Keep already decoded
-    // media for the SAME confirmed game (file, order and nonzero TitleID).
-    // A title replacement, newly provided scan or changed title ID wins.
-    // The usual identical inventory is O(n), without a second disk walk.
+    // A fresh filesystem snapshot can reorder ROMs when updates/DLC are
+    // discovered or a title is added. Keep already enriched media for the
+    // same physical file and nonzero TitleID, regardless of its list index.
+    // New metadata still takes precedence; never inherit media from an
+    // unrelated game reusing a path. No filesystem I/O on the UI thread.
+    const auto merge_media = [](Game& incoming, const Game& previous) {
+        if (!incoming.title_id || incoming.title_id != previous.title_id ||
+            incoming.file != previous.file)
+            return;
+        const auto keep_missing = [](auto& target, const auto& cached) {
+            if (target.empty()) target = cached;
+        };
+        keep_missing(incoming.cover, previous.cover);
+        keep_missing(incoming.box_front, previous.box_front);
+        keep_missing(incoming.box_back, previous.box_back);
+        keep_missing(incoming.hero, previous.hero);
+        keep_missing(incoming.screenshots, previous.screenshots);
+        keep_missing(incoming.intro, previous.intro);
+        keep_missing(incoming.description, previous.description);
+        keep_missing(incoming.publisher, previous.publisher);
+        keep_missing(incoming.developer, previous.developer);
+        keep_missing(incoming.release_date, previous.release_date);
+        keep_missing(incoming.categories, previous.categories);
+        if (incoming.max_players <= 0)
+            incoming.max_players = previous.max_players;
+    };
     if (same) {
-        for (std::size_t i = 0; i < games.size(); ++i) {
-            Game& incoming = games[i];
-            const Game& previous = games_[i];
-            if (!incoming.title_id || incoming.title_id != previous.title_id)
-                continue;
-            const auto keep_missing = [](auto& target, const auto& cached) {
-                if (target.empty()) target = cached;
-            };
-            keep_missing(incoming.cover, previous.cover);
-            keep_missing(incoming.box_front, previous.box_front);
-            keep_missing(incoming.box_back, previous.box_back);
-            keep_missing(incoming.hero, previous.hero);
-            keep_missing(incoming.screenshots, previous.screenshots);
-            keep_missing(incoming.intro, previous.intro);
-            keep_missing(incoming.description, previous.description);
-            keep_missing(incoming.publisher, previous.publisher);
-            keep_missing(incoming.developer, previous.developer);
-            keep_missing(incoming.release_date, previous.release_date);
-            keep_missing(incoming.categories, previous.categories);
-            if (incoming.max_players <= 0)
-                incoming.max_players = previous.max_players;
+        // Fast path: original scan order, no dictionary construction.
+        for (std::size_t i = 0; i < games.size(); ++i)
+            merge_media(games[i], games_[i]);
+    } else if (games_loaded_ && !games_.empty()) {
+        // Indexed once, not O(new ROMs * old ROMs) and not a disk scan.
+        // String views only borrow the old filenames until the final move.
+        std::unordered_map<std::string_view, const Game*> previous_by_file;
+        previous_by_file.reserve(games_.size());
+        for (const Game& previous : games_)
+            previous_by_file.emplace(previous.file, &previous);
+        for (Game& incoming : games) {
+            const auto found = previous_by_file.find(incoming.file);
+            if (found != previous_by_file.end())
+                merge_media(incoming, *found->second);
         }
     }
     games_ = std::move(games);

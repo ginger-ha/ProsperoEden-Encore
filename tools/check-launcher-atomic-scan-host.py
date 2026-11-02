@@ -49,6 +49,8 @@ cpp = r"""
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <unordered_map>
+#include <string_view>
 #include <vector>
 struct Game {
     std::string file;
@@ -205,6 +207,33 @@ int main() {
         assert(media.games_[0].box_front.empty());
         assert(media.games_[0].hero.empty());
         assert(media.games_[0].screenshots.empty());
+        // Reorder / insert a title between scans: keep the art that already
+        // belongs to the same file+TitleID, without crossing into a new game.
+        Game b{"B", true};
+        b.title_id = 0xBBBB;
+        b.box_front = "b-front.webp";
+        b.box_back = "b-back.webp";
+        Game a{"A", true};
+        a.title_id = 0xAAAA;
+        a.box_front = "a-front.webp";
+        media.apply_games({a, b});
+        Game inserted{"C", true};
+        inserted.title_id = 0xCCCC;
+        Game reordered_b{"B", false};
+        reordered_b.title_id = 0xBBBB;
+        Game reordered_a{"A", false};
+        reordered_a.title_id = 0xAAAA;
+        media.apply_games({inserted, reordered_b, reordered_a});
+        assert(media.games_[0].box_front.empty());
+        assert(media.games_[1].box_front == "b-front.webp");
+        assert(media.games_[1].box_back == "b-back.webp");
+        assert(media.games_[2].box_front == "a-front.webp");
+        assert(!media.games_[1].docked && !media.games_[2].docked);
+        Game reused{"B", false};
+        reused.title_id = 0xDEAD;
+        media.apply_games({reused, reordered_a});
+        assert(media.games_[0].box_front.empty());
+        assert(media.games_[1].box_front == "a-front.webp");
     }
     Launcher v;
     v.apply_games({{"A", true}, {"B", false}});
