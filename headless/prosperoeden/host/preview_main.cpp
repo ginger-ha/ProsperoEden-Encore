@@ -234,8 +234,32 @@ void pictures(Stage &s)
         // R1 switches the main tab, not the Library page. Select the
         // eleventh fixture with the same D-pad path as the retail-scan test;
         // otherwise the fallback screenshots can capture another screen.
+        // The preview's simulated 60 Hz clock can outrun a real async
+        // filesystem worker on a busy CI runner. Only count a Right input
+        // once the Library itself reports a genuine focus-move cue. This
+        // waits for the FIRST selected ROM, not an arbitrary sleep or a
+        // fake ready flag. Remaining nine inputs preserve fixture index 10.
+        bool first_rom_selected = false;
+        for (int attempt = 0; attempt < 120 && !first_rom_selected; ++attempt) {
+            const std::size_t previous_cues = s.heard.size();
+            s.press({Key::right});
+            first_rom_selected = std::find(
+                s.heard.begin() + static_cast<std::ptrdiff_t>(previous_cues),
+                s.heard.end(), pe::audio::Cue::focus) != s.heard.end();
+            if (!first_rom_selected) {
+                s.render();
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                s.launcher->update(1.0f / 60.0f);
+            }
+        }
+        if (!first_rom_selected) {
+            std::fprintf(stderr,
+                         "library-fallback-preview: first ROM never became navigable\\n");
+            s.ok = false;
+            return;
+        }
         s.press({Key::right, Key::right, Key::right, Key::right, Key::right,
-                 Key::right, Key::right, Key::right, Key::right, Key::right});
+                 Key::right, Key::right, Key::right, Key::right});
         s.wait(0.4f);
         const auto sample = s.services.games();
         const auto case_scan = s.services.box_art(sample.at(10).title_id);

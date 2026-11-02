@@ -97,3 +97,10 @@ The new official repository is `niakw/ProsperoEden-Encore`. The single change to
 - `headless/prosperoeden/host/preview_main.cpp` : `e87eb1f64bcbc24e8d6263df493064d79dcbbd3f` (précédemment `e1576cbf8a41a34fdd58e387062316fb95a40350`). Le scénario de reconstruction sans scans appelle désormais `Cross` puis `R2` pour vérifier le passage du viewer de 100 % à 130 %. Si le viewer n'ouvre pas, `R2` n'a aucun effet et le contrôle d'écart entre pixels doit encore échouer.
 - **Aucun seuil relâché** : variabilité des trois régions au-dessus de 17 et différence des images zoomées/non zoomées au-dessus de 4 restent exigées dans `.github/workflows/launcher-production-preview.yml`.
 - Changement strictement dans le scénario de prévisualisation hôte ; aucune modification du code d'entrée PS5. La CI du nouveau SHA reste la preuve requise.
+
+## Revue preview asynchrone — 2 novembre 2026
+
+- **Source de la prévisualisation hôte** : `headless/prosperoeden/host/preview_main.cpp`, blob Git `76ad9a17f9f57c23012e8199914132fcf8bf93cb` (précédemment `e87eb1f64bcbc24e8d6263df493064d79dcbbd3f`).
+- **Défaut ciblé** : les appels `wait(2.0f)` simulent 120 frames sans attendre 2 secondes réelles ; un runner peut donc acheminer dix touches Right avant la publication de la liste de ROM.
+- **Correction de test** : le premier Right doit produire un `Cue::focus` réel, avec un plafond de 120 tentatives et 25 ms de délai de travail entre les tentatives. Les neuf Right restants atteignent toujours l'index 10. Échec explicite si la liste n'est pas navigable. La navigation console et les contrôles des pixels de la preview sont inchangés.
+- **Statut** : revue de source et empreinte F07 mise à jour ; qualification sur le nouveau SHA encore requise.

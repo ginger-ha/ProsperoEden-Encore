@@ -292,6 +292,9 @@ assert "shell.y + shell.h - top" in library
 preview = (root / "headless/prosperoeden/host/preview_main.cpp").read_text()
 fallback = preview.split('if (const char* missing = std::getenv("PE_PREVIEW_LIBRARY_FALLBACK")', 1)[1].split(
     'if (const char* library_only', 1)[0]
+assert 'first_rom_selected = std::find(' in fallback
+assert 'pe::audio::Cue::focus' in fallback
+assert 'if (!first_rom_selected) {' in fallback
 assert 's.press({Key::right, Key::right, Key::right, Key::right, Key::right,' in fallback
 assert 's.press({Key::r1, Key::r1});' not in fallback
 assert 's.press({Key::cross, Key::r2});' in fallback
