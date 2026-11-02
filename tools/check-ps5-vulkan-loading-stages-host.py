@@ -65,9 +65,12 @@ assert "LaunchHandoff::Clear()" in frontend
 assert "inline bool Valid(const Frame& frame)" in handoff
 assert "frame.width <= max_width && frame.height <= max_height" in handoff
 assert "std::exchange(pending_frame, {})" in handoff
+assert "inline std::shared_ptr<const Frame> Peek()" in handoff
 for evidence in (
     '#include "launch_handoff.hpp"',
-    "Eden::LaunchHandoff::Take()",
+    "Eden::LaunchHandoff::Peek()",
+    "Eden::LaunchHandoff::Clear();",
+    "loading_jacket_attempts >= 3",
     "loading_jacket_attempted = true;",
     "loading_jacket_buffer = std::move(buffer);",
     "buffer.Flush();",
@@ -77,11 +80,14 @@ for evidence in (
 ):
     assert evidence in renderer, evidence
 assert "vk::Buffer loading_jacket_buffer{};" in renderer_header
+assert "u32 loading_jacket_attempts{};" in renderer_header
+assert "loading_jacket_attempts{}" in generator
+assert renderer.index("Eden::LaunchHandoff::Peek()") < renderer.index("loading_jacket_buffer = std::move(buffer);") < renderer.index("Eden::LaunchHandoff::Clear();")
 assert "loading_jacket_buffer{}" in generator
 assert "launch_handoff.hpp" in generator
 assert "loading_jacket_buffer = std::move(buffer);" in oracle
 assert "cmdbuf.CopyBufferToImage(upload, target," in oracle
-assert renderer.count("EDEN_LOADER_JACKET_HANDOFF_VULKAN") == 2  # success + fallback
+assert renderer.count("EDEN_LOADER_JACKET_HANDOFF_VULKAN") == 4  # success + fallback + retries + unsupported format
 # A native build has been deliberately blocked until full NS2 / NS1
 # compatibility and console validation; host-only tests remain enabled.
 research = (root / ".github/workflows/ns2-native-ps5-research.yml").read_text()
