@@ -1,29 +1,9 @@
 name: NS2 PS5 native research compilation (not a release)
 
+# CLOSED: user requires one complete, optimized, console-validated NS1/NS2
+# engine and one continuous jacket loader before any native PS5 build.
+# Reactivation requires a deliberate source change AFTER those proof gates.
 on:
-  push:
-    branches:
-      - research/ns2-ps5-compatibility
-      - main
-    paths:
-      # Main compiles only from an explicit [ns2-native-build] workflow edit.
-      # Consolidated experimental NS2 PS5 candidate: native GPFIFO/QMD3,
-      # bounded SSBO arrays, buffer-only SPIR-V/Vulkan Compute and VI2 vblank.
-      # TIC/TSC, images, full graphics stages and first guest frame remain
-      # unqualified; no release or gameplay-compatibility assertion.
-      # Rebuild consolidated source with explicit VI2 51/104/105 compatibility.
-      # Keep native GPU/VI2 TIPC event handles as copies, matching NX2 ABI.
-      # Ordinary vendor/main pushes must not trigger repeated 4-hour PS5 jobs.
-      - '.github/workflows/ns2-native-ps5-research.yml'
-      # Workflow-only edits never cancel an already compiling native candidate.
-      - 'tools/ns2/package_native_research.sh'
-      - 'tools/build-headless-native.sh'
-      - 'tools/ns2/check_native_research_selector.py'
-      - 'tools/check-vendor-consolidation-debt.py'
-      - 'tools/install-active-core-backports.py'
-      - 'tools/check-ns2-source-selection.py'
-      - 'headless/CMakeLists.txt'
-      - 'vendor'
   workflow_dispatch:
 
 permissions:
@@ -36,7 +16,9 @@ concurrency:
 
 jobs:
   compile-native-ps5:
-    if: ${{ github.ref != 'refs/heads/main' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[ns2-native-build]') }}
+    # Intentionally blocked even on manual dispatch until the owner
+    # explicitly reopens it after NS2 + loader + NS1 regression proof.
+    if: ${{ false }}
     name: Compile existing PS5 Encore native owners with all NS2 research switches
     runs-on: ubuntu-24.04
     timeout-minutes: 240
