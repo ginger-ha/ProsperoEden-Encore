@@ -47,6 +47,13 @@ finish=lib.split("void Launcher::finish_scan(bool wait)",1)[1].split(
 assert "apply_games(std::move(games));" in finish
 assert "catch (const std::exception &error)" in finish
 assert "games_loaded_ = true;" not in finish, "scan failures must not mark an empty list loaded"
+# Compile the exact extracted scan guard (not a synthetic rewrite), and
+# execute all loaded/volume-state pairs with both compiler optimization levels.
+guard_anchor = "            if (preserve_loaded_games && !services_.game_storage_available())"
+assert scan.count(guard_anchor) == 1
+guard_body = guard_anchor + scan.split(guard_anchor, 1)[1].split(
+    "            return games;", 1)[0]
+assert guard_body.count("throw std::runtime_error") == 1
 cpp=r"""
 #include <algorithm>
 #include <cassert>
@@ -54,6 +61,7 @@ cpp=r"""
 #include <cstdint>
 #include <deque>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -73,10 +81,26 @@ class Textures {
 };
 """ + avatar + "\n" + cover + r"""
 struct Game {std::string file;};
+struct Storage {bool available=true;bool game_storage_available()const{return available;}};
+struct Scanner {
+ Storage services_;
+ bool run(bool preserve_loaded_games) {
+""" + guard_body + r"""
+ return true;
+ }
+};
 bool absent(const std::vector<std::string>* known_missing,const Game& game){
 """ + candidate + r"""
 }
 int main(){
+ for (const bool loaded : {false,true})
+   for (const bool available : {false,true}) {
+     Scanner scanner{Storage{available}};
+     bool rejected=false;
+     try {assert(scanner.run(loaded));}
+     catch (const std::runtime_error&) {rejected=true;}
+     assert(rejected==(loaded && !available));
+   }
  Textures t;
  assert(t.cover("",256).missing && t.queue_.empty());
  for(int i=0;i<160;++i)t.cover("box-"+std::to_string(i),300);
