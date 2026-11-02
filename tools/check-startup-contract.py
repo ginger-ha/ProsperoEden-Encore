@@ -26,9 +26,10 @@ assert 'sandbox-elevator.elf' in packager
 assert 'PPSA99121' not in lifecycle, "stale lifecycle title ID"
 assert 'PPSA99008' in lifecycle
 
-# The rotating 3D jacket is the only authored startup animation. Both
-# render backends retain their warm-up presentations but show a plain
-# dark handoff, NOT the obsolete violet loading shader.
+# The 3D jacket is the only authored startup animation. Vulkan now
+# displays the actual last launcher frame (hero, jacket and title) across
+# the EGL/renderer handoff. The dark clear remains a fallback only if
+# an image cannot be captured; the obsolete violet scene stays disabled.
 graphics = (root / "headless/graphics.cpp").read_text()
 vulkan_backend = (root / "vendor/encore-active/eden-vulkan/vulkan_renderer.cpp").read_text()
 native_presenter = (root / "vendor/encore-active/eden-vulkan/vulkan_window_adapt_pass.cpp").read_text()
