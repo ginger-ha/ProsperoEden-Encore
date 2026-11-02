@@ -6370,6 +6370,21 @@ apply_reviewed_delta(
     "    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&", "    // BindToChannel/EraseChannel mutate these pointers under config_mutex.\n    // The renderer holds texture_cache.mutex; take the configuration lock\n    // briefly as well so a concurrent channel switch cannot race this proof.\n    std::scoped_lock channel_lock{config_mutex};\n    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&",
     'Native texture owner proof serialized with config channel switches')
 
+# P2.2b: hold ChannelSetupCaches::config_mutex for the ENTIRE
+# authenticated image/sampler acquisition, not only NativeChannelMatches.
+# Otherwise BindToChannel can change the active GMMU between the read-only
+# proof and slot lookup. Preserve the shared Maxwell texture cache owner.
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache.h',
+    "    if (!NativeChannelMatches(expected_compute, expected_memory))\n        return NULL_IMAGE_VIEW_ID;\n    const auto [pair, is_new] = channel_state->image_views.try_emplace(descriptor);",
+    "    // BindToChannel/EraseChannel use config_mutex, NOT texture_cache.mutex.\n    // A standalone NativeChannelMatches() returns with that lock released;\n    // the channel may change before image_views is accessed. Hold the same\n    // configuration lock through slot lookup, creation and preparation.\n    // The caller already holds texture_cache.mutex (lock order: texture,\n    // then config), exactly as NativeChannelMatches() does.\n    std::scoped_lock channel_lock{config_mutex};\n    if (!channel_state || !gpu_memory ||\n        kepler_compute != &expected_compute ||\n        gpu_memory != &expected_memory ||\n        &channel_state->kepler_compute != &expected_compute ||\n        &channel_state->gpu_memory != &expected_memory)\n        return NULL_IMAGE_VIEW_ID;\n    const auto [pair, is_new] = channel_state->image_views.try_emplace(descriptor);",
+    'NS2 native image lookup holds channel mutex through slot acquisition')
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache.h',
+    "    if (!NativeChannelMatches(expected_compute, expected_memory))\n        return NULL_SAMPLER_ID;\n    // FindSampler already owns slot_samplers and the per-channel TSC",
+    "    // Hold config_mutex until FindSampler has finished its per-channel\n    // lookup. Checking the engine once and unlocking before FindSampler\n    // could publish a sampler belonging to a different channel.\n    std::scoped_lock channel_lock{config_mutex};\n    if (!channel_state || !gpu_memory ||\n        kepler_compute != &expected_compute ||\n        gpu_memory != &expected_memory ||\n        &channel_state->kepler_compute != &expected_compute ||\n        &channel_state->gpu_memory != &expected_memory)\n        return NULL_SAMPLER_ID;\n    // FindSampler already owns slot_samplers and the per-channel TSC",
+    'NS2 native sampler lookup holds channel mutex through slot acquisition')
+
 # Native QMD Compute pipeline owners are GPU objects. The old guest
 # SignalFence callback may run immediately; use the exact GPU timeline
 # wait via the host-validated native helper on success AND epoch refusal.
