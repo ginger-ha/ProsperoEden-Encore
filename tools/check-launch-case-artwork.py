@@ -323,6 +323,12 @@ assert '"Nintendo Switch", "Nintendo Switch 2"' in indexer
 assert '"https://gamesdb-images.launchbox.gg"' in native
 assert 'const bool r2 = filename.rfind("r2_", 0) == 0;' in native
 assert "return FetchKnownNs2Front" not in native
+assert "bool FetchKnownNs2Front(" not in native
+# Reject previously cached storefront product photographs; they are not
+# genuine flat jacket scans and produced white paper borders in NS2.
+assert 'origin.rfind("https://www.powerplanetonline.com", 0) == 0' in native_resolver
+assert 'origin.rfind("https://www.euronics.ee", 0) == 0' in native_resolver
+assert 'if (std::strcmp(side, "front") == 0)' in native_resolver
 # Execute the actual streaming Metadata.xml parser with both console types.
 # No HTTP access or native console build needed for this self-test.
 subprocess.run([sys.executable, str(root / "tools/launcher/build-box-art-index.py"),

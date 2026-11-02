@@ -23,3 +23,7 @@ This refreshes the historical source fingerprint while retaining the existing `n
 | Source owner | Disposition | Evidence limit |
 |---|---|---|
 | `headless/prosperoeden/eden_services.cpp` | Source-reviewed 2026-11-01 | No FPS or console first-frame claim |
+
+## Addendum — CDN GamesDB et provenance des jaquettes (2 novembre 2026)
+
+La re-revue F07 `8a9462ae7c71831b33767d5ed1244d85a89a6b0f` remplace le blob de `eden_services.cpp` par `b8aeeafb7c8ce6d9993a34498e9701d851d7df12`. Les changements postérieurs au relevé du 1er novembre sont `f9437a986a0a66aeb31b075dfa5220b854e208bc` (+ CDN GamesDB pour `r2_`, tranche indépendante, rejet des caches marchands) et `336360d437a22519cfe41fc2ddcf7c7e62593c7e` (suppression du téléchargeur de photos produit). **L'ancien paragraphe sur le secours marchand décrit uniquement l'état historique : ce chemin n'existe plus.** Les jeux sans scan LaunchBox valide conservent le rendu procédural partagé NS1/NS2. `LocaleCaseCandidates` et sa déduplication linéaire ne sont pas modifiés. Le témoin hôte `tools/check-launch-case-artwork.py` vérifie les ancres de provenance, le CDN et l'absence de téléchargement marchand ; aucune disponibilité réseau ni qualité console n'est déduite.
