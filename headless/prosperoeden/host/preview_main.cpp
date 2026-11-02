@@ -256,7 +256,10 @@ void pictures(Stage &s)
         s.press({Key::down});
         s.wait(0.22f);
         s.shoot("01-library-fallback-back");
-        s.press({Key::cross});
+        s.press({Key::cross, Key::r2});
+        // Real 130% controller zoom makes the reconstructed paper test
+        // discriminating. R2 is ignored outside the viewer, so a failed
+        // Cross still fails the existing unrelaxed OpenGL pixel-diff gate.
         s.wait(0.32f);
         s.shoot("02-library-fallback-zoom");
         return;

@@ -85,3 +85,9 @@ The new official repository is `niakw/ProsperoEden-Encore`. The single change to
 - Changement revu : le scénario hôte `PE_PREVIEW_LIBRARY_FALLBACK` sélectionne la onzième jaquette par dix appuis directionnels `Right` au lieu de deux `R1`, qui changent maintenant l'onglet principal.
 - Portée : **test de prévisualisation hôte uniquement**. Aucun chemin PS5 native, shader, GPU, threading ou JIT modifié ; aucune baisse des exigences de vérification pixel, cadrage, zoom ou texture.
 - Qualification attendue : contrôler les tests de preview et la couverture d'optimisation F07 ; cette revue de source ne prétend pas mesurer ni améliorer les performances FC27 ou NS2 sur console.
+
+## Revue additionnelle du 2 novembre 2026 — recherche du scan NS2
+
+- `headless/prosperoeden/eden_services.cpp`, blob Git `8a25564b3588720d4e9e78c699f495d137272f09` (précédemment `b8aeeafb7c8ce6d9993a34498e9701d851d7df12`). Pour un TitleID déjà répertorié par `Ns2Catalog`, l'enrichissement cherche les véritables scans LaunchBox avec le nom canonique en premier ; exemple : `DonkeyKongBananza` contre `Donkey Kong Bananza`. Ce choix intervient hors du rendu et avant les appels Nlib.
+- Le fallback des jeux NS1 et des titres inconnus est inchangé. Le fichier de référence F07 conserve exactement 518 sources, dont cette unique empreinte revue, les 517 autres restant intactes.
+- `tools/check-launch-case-artwork.py` vérifie le branchement, `tools/check-release-case-index-dedup-host.py` garde la preuve de déduplication. **Aucun FPS, téléchargement console ni image NS2 prouvés**.

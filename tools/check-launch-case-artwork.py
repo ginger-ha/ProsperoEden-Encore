@@ -294,6 +294,7 @@ fallback = preview.split('if (const char* missing = std::getenv("PE_PREVIEW_LIBR
     'if (const char* library_only', 1)[0]
 assert 's.press({Key::right, Key::right, Key::right, Key::right, Key::right,' in fallback
 assert 's.press({Key::r1, Key::r1});' not in fallback
+assert 's.press({Key::cross, Key::r2});' in fallback
 assert 's.shoot("03-library-back-zoom-pan");' in (
     root / "headless/prosperoeden/host/preview_main.cpp").read_text()
 assert "RADIO_INPUT_L2" in (root / "headless/prosperoeden/radio_input.h").read_text()
