@@ -145,7 +145,9 @@ assert 'c.list.gradient_rect({shell.x, shell.y, shell.w, top}' in library
 assert 'c.list.gradient_rect({shell.x, shell.y + shell.h - top,' in library
 assert 'const float side = shell.w * (7.0f / 454.0f);' in library
 assert 'c.list.image(artwork.texture, fitted, {0.0f, 0.0f, 1.0f, 1.0f},' in library
-assert 'fitted.x += rear ? paper.w - fitted.w : (paper.w - fitted.w) * 0.5f;' in library
+assert 'fitted.x += paper.w - fitted.w;' in library
+assert 'c.list.image(artwork.texture, paper, uv,' in library
+assert 'if (artwork.texture != 0) {' in library
 assert 'flat_retail_sleeve(c, game, sleeve, false, 0.24f);' in library
 assert 'flat_retail_sleeve(c, *game, art, true, 0.60f);' in library
 assert 'flat_retail_sleeve(c, *game, enlarged, true, 0.92f,' in library
