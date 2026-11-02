@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""P3.4: run the actual launcher game-list publication under host C++20.
+
+Tests an incomplete asynchronous scan, atomic replacement, selected-title
+stability, failed discovery and launch cancellation. No PS5 build or ROM I/O.
+"""
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+source = (ROOT / "headless/prosperoeden/pe/ui/library.cpp").read_text()
+launcher = (ROOT / "headless/prosperoeden/pe/ui/launcher.cpp").read_text()
+
+def owner(start: str, following: str) -> str:
+    assert source.count(start) == 1, ("source owner changed", start)
+    tail = source.split(start, 1)[1]
+    assert following in tail, ("owner boundary changed", following)
+    return start + tail.split(following, 1)[0]
+
+finish = owner("void Launcher::finish_scan(bool wait)", "\nvoid Launcher::start_home_media()")
+apply = owner("void Launcher::apply_games(std::vector<Game> games)", "\nvoid Launcher::sync_home_game(")
+enter = owner("void Launcher::enter_library()", "\nbool Launcher::open_game_settings_at_file(")
+draw = owner("void Launcher::draw_library(Canvas &c)", "\nvoid Launcher::",) if False else source
+
+# A tab change cannot invalidate a good list, synchronously scan the filesystem,
+# or render the initial pending scan as a verified empty collection.
+assert "if (!games_loaded_ && !scan_.valid()) start_scan();" in enter
+assert "if (!games_loaded_) {" in source
+assert 'tr("Loading game library...")' in source
+assert 'tr("No ROM files found.")' in source
+assert source.index('if (!games_loaded_) {\n        // First-ever discovery is pending.') < source.index('tr("No ROM files found.")')
+assert "games_ = std::move(games);" in apply
+assert "if (!scan_cancel_.load(std::memory_order_acquire))" in finish
+assert "scan_.wait_for(std::chrono::seconds(0))" in finish
+assert "open(Screen::library, true);" in launcher
+
+cpp = r"""
+#include <algorithm>
+#include <atomic>
+#include <cassert>
+#include <chrono>
+#include <exception>
+#include <future>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+struct Game {
+    std::string file;
+    bool docked = false;
+};
+enum class Cue { error };
+namespace sys {
+template<class... Args> void log(const char*, Args...) {}
+}
+std::string tr(const char* message) { return message; }
+class Launcher {
+public:
+    struct Library {
+        int selected = -1, count = 0, resets = 0;
+        void reset(int n, int selection) {
+            assert(n >= 0 && (n == 0 || (selection >= 0 && selection < n)));
+            count = n;
+            selected = n ? selection : -1;
+            ++resets;
+        }
+    } library_;
+    struct Mode {
+        int snaps = 0;
+        void snap(float) { ++snaps; }
+    } mode_;
+    std::vector<Game> games_;
+    std::future<std::vector<Game>> scan_;
+    std::atomic<bool> scan_cancel_{false};
+    std::string pending_settings_file_;
+    bool games_loaded_ = false, library_back_focused_ = false;
+    bool library_back_zoom_ = false, docked_refresh_after_scan_ = false;
+    bool selected_docked_ = false;
+    int refreshed = 0, named = 0, media = 0, started = 0, errors = 0;
+    void apply_games(std::vector<Game> games);
+    void finish_scan(bool wait);
+    void start_scan() { ++started; }
+    void refresh_selected_game() {
+        ++refreshed;
+        if (library_.selected >= 0 &&
+            library_.selected < static_cast<int>(games_.size()))
+            selected_docked_ = games_[static_cast<std::size_t>(library_.selected)].docked;
+    }
+    void name_home_games() { ++named; }
+    void start_selected_media() { ++media; }
+    void say(const std::string&, bool) { ++errors; }
+    void cue(Cue) {}
+};
+""" + finish + "\n" + apply + r"""
+int main() {
+    Launcher v;
+    v.apply_games({{"A", true}, {"B", false}});
+    assert(v.games_loaded_ && v.library_.count == 2);
+    assert(v.library_.selected == 0 && v.library_.resets == 1);
+    v.library_.selected = 1;
+    v.library_back_focused_ = true;
+    v.library_back_zoom_ = true;
+    v.apply_games({{"A", false}, {"B", true}});
+    assert(v.library_.selected == 1 && v.library_.resets == 1);
+    assert(v.selected_docked_ && !v.library_back_focused_ && !v.library_back_zoom_);
+    v.apply_games({{"B", true}, {"A", false}, {"C", false}});
+    assert(v.library_.selected == 0 && v.library_.count == 3);
+    assert(v.library_.resets == 2 && v.games_[0].file == "B");
+
+    // An incomplete scan is never published as empty or as a failure.
+    std::promise<std::vector<Game>> pending;
+    v.scan_ = pending.get_future();
+    const int before = v.library_.resets;
+    v.finish_scan(false);
+    assert(v.games_.size() == 3 && v.library_.resets == before);
+    pending.set_value({{"C", false}, {"B", true}});
+    v.finish_scan(true);
+    assert(v.games_.size() == 2 && v.games_[1].file == "B");
+    assert(v.library_.selected == 1 && v.library_.resets == before + 1);
+
+    // Failed discovery preserves last-known-good contents and selection.
+    std::promise<std::vector<Game>> failure;
+    v.scan_ = failure.get_future();
+    failure.set_exception(std::make_exception_ptr(std::runtime_error("disk unavailable")));
+    v.finish_scan(true);
+    assert(v.games_.size() == 2 && v.library_.selected == 1);
+    assert(v.games_loaded_);
+
+    // Results collected after launch cancellation are discarded.
+    std::promise<std::vector<Game>> cancelled;
+    v.scan_ = cancelled.get_future();
+    v.scan_cancel_.store(true, std::memory_order_release);
+    cancelled.set_value({});
+    v.finish_scan(true);
+    assert(v.games_.size() == 2 && v.games_loaded_);
+    v.scan_cancel_.store(false, std::memory_order_release);
+
+    // An overlapping preferences refresh requeues exactly one later scan.
+    std::promise<std::vector<Game>> refresh;
+    v.scan_ = refresh.get_future();
+    v.docked_refresh_after_scan_ = true;
+    refresh.set_value({{"C", false}, {"B", false}});
+    v.finish_scan(true);
+    assert(v.started == 1 && !v.docked_refresh_after_scan_);
+    assert(v.games_[1].file == "B" && !v.selected_docked_);
+}
+""";
+
+compilers = list(dict.fromkeys(
+    p for name in ("clang++", "g++") if (p := shutil.which(name))))
+assert compilers, "C++20 compiler required for P3.4 source extraction"
+with tempfile.TemporaryDirectory(prefix="encore-library-atomic-") as folder:
+    folder = Path(folder)
+    test = folder / "library-atomic.cpp"
+    test.write_text(cpp)
+    for compiler in compilers:
+        for opt in ("-O0", "-O2"):
+            exe = folder / (Path(compiler).name + opt)
+            built = subprocess.run(
+                [compiler, "-std=c++20", "-pthread", opt, "-Wall", "-Wextra",
+                 "-Werror", str(test), "-o", str(exe)],
+                capture_output=True, text=True, timeout=45)
+            assert built.returncode == 0, (compiler, opt, built.stderr[-5000:])
+            ran = subprocess.run([str(exe)], capture_output=True, text=True, timeout=15)
+            assert ran.returncode == 0, (compiler, opt, ran.stderr[-5000:])
+            print("P3_4_LAUNCHER_ATOMIC_SCAN_PASS", Path(compiler).name, opt)
