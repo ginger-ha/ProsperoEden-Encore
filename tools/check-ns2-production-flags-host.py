@@ -15,10 +15,11 @@ README = (ROOT / "README.md").read_text()
 OPT = re.compile(
     r'option\(\s*(EDEN_NS2_[A-Z0-9_]*EXPERIMENTAL)\s*"[^"]+"\s+(ON|OFF)\s*\)'
 )
-flags = dict(OPT.findall(CMAKE))
+declared = OPT.findall(CMAKE)
+flags = dict(declared)
 all_source_flags = set(re.findall(r'\bEDEN_NS2_[A-Z0-9_]*EXPERIMENTAL\b', CMAKE))
+assert len(declared) == len(flags), "Duplicate CMake option owner"
 assert len(flags) == 22, ("Unreviewed number of NS2 research gates", len(flags))
-assert len(flags) == len(set(flags))  # duplicate names would be merged by dict
 assert all_source_flags == set(flags), sorted(all_source_flags - set(flags))
 assert set(flags.values()) == {"OFF"}, "Research flags must not be enabled by default"
 
