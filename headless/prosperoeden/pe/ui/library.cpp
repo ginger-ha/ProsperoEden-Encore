@@ -724,22 +724,24 @@ void Launcher::finish_selected_media()
         if (enriched.case_artwork_changed & 2u)
             textures_.invalidate(enriched.box_back);
         for (Game& game : games_) {
-            if (game.title_id != enriched.title_id) continue;
-            if (!enriched.cover.empty()) game.cover = std::move(enriched.cover);
-            if (!enriched.box_front.empty()) game.box_front = std::move(enriched.box_front);
-            if (!enriched.box_back.empty()) game.box_back = std::move(enriched.box_back);
-            if (!enriched.hero.empty()) game.hero = std::move(enriched.hero);
-            if (!enriched.screenshots.empty()) game.screenshots = std::move(enriched.screenshots);
+            if (!enriched.title_id || game.title_id != enriched.title_id) continue;
+            if (!enriched.cover.empty()) game.cover = enriched.cover;
+            if (!enriched.box_front.empty()) game.box_front = enriched.box_front;
+            if (!enriched.box_back.empty()) game.box_back = enriched.box_back;
+            if (!enriched.hero.empty()) game.hero = enriched.hero;
+            if (!enriched.screenshots.empty()) game.screenshots = enriched.screenshots;
             if (enriched.max_players > 0) game.max_players = enriched.max_players;
-            if (!enriched.name.empty()) game.name = std::move(enriched.name);
-            if (!enriched.intro.empty()) game.intro = std::move(enriched.intro);
-            if (!enriched.description.empty()) game.description = std::move(enriched.description);
-            if (!enriched.publisher.empty()) game.publisher = std::move(enriched.publisher);
-            if (!enriched.developer.empty()) game.developer = std::move(enriched.developer);
-            if (!enriched.release_date.empty()) game.release_date = std::move(enriched.release_date);
-            if (!enriched.categories.empty()) game.categories = std::move(enriched.categories);
+            if (!enriched.name.empty()) game.name = enriched.name;
+            if (!enriched.intro.empty()) game.intro = enriched.intro;
+            if (!enriched.description.empty()) game.description = enriched.description;
+            if (!enriched.publisher.empty()) game.publisher = enriched.publisher;
+            if (!enriched.developer.empty()) game.developer = enriched.developer;
+            if (!enriched.release_date.empty()) game.release_date = enriched.release_date;
+            if (!enriched.categories.empty()) game.categories = enriched.categories;
+            // A single Nlib lookup belongs to a TitleID and must update
+            // EVERY installed copy; moving into the first one silently
+            // starved later entries with that same identity.
             sync_home_game(game);
-            break;
         }
     }
     catch (const std::exception& error)

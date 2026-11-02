@@ -22,6 +22,7 @@ def owner(start: str, following: str) -> str:
 
 finish = owner("void Launcher::finish_scan(bool wait)", "\nvoid Launcher::start_home_media()")
 apply = owner("void Launcher::apply_games(std::vector<Game> games)", "\nvoid Launcher::sync_home_game(")
+media_finish = owner("void Launcher::finish_selected_media()", "\nvoid Launcher::apply_games(")
 enter = owner("void Launcher::enter_library()", "\nbool Launcher::open_game_settings_at_file(")
 draw = owner("void Launcher::draw_library(Canvas &c)", "\nvoid Launcher::",) if False else source
 
@@ -53,6 +54,9 @@ struct Game {
     std::string file;
     bool docked = false;
     std::uint64_t title_id = 0;
+    std::string name;
+    bool artwork_changed = false;
+    unsigned case_artwork_changed = 0;
     std::string cover, box_front, box_back, hero;
     std::vector<std::string> screenshots;
     std::string intro, description, publisher, developer, release_date, categories;
@@ -63,8 +67,13 @@ namespace sys {
 template<class... Args> void log(const char*, Args...) {}
 }
 std::string tr(const char* message) { return message; }
+struct Textures { int invalidated = 0; void invalidate(const std::string&) { ++invalidated; } };
 class Launcher {
 public:
+    Textures textures_;
+    std::future<Game> media_scan_;
+    std::uint64_t media_scan_title_id_ = 0;
+    int home_syncs = 0;
     struct Library {
         int selected = -1, count = 0, resets = 0;
         void reset(int n, int selection) {
@@ -88,6 +97,8 @@ public:
     int refreshed = 0, named = 0, media = 0, started = 0, errors = 0;
     void apply_games(std::vector<Game> games);
     void finish_scan(bool wait);
+    void finish_selected_media();
+    void sync_home_game(const Game&) { ++home_syncs; }
     void start_scan() { ++started; }
     void refresh_selected_game() {
         ++refreshed;
@@ -100,8 +111,48 @@ public:
     void say(const std::string&, bool) { ++errors; }
     void cue(Cue) {}
 };
-""" + finish + "\n" + apply + r"""
+""" + finish + "\n" + apply + "\n" + media_finish + r"""
 int main() {
+    // Duplicate installations of the same TitleID must all inherit Nlib
+    // artwork. Never distribute an invalid zero ID to unrelated ROMs.
+    {
+        Launcher copies;
+        Game first{"MKW copy 1", true};
+        first.title_id = 0x123;
+        Game second{"MKW copy 2", true};
+        second.title_id = 0x123;
+        Game unrelated{"Other game", true};
+        unrelated.title_id = 0x456;
+        copies.games_ = {first, second, unrelated};
+        Game nlib{"MKW copy 1", false};
+        nlib.title_id = 0x123;
+        nlib.cover = "mkw-icon.webp";
+        nlib.box_front = "mkw-front.webp";
+        nlib.box_back = "mkw-back.webp";
+        nlib.hero = "mkw-hero.webp";
+        nlib.description = "Mario Kart World";
+        nlib.screenshots = {"mkw-shot.webp"};
+        std::promise<Game> done;
+        copies.media_scan_ = done.get_future();
+        done.set_value(nlib);
+        copies.finish_selected_media();
+        assert(copies.games_[0].box_back == "mkw-back.webp");
+        assert(copies.games_[1].box_back == "mkw-back.webp");
+        assert(copies.games_[1].hero == "mkw-hero.webp");
+        assert(copies.games_[1].screenshots.size() == 1);
+        assert(copies.games_[2].box_front.empty());
+        assert(copies.home_syncs == 2 && copies.media == 1);
+        Game zero{"Invalid", false};
+        zero.title_id = 0;
+        zero.cover = "bad.webp";
+        copies.games_.push_back(zero);
+        std::promise<Game> invalid;
+        copies.media_scan_ = invalid.get_future();
+        invalid.set_value(zero);
+        copies.finish_selected_media();
+        assert(copies.games_[3].cover == "bad.webp");
+        assert(copies.home_syncs == 2);
+    }
     // Fresh discovery is pending: the UI cannot declare "No ROM" until
     // a complete worker result has been committed on the owner thread.
     {

@@ -406,6 +406,18 @@ int main() {
                (addr==0x1000012345000ULL && bytes==0x40);
     }));
     assert(mapped_spans==2);
+    // A corrupt CBUF/SSBO range at the end of the 49-bit GMMU must fail
+    // before the renderer stages even one Vulkan buffer descriptor.
+    auto overflowing_plan = *plan;
+    overflowing_plan.uniform_buffers[0].gpu_address = (u64{1} << 49) - 8;
+    assert(!overflowing_plan.ValidateGpuMappings([](u64, std::size_t) {
+        return true;
+    }));
+    overflowing_plan = *plan;
+    overflowing_plan.storage_buffers[0].gpu_address = (u64{1} << 49) - 1;
+    assert(!overflowing_plan.ValidateGpuMappings([](u64, std::size_t) {
+        return true;
+    }));
     // Vulkan BufferCache entrypoint receives the native QMD3 descriptor
     // order without copying the legacy Kepler launch descriptor. Refuse all
     // guest spans before any staging; rollback partial renderer submissions.
