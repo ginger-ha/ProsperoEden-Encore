@@ -952,36 +952,36 @@ int main() {
         // P2.2: native shader reflection must use the dimensions of the
         // SAME typed TIC before acquiring any shared Vulkan cache slot.
         layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
-        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         // MSAA is an independent SPIR-V image type bit. Even matching TIC
         // dimensions must be refused when the shader expects other samples.
         layout.texture_descriptors[0].is_multisample = true;
-        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         auto msaa_view = *typed;
         msaa_view[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
-        assert(NativeQmdTypedImageLayoutMatches(layout, msaa_view));
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, msaa_view));
         layout.texture_descriptors[0].is_multisample = false;
-        assert(!NativeQmdTypedImageLayoutMatches(layout, msaa_view));
-        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, msaa_view));
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
-        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2D;
-        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         auto normalized_view = *typed;
         normalized_view[0].tic.normalized_coords.Assign(1);
-        assert(NativeQmdTypedImageLayoutMatches(layout, normalized_view));
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, normalized_view));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
         auto invalid_typed = *typed;
         invalid_typed[0].sampler.reset();
-        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
         invalid_typed = *typed;
         invalid_typed[0].kind = NativeQmdImageKind::StorageImage;
-        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
         invalid_typed = *typed;
         invalid_typed[0].tic.is_sparse.Assign(1);
-        assert(!NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
-        assert(!NativeQmdTypedImageLayoutMatches(layout, {}));
-        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, invalid_typed));
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, {}));
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         auto corrupted_record = *image;
         corrupted_record[0].is_written = true;
         assert(!guest_tables.DecodeAdmitted(textured, corrupted_record));
@@ -1035,13 +1035,13 @@ int main() {
         forged_tic = tic;
         forged_tic.width_minus_one.Assign(16383);
         forged_tic.height_minus_1.Assign(8191);
-        assert(!NativeQmdTicLayoutSupported(forged_tic));
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(forged_tic));
         assert(rejects_tic(forged_tic)); // >64M texels on replay
         forged_tic = tic;
         forged_tic.msaa_mode.Assign(MsaaMode::Msaa4x4);
         forged_tic.width_minus_one.Assign(4095);
         forged_tic.height_minus_1.Assign(4095);
-        assert(!NativeQmdTicLayoutSupported(forged_tic));
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(forged_tic));
         assert(rejects_tic(forged_tic)); // >4M multisampled texels
         forged_tic = tic;
         forged_tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
