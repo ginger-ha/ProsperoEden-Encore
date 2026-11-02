@@ -96,6 +96,20 @@ public:
 };
 """ + finish + "\n" + apply + r"""
 int main() {
+    // Fresh discovery is pending: the UI cannot declare "No ROM" until
+    // a complete worker result has been committed on the owner thread.
+    {
+        Launcher cold;
+        std::promise<std::vector<Game>> first;
+        cold.scan_ = first.get_future();
+        cold.finish_scan(false);
+        assert(!cold.games_loaded_ && cold.games_.empty());
+        assert(cold.library_.resets == 0 && cold.library_.count == 0);
+        first.set_value({{"Switch 2 title", false}});
+        cold.finish_scan(true);
+        assert(cold.games_loaded_ && cold.library_.count == 1);
+        assert(cold.games_[0].file == "Switch 2 title");
+    }
     Launcher v;
     v.apply_games({{"A", true}, {"B", false}});
     assert(v.games_loaded_ && v.library_.count == 2);
@@ -146,6 +160,19 @@ int main() {
     v.finish_scan(true);
     assert(v.started == 1 && !v.docked_refresh_after_scan_);
     assert(v.games_[1].file == "B" && !v.selected_docked_);
+
+    // A new scan must not blank a known-good shelf while it is in flight.
+    // An *actually completed* empty inventory is different: removing all
+    // ROMs can legitimately leave the Library empty.
+    std::promise<std::vector<Game>> empty;
+    v.scan_ = empty.get_future();
+    const int before_empty = v.library_.resets;
+    v.finish_scan(false);
+    assert(v.games_.size() == 2 && v.library_.resets == before_empty);
+    empty.set_value({});
+    v.finish_scan(true);
+    assert(v.games_loaded_ && v.games_.empty());
+    assert(v.library_.count == 0 && v.library_.selected == -1);
 }
 """;
 
