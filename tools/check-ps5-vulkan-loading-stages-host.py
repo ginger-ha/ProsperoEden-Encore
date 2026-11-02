@@ -52,7 +52,11 @@ assert frontend.count("glReadPixels(") == 1
 assert frontend.count("LaunchHandoff::Publish(") == 1
 assert frontend.index("batch.draw(list, viewport,") < frontend.index("glReadPixels(") < frontend.index("display.swap()")
 assert "handoff_captured = true;" in frontend
-assert "pe::ui::theme::kLaunchSeconds - 0.75f" in frontend
+assert "handoff_captured && launcher.done()" not in frontend  # capture is single-use
+assert "if (!handoff_captured && launcher.done() &&" in frontend
+launcher_scene = (root / "headless/prosperoeden/pe/ui/launcher.cpp").read_text()
+assert "const float leave = 1.0f;" in launcher_scene
+assert "if (fade > 0.0f)" not in launcher_scene
 assert "LaunchHandoff::Clear()" in frontend
 assert "inline bool Valid(const Frame& frame)" in handoff
 assert "frame.width <= max_width && frame.height <= max_height" in handoff
