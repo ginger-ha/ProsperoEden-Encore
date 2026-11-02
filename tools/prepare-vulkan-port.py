@@ -6385,6 +6385,44 @@ apply_reviewed_delta(
     "    // Hold config_mutex until FindSampler has finished its per-channel\n    // lookup. Checking the engine once and unlocking before FindSampler\n    // could publish a sampler belonging to a different channel.\n    std::scoped_lock channel_lock{config_mutex};\n    if (!channel_state || !gpu_memory ||\n        kepler_compute != &expected_compute ||\n        gpu_memory != &expected_memory ||\n        &channel_state->kepler_compute != &expected_compute ||\n        &channel_state->gpu_memory != &expected_memory)\n        return NULL_SAMPLER_ID;\n    // FindSampler already owns slot_samplers and the per-channel TSC",
     'NS2 native sampler lookup holds channel mutex through slot acquisition')
 
+# Native texture-cache work can recurse into the shared getStorageID
+# accessor while the channel configuration mutex is held. Keep pristine
+# upstream and the shipping backport manifest byte-for-byte unchanged.
+# Only the NS2-aware versioned texture owner bypasses that nested mutex on
+# the same thread, with a scope guard restoring the lease on exceptions.
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache_base.h',
+    "    [[nodiscard]] ImageViewId AcquireNativeImageView(",
+    "    // Native acquisitions hold config_mutex across texture-cache work.\n"
+    "    // The existing GPU-region enumerators call getStorageID() internally:\n"
+    "    // never re-acquire this non-recursive mutex on the owner thread. Other\n"
+    "    // threads and all NS1 call sites retain the original locking behavior.\n"
+    "    inline static thread_local const TextureCache<P>* native_channel_lock_owner = nullptr;\n"
+    "    [[nodiscard]] std::optional<size_t> getStorageID(size_t id) const {\n"
+    "        if (native_channel_lock_owner == this) {\n"
+    "            const auto it = this->address_spaces.find(id);\n"
+    "            return it == this->address_spaces.end()\n"
+    "                ? std::nullopt : std::optional<size_t>{it->second.storage_id};\n"
+    "        }\n"
+    "        return VideoCommon::ChannelSetupCaches<TextureCacheChannelInfo>::getStorageID(id);\n"
+    "    }\n"
+    "    [[nodiscard]] ImageViewId AcquireNativeImageView(",
+    "Native native-only same-thread channel-lease storage lookup")
+for needle in (
+    "    const auto [pair, is_new] = channel_state->image_views.try_emplace(descriptor);",
+    "    // FindSampler already owns slot_samplers and the per-channel TSC",
+):
+    apply_reviewed_delta(
+        'vulkan-cache/video_core/texture_cache/texture_cache.h',
+        needle,
+        "    // Suppress only same-thread nested getStorageID locking while the\n"
+        "    // configuration lease remains live; never waive locks on other threads.\n"
+        "    const auto prior_native_owner = native_channel_lock_owner;\n"
+        "    native_channel_lock_owner = this;\n"
+        "    SCOPE_EXIT { native_channel_lock_owner = prior_native_owner; };\n"
+        + needle,
+        "Native TIC/TSC scoped storage lookup is non-blocking for owner thread")
+
 # Native QMD Compute pipeline owners are GPU objects. The old guest
 # SignalFence callback may run immediately; use the exact GPU timeline
 # wait via the host-validated native helper on success AND epoch refusal.

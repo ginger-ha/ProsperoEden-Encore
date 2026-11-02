@@ -310,55 +310,80 @@ for name, member in (
     )
 print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS owner_check_and_both_acquisitions_locked")
 
-# Native TIC acquisition can enter CreateImageView/PrepareImageView while
-# holding config_mutex. Those cache paths call getStorageID(), which takes
-# that same lock. A non-recursive mutex would deadlock on a cache miss.
-# Prove native NS2 is reentrant, while NS1 retains std::mutex.
+# Source-owner reentrancy proof: the pristine shared ChannelSetupCaches
+# mutex remains non-recursive for NS1, while an NS2 cache call holds it
+# through TIC/TSC publication. The derived native texture cache's
+# per-thread owner marker avoids locking again during getStorageID().
 import subprocess
 import tempfile
 import shutil
 
 channel_header = (vendor / "sources/eden/src/video_core/control/channel_state_cache.h").read_text()
 channel_impl = (vendor / "sources/eden/src/video_core/control/channel_state_cache.inc").read_text()
+assert "mutable std::mutex config_mutex;" in channel_header
+assert "std::recursive_mutex config_mutex" not in channel_header
+assert channel_header.count("std::unique_lock<std::mutex> lk(config_mutex);") == 2
+assert channel_impl.count("std::unique_lock<std::mutex> lk(config_mutex);") == 3
 assert "auto storage_id = getStorageID(as_id);" in impl
-assert channel_header.count("std::unique_lock lk(config_mutex);") == 2
-assert channel_impl.count("std::unique_lock lk(config_mutex);") == 3
-assert "std::unique_lock<std::mutex> lk(config_mutex);" not in channel_impl
-channel_policy = re.search(
-    r"(#if defined[(]PS5_NATIVE[)] && defined[(]EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL[)]"
-    r"\s+mutable std::recursive_mutex config_mutex;"
-    r"\s+#else\s+mutable std::mutex config_mutex;\s+#endif)",
-    channel_header,
-)
-assert channel_policy, "NS2 reentrant config mutex not isolated from NS1"
+assert "inline static thread_local const TextureCache<P>* native_channel_lock_owner" in header
+assert "native_channel_lock_owner == this" in header
+assert "ChannelSetupCaches<TextureCacheChannelInfo>::getStorageID(id)" in header
+for name in ("ImageViewId TextureCache<P>::AcquireNativeImageView(",
+             "SamplerId TextureCache<P>::AcquireNativeSampler("):
+    body = impl.split(name, 1)[1].split("\ntemplate <class P>", 1)[0]
+    assert body.index("std::scoped_lock channel_lock{config_mutex};") < (
+        body.index("native_channel_lock_owner = this;"))
+    assert "SCOPE_EXIT { native_channel_lock_owner = prior_native_owner; };" in body
+    assert body.index("native_channel_lock_owner = this;") < (
+        body.index("channel_state->image_views.try_emplace(descriptor)")
+        if "ImageView" in name else body.index("return FindSampler(descriptor, true);"))
+
+# Compile/run a small exact-syntax policy witness on Clang/GCC. The source
+# oracle above ties this primitive to the actual cache, not a dummy owner.
 fixture = (
-    "#include <mutex>\n#include <type_traits>\n"
-    "struct CacheOwner { public:\n" + channel_policy.group(1) +
-    "\nvoid nested() { std::scoped_lock hold{config_mutex}; lookup(); }\n"
-    "void lookup() { std::unique_lock hold{config_mutex}; }\n};\n"
-    "int main() {\n#ifdef PS5_NATIVE\n"
-    "static_assert(std::is_same_v<decltype(CacheOwner::config_mutex),"
-    " std::recursive_mutex>);\nCacheOwner{}.nested();\n#else\n"
-    "static_assert(std::is_same_v<decltype(CacheOwner::config_mutex),"
-    " std::mutex>);\n#endif\n}\n"
+    "#include <mutex>\n#include <optional>\n#include <unordered_map>\n"
+    "#include <thread>\n#include <cassert>\n"
+    "class Cache { public:\n"
+    "struct Entry { size_t storage_id; };\n"
+    "mutable std::mutex config_mutex;\n"
+    "std::unordered_map<size_t, Entry> address_spaces{{1, {7}}};\n"
+    "inline static thread_local const Cache* native_channel_lock_owner = nullptr;\n"
+    "std::optional<size_t> getStorageID(size_t id) const {\n"
+    " if (native_channel_lock_owner == this) {\n"
+    "  auto it = address_spaces.find(id);\n"
+    "  return it == address_spaces.end() ? std::nullopt : "
+    "std::optional<size_t>{it->second.storage_id};\n"
+    " }\n"
+    " std::unique_lock lock{config_mutex};\n"
+    " auto it = address_spaces.find(id);\n"
+    " return it == address_spaces.end() ? std::nullopt : "
+    "std::optional<size_t>{it->second.storage_id};\n"
+    "}\n"
+    "void acquire() {\n"
+    " std::scoped_lock lock{config_mutex};\n"
+    " auto prior = native_channel_lock_owner;\n"
+    " native_channel_lock_owner = this;\n"
+    " struct Restore { const Cache* prior; ~Restore() {"
+    " Cache::native_channel_lock_owner = prior; } } restore{prior};\n"
+    " assert(getStorageID(1) == 7);\n"
+    "}\n};\n"
+    "int main() {\nCache cache;\ncache.acquire();\n"
+    "assert(cache.getStorageID(1) == 7);\n"
+    "assert(Cache::native_channel_lock_owner == nullptr);\n"
+    "}\n"
 )
-compilers = [tool for tool in ("clang++", "g++") if shutil.which(tool)]
-assert compilers, "no C++ compiler for native channel reentrancy witness"
-with tempfile.TemporaryDirectory(prefix="ns2-native-channel-owner-") as temp_dir:
-    source = Path(temp_dir) / "channel.cpp"
+compilers = [x for x in ("clang++", "g++") if shutil.which(x)]
+assert compilers, "native config-lease compilers absent"
+with tempfile.TemporaryDirectory(prefix="ns2-channel-lease-") as tmp:
+    source = Path(tmp) / "lease.cpp"
     source.write_text(fixture)
-    for compiler in compilers:
-        for name, flags in (
-            ("ns1", []),
-            ("ns2", ["-DPS5_NATIVE=1",
-                     "-DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1"]),
-        ):
-            executable = Path(temp_dir) / f"{compiler}-{name}"
-            subprocess.run([compiler, "-std=c++20", "-O0", "-pthread",
-                            *flags, str(source), "-o", str(executable)],
-                           capture_output=True, text=True, check=True, timeout=20)
-            subprocess.run([str(executable)], check=True, timeout=5)
-print("NS2_CACHE_CHANNEL_REENTRANCY_PASS compiled=1 ns1_mutex=unchanged")
+    for cc in compilers:
+        output = Path(tmp) / cc
+        subprocess.run([cc, "-std=c++20", "-O0", "-pthread",
+                        str(source), "-o", str(output)],
+                       capture_output=True, text=True, check=True, timeout=20)
+        subprocess.run([str(output)], check=True, timeout=5)
+print("NS2_CACHE_CHANNEL_LEASE_PASS upstream=pristine native=thread_local")
 
 # The generic guest fence callback can execute synchronously when delay is
 # false. Native pipeline retirement MUST wait a real GPU timeline tick via
