@@ -219,17 +219,15 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         assert expected["vulkan_window_adapt_pass.cpp"].read_text().count(after) == 1, "native loader delta changed"
         loader_source = loader_source.replace(before, after)
     loader_path.write_text(loader_source)
-    # R01: reconstruct only the exact opt-in graphics telemetry deltas on top
+    # R01: the generated loader now owns its own frame metrics and includes.\n    # Reconstruct the remaining opt-in graphics telemetry deltas on top
     # of the formerly validated generator output. The active Vulkan fork and
     # shader owners remain full checked-in sources; generator only acts as a
     # BYTE-FOR-BYTE parity oracle, never as production patcher.
     metrics_deltas = {
         "vulkan_renderer.cpp": [
-            ("#include \"display_refresh.h\"", "#include \"display_refresh.h\"\n#include \"frame_metrics.h\""),
             ("    RenderScreenshot(framebuffers);\n    if (::Eden::Display::SkipFrame()) {", "    RenderScreenshot(framebuffers);\n    // Count a source callback separately from submitted or displayed frames.\n    ::Eden::FrameMetrics::OnSourceComposite();\n    if (::Eden::Display::SkipFrame()) {\n        ::Eden::FrameMetrics::OnSourceSkipped();"),
             ("        present_manager.Present(generated);\n    }\n#endif", "        present_manager.Present(generated);\n        ::Eden::FrameMetrics::OnGeneratedQueued();\n    }\n#endif"),
             ("    present_manager.Present(frame);\n    scheduler.DispatchWork();", "    present_manager.Present(frame);\n    ::Eden::FrameMetrics::OnRealQueued();\n    scheduler.DispatchWork();"),
-            ("    scheduler.Flush(*frame->render_ready);\n    present_manager.Present(frame);\n}\n\nvoid RendererVulkan::Report() const {", "    scheduler.Flush(*frame->render_ready);\n    present_manager.Present(frame);\n    ::Eden::FrameMetrics::OnLoadingQueued();\n}\n\nvoid RendererVulkan::Report() const {"),
         ],
         "vulkan_present_manager.cpp": [
             ("#include \"common/settings.h\"", "#include \"common/settings.h\"\n#include \"frame_metrics.h\""),
