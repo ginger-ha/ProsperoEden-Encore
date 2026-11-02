@@ -295,7 +295,6 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
         long long ui_max_update_us = 0, ui_max_draw_us = 0, ui_max_present_us = 0;
 #endif
         Eden::LaunchHandoff::Clear();
-        Clock::time_point selected_since{};
         bool handoff_captured = false;
         while (running && !launcher.done() && !launcher.restart_requested()) {
             const auto frame_start = Clock::now();
@@ -389,14 +388,14 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
             glClear(GL_COLOR_BUFFER_BIT);
             batch.draw(list, viewport, display.width(), display.height());
             // Preserve the ACTUAL jacket/hero/title composition before EGL
-            // is destroyed and Vulkan takes over. Capture once, near the
-            // end of the case rotation but before the black fade. The PS5
-            // Vulkan warm-up reuses this frame until the first guest frame.
-            if (!handoff_captured && !launcher.selected_game().empty()) {
-                const auto now = Clock::now();
-                if (selected_since == Clock::time_point{}) selected_since = now;
-                if (std::chrono::duration<float>(now - selected_since).count() >=
-                    pe::ui::theme::kLaunchSeconds - 0.75f) {
+            // is destroyed and Vulkan takes over. Capture the final complete
+            // case frame once, without any black-fade interstitial. Vulkan
+            // reuses this exact scene until the first guest frame.
+            if (!handoff_captured && launcher.done() &&
+                !launcher.selected_game().empty()) {
+                    // The final launcher frame remains fully visible, with
+                    // the 3D case settled and NO black outro. Capture this
+                    // exact presentation instead of an earlier spin angle.
                     handoff_captured = true;
                     const int width = display.width();
                     const int height = display.height();
@@ -440,7 +439,6 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
                                 "EDEN_LOADER_JACKET_HANDOFF_CAPTURE ready=0 memory=insufficient\n");
                         }
                     }
-                }
             }
             const auto drawn = Clock::now();
             bool captured = false;
