@@ -366,6 +366,14 @@ def main() -> int:
             "bool ConfigureNative(" in native_vk_pipeline_h and
             "CreateNativeComputePipeline(" in native_vk_cache_h and
             "PipelineCache::CreateNativeComputePipeline(" in native_vk_cache and
+            "std::shared_ptr<ComputePipeline> PipelineCache::CreateNativeComputePipeline(" in native_vk_cache and
+            "std::vector<NativeComputeReuse> native_compute_reuse;" in native_vk_cache_h and
+            "it->channel_generation != ticket->channel_generation" in native_vk_cache and
+            "it->words.size() != shader.words.size()" in native_vk_cache and
+            "std::equal(it->words.begin(), it->words.end(), shader.words.begin())" in native_vk_cache and
+            "std::rotate(it, it + 1, native_compute_reuse.end());" in native_vk_cache and
+            "if (native_compute_reuse.size() == 12)" in native_vk_cache and
+            "RetainNativeComputeUntilGpuTick(" in native_vk_rasterizer and
             "shader.ComputeMetadataReady()" in native_vk_cache and
             "registry.IsComputeCurrent(kepler_compute, *ticket)" in native_vk_cache and
             "vk::ShaderModule spv_module = BuildShader(device, shader.words)" in native_vk_cache and
