@@ -37,6 +37,13 @@ inline void Publish(Frame&& frame) {
     const std::lock_guard lock{frame_mutex};
     pending_frame = std::move(stored);
 }
+// Renderer may inspect pending pixels while the swapchain has zero extent
+// or while a transient staging allocation fails. The owner stays available
+// until successful Vulkan upload; a failed warm-up must never eat the jacket.
+inline std::shared_ptr<const Frame> Peek() {
+    const std::lock_guard lock{frame_mutex};
+    return pending_frame;
+}
 inline std::shared_ptr<const Frame> Take() {
     const std::lock_guard lock{frame_mutex};
     return std::exchange(pending_frame, {});
