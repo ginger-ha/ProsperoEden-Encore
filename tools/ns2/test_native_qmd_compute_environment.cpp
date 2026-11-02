@@ -470,7 +470,7 @@ int main() {
         tic.header_version.Assign(TICHeaderVersion::BlockLinear);
         tic.texture_type.Assign(TextureType::Texture2D);
         tic.address_high.Assign(texture_va >> 32);
-        tic.address_low.Assign(static_cast<u32>(texture_va));
+        tic.address_low = static_cast<u32>(texture_va);
         tic.width_minus_one.Assign(63);
         tic.height_minus_1.Assign(63);
         tic.depth_minus_1.Assign(0);
