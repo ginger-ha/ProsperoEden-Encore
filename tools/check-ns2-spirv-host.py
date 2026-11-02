@@ -71,6 +71,7 @@ def main():
              "-ffunction-sections", "-fdata-sections", "-Wno-unused-parameter",
              "-pthread", "-I" + str(FMT),
              "-I" + str(ROOT / "vendor/encore-active/ns2-runtime/ampere"),
+             "-I" + str(ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch"),
              "-I" + str(ROOT / "vendor/encore-active/ns2-runtime/hle"), "-I" + str(SRC),
              "-I" + str(SRC / "dynarmic/src"),
              "-I" + str(SIRIT / "include"), "-I" + str(SIRIT / "src"),
