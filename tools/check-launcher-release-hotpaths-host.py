@@ -43,6 +43,15 @@ assert "preserve_loaded_games" not in scan
 assert (scan.index("services_.games(&scan_cancel_)") <
         scan.index("services_.game_storage_available()") <
         scan.index("return games;")), "storage availability must be checked on the worker after enumeration"
+# A same-file scan can change mod preferences without moving the game.
+# Refresh that single UI switch only when the actual preference changes,
+# without resetting the selection animation or restarting its media worker.
+applied = lib.split("void Launcher::apply_games(std::vector<Game> games)",1)[1].split(
+    "void Launcher::sync_home_game(",1)[0]
+assert applied.count("const bool selected_mods_changed =") == 1
+assert "mods_enabled !=\n            games_[static_cast<std::size_t>(library_.selected)].mods_enabled" in applied
+assert "if (selected_mods_changed)\n            mods_switch_.snap(selected_game.mods_enabled ? 1.0f : 0.0f);" in applied
+assert applied.index("const bool selected_mods_changed =") < applied.index("games_ = std::move(games);")
 finish=lib.split("void Launcher::finish_scan(bool wait)",1)[1].split(
     "void Launcher::start_home_media()",1)[0]
 assert "apply_games(std::move(games));" in finish
