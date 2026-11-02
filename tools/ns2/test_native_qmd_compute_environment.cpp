@@ -461,6 +461,7 @@ int main() {
         using namespace Tegra::Texture;
         using Shader::Ampere::NativeQmdContiguousGpuSpan;
         using Shader::Ampere::NativeQmdWithinTexelBudget;
+        using Shader::Ampere::NativeQmdSamplerSupported;
         using Shader::Ampere::NativeQmdImageHandle;
         using Shader::Ampere::NativeQmdImageKind;
         using Shader::Ampere::NativeQmdResourcePlan;
@@ -487,7 +488,11 @@ int main() {
         tic.res_min_mip_level.Assign(0);
         tic.res_max_mip_level.Assign(0);
         TSCEntry tsc{};
-        tsc.raw[0] = 1; // a non-null sampled sampler record
+        tsc.mag_filter.Assign(TextureFilter::Nearest);
+        tsc.min_filter.Assign(TextureFilter::Linear);
+        tsc.mipmap_filter.Assign(TextureMipmapFilter::None);
+        assert(NativeQmdSamplerSupported(tsc));
+        const TSCEntry valid_sampler = tsc;
         const auto mapper = [&](u64 addr) -> std::optional<u64> {
             if (addr < texture_va || addr - texture_va >= 8192)
                 return std::nullopt;
@@ -572,8 +577,23 @@ int main() {
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tic.depth_minus_1.Assign(0);
         tsc.raw.fill(0);
+        assert(!NativeQmdSamplerSupported(tsc));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tsc.raw[0] = 1;
+        tsc = valid_sampler;
+        tsc.mag_filter.Assign(static_cast<TextureFilter>(0));
+        assert(!NativeQmdSamplerSupported(tsc));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        tsc.min_filter.Assign(static_cast<TextureFilter>(3));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        tsc.mipmap_filter.Assign(static_cast<TextureMipmapFilter>(0));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        tsc.reduction_filter.Assign(static_cast<SamplerReduction>(3));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc = valid_sampler;
+        assert(NativeQmdSamplerSupported(tsc));
         tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tic.msaa_mode.Assign(static_cast<MsaaMode>(10));
