@@ -18,8 +18,10 @@ assert 'base/exefs/icon.jpg' in services and 'exefs/icon.png' in services
 assert 'IsSafeExtractedDirectory(parent)' in services
 assert 'icon_' in services and 'std::memcmp(signature,' in services
 assert 'IsSafeExtractedDirectory(ancestor)' in services
-assert 'WriteJpegTga(*body, staged, true)' in services
-assert 'std::rename(staged.c_str(), target.c_str())' in services
+assert 'WriteJpegTga(best, staged, true)' in services
+assert 'std::rename(staged.c_str(), destination.c_str())' in services
+assert 'FetchKnownNs2Front' not in services
+assert 'front_host' not in header and 'front_path' not in header
 compiler=shutil.which("clang++") or shutil.which("g++")
 if not compiler: raise SystemExit("No native C++20 compiler")
 source=r"""
@@ -37,10 +39,7 @@ int main() {
     assert(!Find(0x0100C49025D3E000ULL));
     for (const auto& item : Eden::Ns2Catalog::kTitles) {
         assert(!item.name.empty() && (item.id >> 56) == 4);
-        if (!item.front_host.empty()) {
-            assert(item.front_host.starts_with("https://"));
-            assert(item.front_path.starts_with("/"));
-        }
+        assert(item.id != 0 && !item.name.empty());
     }
     for (std::size_t i = 0; i < Eden::Ns2Catalog::kTitles.size(); ++i)
         for (std::size_t j = i+1; j < Eden::Ns2Catalog::kTitles.size(); ++j)
