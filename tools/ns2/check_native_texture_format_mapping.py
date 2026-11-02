@@ -298,7 +298,10 @@ generic_fence = (vendor / "sources/eden/src/video_core/fence_manager.h").read_te
 assert "if (!delay_fence) {" in generic_fence
 assert "func();" in generic_fence
 assert "RetainNativeComputeUntilGpuTick(" in native_env
-assert "const u64 tick = scheduler.Flush();" in native_env
+assert "tick = scheduler.Flush();" in native_env
+assert "try { scheduler.Finish(); } catch (...) {}" in native_env, (
+    "failed native GPU flush may release queued pipeline before GPU retirement"
+)
 assert "fences.SyncOperation(" in native_env
 assert "gpu_scheduler->Wait(tick);" in native_env
 assert "fences.SignalReference();" in native_env

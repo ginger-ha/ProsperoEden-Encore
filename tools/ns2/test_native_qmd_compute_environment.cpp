@@ -40,7 +40,22 @@ struct NativeRetirementMockScheduler {
     // The GPU may complete an earlier dispatch while a later one is queued.
     // A Wait for the earlier tick must not require it to be the latest tick.
     u64 completed_tick{};
-    u64 Flush() { return ++current_tick; }
+    bool throw_after_flush_once{};
+    u32 finish_count{};
+    u64 Flush() {
+        const u64 tick = ++current_tick;
+        if (throw_after_flush_once) {
+            throw_after_flush_once = false;
+            throw std::runtime_error{"mock flush failure after command submission"};
+        }
+        return tick;
+    }
+    void Finish() {
+        // Actual Scheduler::Finish drains the pending command worker.
+        ++finish_count;
+        completed_tick = current_tick;
+        Wait(current_tick);
+    }
     void Wait(u64 tick) {
         assert(tick && tick <= current_tick && tick <= completed_tick);
         if (tick > waited) waited = tick;
@@ -104,6 +119,34 @@ int main() {
         assert(scheduler.waited == 1 && destroyed == 0);
         deferred = {};
         assert(destroyed == 1);
+    }
+    {
+        // Flush may throw after enqueuing deferred command-buffer
+        // closures, before returning their timeline ticket. The native
+        // pipeline must survive a fallback Finish, NOT disappear with the
+        // failed guest dispatch while those GPU closures still refer to it.
+        NativeRetirementMockScheduler scheduler{};
+        scheduler.throw_after_flush_once = true;
+        NativeRetirementMockFences fences{};
+        int destroyed{};
+        auto pipeline = std::shared_ptr<int>(
+            new int(17), [&](int* value) {
+                assert(scheduler.finish_count == 1 &&
+                       scheduler.waited == scheduler.current_tick);
+                ++destroyed;
+                delete value;
+            });
+        bool refused{};
+        try {
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, fences, std::move(pipeline));
+        } catch (const std::runtime_error&) {
+            refused = true;
+        }
+        assert(refused && scheduler.current_tick == 1 &&
+               scheduler.completed_tick == 1 && scheduler.waited == 1 &&
+               scheduler.finish_count == 1 && !fences.pending &&
+               !fences.signaled && destroyed == 1);
     }
     {
         // A failed SyncOperation registration must not destroy the
