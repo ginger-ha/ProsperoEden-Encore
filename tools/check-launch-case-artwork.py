@@ -88,7 +88,7 @@ assert "progress%" not in draw
 for fragment in (
     "draw_composed_case_face(ink, launch_case_game_",
     "c.textures.render_case_page(",
-    "if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)",
+    "if (decoded.texture != 0 ||",
     "const bool use_composed = artwork.texture == 0 && composed_page != 0;",
     "c.list.case_face(composed_page, face, angle, back, kWhite,",
     "{0.0f, 1.0f, 1.0f, -1.0f}",
@@ -175,7 +175,8 @@ assert 'Color::rgb(0x030507, 0.98f)' not in library_src
 
 # A cached original face is authoritative even while its texture is pending.
 # Independent reconstruction occurs ONLY for the specific missing face.
-assert "if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)" in draw
+assert "if (decoded.texture != 0 ||" in draw
+assert "(!decoded.missing && seconds < 4.0f)" in draw
 assert "const bool use_composed = artwork.texture == 0 && composed_page != 0;" in draw
 assert "if (scan.empty() || artwork.texture == 0)" not in draw
 assert "if (rear)\n                flat_back_fallback(c, game, paper);" not in library_src
