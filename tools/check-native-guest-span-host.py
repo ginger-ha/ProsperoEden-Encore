@@ -37,6 +37,10 @@ assert native_source.count(begin) == a32_source.count(begin) == 1
 maintained_methods = begin + native_source.split(begin,1)[1].split(end,1)[0]
 a32_methods = begin + a32_source.split(begin,1)[1].split(end,1)[0]
 assert maintained_methods == a32_methods, "native GetSpan must not vary by A32 profile"
+assert maintained_methods.count("current_page_table == nullptr ||") == 1
+assert maintained_methods.index("current_page_table == nullptr ||") < maintained_methods.index(
+    "!AddressSpaceContains(*current_page_table, addr, size)")
+
 assert maintained_methods.count("if (size == 0 || addr + (size - 1) < addr)") == 2
 assert maintained_methods.count("start_page >= entries.size() || end_page >= entries.size()") == 2
 assert old not in maintained_methods
