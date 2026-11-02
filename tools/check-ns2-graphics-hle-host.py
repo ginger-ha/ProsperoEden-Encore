@@ -56,6 +56,19 @@ def main()->int:
     ):
         assert source in text, "Missing real GSV NVMap lifetime owner: " + source
     assert 'm_native_memory.Create(size)' not in text, "Synthetic GSV native memory ID in runtime"
+    # Protocol 11 (VI2) and 12 (GPU session) must expose an event as
+    # a TIPC COPY handle. Explicit errors carry no phantom null handle.
+    vi_notify=text.split('void Event(HLERequestContext& ctx) {',1)[1].split('void VsyncEvent(',1)[0]
+    assert 'IPC::ResponseBuilder rb{ctx,2,1,0};' in vi_notify
+    assert 'rb.PushCopyObjects(ctx,m_event->GetReadableEvent());' in vi_notify
+    assert 'AddMoveObject' not in vi_notify
+    assert 'readable->Open(kernel)' not in vi_notify
+    gpu_session=(ROOT/"vendor/encore-active/ns2-runtime/gpu_session/core/hle/service/am/service/gpu_session.cpp").read_text()
+    gpu_notify=gpu_session.split('void IGpuSession::GetNotificationEvent(HLERequestContext& ctx) {',1)[1].split('IGpuSession::ResolveOpenedAddressSpace',1)[0]
+    assert 'IPC::ResponseBuilder rb{ctx, 2, 1, 0};' in gpu_notify
+    assert 'rb.PushCopyObjects(ctx, *readable);' in gpu_notify
+    assert 'AddMoveObject' not in gpu_notify
+    assert 'readable->Open(kernel)' not in gpu_notify
     # NX2 VI2 display polling uses explicit, known empty acknowledgements.
     # Do not blanket-ack unknown service commands or fake guest frames.
     for number in (51, 104, 105):
