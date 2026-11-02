@@ -1326,7 +1326,8 @@ adapt('src/video_core/renderer_vulkan/renderer_vulkan.h',
     ('    MemoryAllocator memory_allocator;\n    StateTracker state_tracker;',
      '    MemoryAllocator memory_allocator;\n'
      '#ifdef PS5_NATIVE\n'
-     '    // The last real launcher frame is kept until all GPU work retires.\n'
+     '    // Kept alive until Vulkan scheduler/device retirement. One persistent\n'
+     '    // upload buffer per title: no per-vblank CPU copies or decoder work.\n'
      '    vk::Buffer loading_jacket_buffer{};\n'
      '    u32 loading_jacket_width{};\n'
      '    u32 loading_jacket_height{};\n'
