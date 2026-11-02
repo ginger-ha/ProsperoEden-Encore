@@ -583,6 +583,35 @@ int main() {
         storage, rollback));
     assert(rollback_count == 4 && stage_order == 0 &&
            storage_binds == storage_before_oom);
+    // A failing cleanup handler must never cause a second rollback. This
+    // previously re-entered the same callback through the catch handler,
+    // risking a double release of already-retired Vulkan descriptor owners.
+    unsigned cleanup_before = rollback_count;
+    unsigned unexpected_storage_bind{};
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,
+        [&](u32,u32,u64,u32) { return false; },
+        [&](u32,u64,u32,bool) { ++unexpected_storage_bind; return true; },
+        [&] { ++rollback_count; throw std::bad_alloc{}; }));
+    assert(rollback_count == cleanup_before + 1 &&
+           unexpected_storage_bind == 0);
+    // Also exercise a cleanup exception after CBUF staging, when the
+    // storage-descriptor callback itself refuses the Vulkan binding.
+    cleanup_before = rollback_count;
+    unsigned touched_bindings{};
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,
+        [&](u32,u32,u64,u32) { ++touched_bindings; return true; },
+        [&](u32,u64,u32,bool) { ++touched_bindings; return false; },
+        [&] {
+            ++rollback_count;
+            throw std::runtime_error{"descriptor cleanup failed"};
+        }));
+    assert(touched_bindings == 2 && rollback_count == cleanup_before + 1);
+    // Cleanup exceptions must not poison subsequent independent dispatches.
+    stage_order = 0;
+    assert(plan->StageVulkanBufferBindings(
+        mapped_all, uniform, storage, rollback));
     assert(!plan->ValidateGpuMappings([](u64, std::size_t) {
         return false;
     })); // A mapped QMD is not proof of mapped descriptor targets.
