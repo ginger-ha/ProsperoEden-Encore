@@ -17,6 +17,7 @@
 #include "pe/platform/audio_out.hpp"
 #include "pe/platform/display_egl.hpp"
 #include "pe/ui/launcher.hpp"
+#include "pe/ui/theme.hpp"
 #include "radio_input.h"
 #include <cerrno>
 #include <cstring>
@@ -37,6 +38,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <pthread.h>
 #include <string>
 #include <utility>
