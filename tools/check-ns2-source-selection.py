@@ -23,6 +23,15 @@ def main() -> int:
             require(f"option({flag}" in CMAKE and f"if({flag})" in CMAKE and
                     f"{flag} OR" in CMAKE.split("# Release gate: Vulkan/RADV", 1)[1],
                     "NS2 research flag not release-forbidden: " + flag)
+        # QMD3's virtual RasterizerInterface must be the SAME reviewed
+        # header in every research native consumer; a private override in
+        # RasterizerVulkan alone does not compile or preserve the vtable ABI.
+        rasterizer_abi = (ROOT / "vendor/sources/eden/src/video_core/rasterizer_interface.h").read_text()
+        require('virtual bool DispatchNativeCompute(const Tegra::NativeComputeLaunch&)' in rasterizer_abi and
+                'configure_file("${EDEN_NS2_RASTERIZER_INTERFACE}"' in CMAKE and
+                'target_compile_definitions(video_core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)' in CMAKE and
+                'target_compile_definitions(core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)' in CMAKE,
+                "Native QMD3 RasterizerInterface selector or public ABI guard missing")
         # Experimental engine code may have only one maintained vendor owner.
         require((ROOT / "vendor/encore-active/ns2-helpers/include/npdm_layout.h").is_file(),
                 "The NPDM parser must use the maintained vendor ACID helper")
