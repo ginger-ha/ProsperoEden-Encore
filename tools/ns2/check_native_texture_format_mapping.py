@@ -283,6 +283,8 @@ for symbol in ("RetireGpuImage(Image&& image)", "RetireGpuImageView(ImageView&& 
     queue = "pending_retired_images" if "Image&&" in symbol else "pending_retired_views"
     assert block.index(queue + ".reserve(") < block.index(queue + ".push_back("), (
         "Vulkan owner must not move before throwing queue growth", queue)
+    assert "max_size()" in block and "capacity()" in block, (
+        "GPU retirement container growth must remain amortized", queue)
 for site in ("void TextureCache<P>::InvalidateScale(", "void TextureCache<P>::DeleteImage("):
     block = impl.split(site, 1)[1].split("\ntemplate <class P>", 1)[0]
     assert "runtime.RetireGpuImageView(" in block, site
