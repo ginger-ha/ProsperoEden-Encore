@@ -25,6 +25,7 @@
 #include "diagnostics.h"
 #include "display_refresh.h"
 #include "graphics.h"
+#include "launch_handoff.hpp"
 #include "experimental_performance.h"
 #include "common/scope_exit.h"
 #include "core/core.h"
@@ -591,6 +592,9 @@ bool LoadingTick(VideoCore::RendererBase& renderer, bool idle) {
     return current_window_context && current_window_context->LoadingTick(idle);
 }
 GraphicsWindow::GraphicsWindow(bool use_vulkan) : vulkan(use_vulkan) {
+    // The jacket image is an in-memory Vulkan-only continuation, not
+    // something OpenGL should retain for the entire guest session.
+    if (!vulkan) LaunchHandoff::Clear();
     vulkan_loading = vulkan;
     vulkan_loading_start = -1;
     vulkan_loading_frames = 0;
