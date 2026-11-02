@@ -60,7 +60,10 @@ handoff_read = frontend.index("snapshot.rgba.data());")
 assert frontend.index("display.swap()") < frontend.index("batch.draw(list, viewport,")
 assert frontend.index("batch.draw(list, viewport,") < handoff_read < frontend.index("display.swap()", handoff_read)
 assert "handoff_captured = true;" in frontend
-assert "handoff_captured && launcher.done()" not in frontend  # capture is single-use
+# The production guard already contains the substring after its leading '!'.
+# Check the *full* conditional, not an ambiguous substring.
+assert frontend.count("if (!handoff_captured && launcher.done() &&") == 1
+assert "if (handoff_captured && launcher.done() &&" not in frontend
 assert "if (!handoff_captured && launcher.done() &&" in frontend
 launcher_scene = (root / "headless/prosperoeden/pe/ui/launcher.cpp").read_text()
 assert "const float leave = 1.0f;" in launcher_scene
