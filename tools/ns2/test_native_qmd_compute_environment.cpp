@@ -460,12 +460,21 @@ int main() {
     {
         using namespace Tegra::Texture;
         using Shader::Ampere::NativeQmdContiguousGpuSpan;
+        using Shader::Ampere::NativeQmdWithinTexelBudget;
         using Shader::Ampere::NativeQmdImageHandle;
         using Shader::Ampere::NativeQmdImageKind;
         using Shader::Ampere::NativeQmdResourcePlan;
         using Shader::Ampere::NativeQmdTextureTables;
         constexpr u64 texture_va = (u64{1} << 40) + 0x4000;
         constexpr u64 physical_va = (u64{1} << 41) + 0x8000;
+        // A large 1D width times 14-bit depth plus 11-bit layers must
+        // not wrap u64 and accidentally pass the small-image budget.
+        assert(NativeQmdWithinTexelBudget(64, 64, 1, 1, 64ULL * 1024 * 1024));
+        assert(!NativeQmdWithinTexelBudget(0, 64, 1, 1, 64ULL * 1024 * 1024));
+        assert(!NativeQmdWithinTexelBudget(
+            0x100000000ULL, 65536, 16384, 2048, 64ULL * 1024 * 1024));
+        assert(!NativeQmdWithinTexelBudget(64, 64, 1, 1, 0));
+        assert(!NativeQmdWithinTexelBudget(8192, 8192, 2, 1, 64ULL * 1024 * 1024));
         TICEntry tic{};
         tic.header_version.Assign(TICHeaderVersion::BlockLinear);
         tic.texture_type.Assign(TextureType::Texture2D);
@@ -547,6 +556,14 @@ int main() {
         tsc.raw[0] = 1;
         tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(static_cast<MsaaMode>(10));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(static_cast<MsaaMode>(11));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(MsaaMode::Msaa2x2_VC4);
+        assert(guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(MsaaMode::Msaa2x2_VC12);
+        assert(guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tic.msaa_mode.Assign(MsaaMode::Msaa1x1);
         tic.width_minus_one.Assign(16383);
         tic.height_minus_1.Assign(8191);
