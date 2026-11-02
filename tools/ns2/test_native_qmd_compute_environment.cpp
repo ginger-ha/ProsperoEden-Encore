@@ -999,6 +999,20 @@ int main() {
         forged_tic = tic;
         forged_tic.header_version.Assign(TICHeaderVersion::OneDBuffer);
         assert(rejects_tic(forged_tic));
+        forged_tic = tic;
+        forged_tic.width_minus_one.Assign(16383);
+        forged_tic.height_minus_1.Assign(8191);
+        assert(!NativeQmdTicLayoutSupported(forged_tic));
+        assert(rejects_tic(forged_tic)); // >64M texels on replay
+        forged_tic = tic;
+        forged_tic.msaa_mode.Assign(MsaaMode::Msaa4x4);
+        forged_tic.width_minus_one.Assign(4095);
+        forged_tic.height_minus_1.Assign(4095);
+        assert(!NativeQmdTicLayoutSupported(forged_tic));
+        assert(rejects_tic(forged_tic)); // >4M multisampled texels
+        forged_tic = tic;
+        forged_tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
+        assert(rejects_tic(forged_tic)); // unknown multisample mode
         assert(!guest_tables.DecodeAdmitted(textured, {}));
         assert(guest_tables.DecodeAdmitted(textured, *image));
         // The second TIC/TSC read is now a streaming, allocation-free

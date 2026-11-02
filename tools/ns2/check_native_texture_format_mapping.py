@@ -175,6 +175,12 @@ native_env = (vendor / (
     "encore-active/ns2-runtime/ampere/shader_recompiler/"
     "frontend/ampere/native_qmd_compute_environment.h"
 )).read_text()
+# Capture and typed replay must enforce the EXACT same TIC budget/MSAA
+# admission, not two diverging copies of the field-policy checks.
+assert "bool NativeQmdTicLayoutSupported(" in native_env
+assert native_env.count("NativeQmdTicLayoutSupported(") == 3
+assert "if (!NativeQmdTicLayoutSupported(tic)) return std::nullopt;" in native_env
+assert "if (!NativeQmdTicLayoutSupported(entry.tic)) return std::nullopt;" in native_env
 assert "bool NativeQmdImageLayoutMatches(" in native_env
 assert "NativeQmdImageKind::TextureBuffer" in native_env
 assert "NativeQmdImageKind::ImageBuffer" in native_env
