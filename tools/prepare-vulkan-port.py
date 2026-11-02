@@ -6369,3 +6369,19 @@ apply_reviewed_delta(
     'vulkan-cache/video_core/texture_cache/texture_cache.h',
     "    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&", "    // BindToChannel/EraseChannel mutate these pointers under config_mutex.\n    // The renderer holds texture_cache.mutex; take the configuration lock\n    // briefly as well so a concurrent channel switch cannot race this proof.\n    std::scoped_lock channel_lock{config_mutex};\n    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&",
     'Native texture owner proof serialized with config channel switches')
+
+# Native QMD Compute pipeline owners are GPU objects. The old guest
+# SignalFence callback may run immediately; use the exact GPU timeline
+# wait via the host-validated native helper on success AND epoch refusal.
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};", "        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};\n        // The native owner must survive GPU completion independently of\n        // immediate guest callbacks. Use the host-tested timeline helper.",
+    "NS2 fence pipeline owner uses real timeline instead of guest callback")
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "            fence_manager.SignalFence([pipeline = std::move(pipeline)] {});\n            return false;", "            Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n            return false;",
+    "NS2 Vulkan pipeline retained on post-bind epoch rejection")
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "        fence_manager.SignalFence([pipeline = std::move(pipeline)] {});\n        return true;", "        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;",
+    "NS2 Vulkan pipeline retained through successful compute dispatch")

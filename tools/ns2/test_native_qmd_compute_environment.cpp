@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -28,6 +29,32 @@ struct TextureMetadata final : Shader::Environment {
         return std::nullopt;
     }
     void Dump(u64,u64) override { std::abort(); }
+};
+// The production native Compute retirement helper, tested with a
+// timeline-backed scheduler and a fence manager that does NOT delay the
+// guest callback. Only SyncOperation can retain the owner until completion.
+struct NativeRetirementMockScheduler {
+    u64 current_tick{};
+    u64 waited{};
+    bool gpu_completed{};
+    u64 Flush() { return ++current_tick; }
+    void Wait(u64 tick) {
+        assert(gpu_completed && tick == current_tick);
+        waited = tick;
+    }
+};
+struct NativeRetirementMockFences {
+    std::function<void()> pending{};
+    bool signaled{};
+    void SyncOperation(std::function<void()>&& operation) {
+        assert(!pending);
+        pending = std::move(operation);
+    }
+    void SignalReference() {
+        // Guest callbacks would run immediately in this fence policy,
+        // but the SyncOperation callback is still pending.
+        signaled = true;
+    }
 };
 struct MockMappedGpu {
     u64 address{};
@@ -53,6 +80,24 @@ static bool Reject(F&& call) {
 }
 int main() {
     using Shader::Ampere::NativeQmdComputeEnvironment;
+    {
+        NativeRetirementMockScheduler scheduler{};
+        NativeRetirementMockFences fences{};
+        int destroyed{};
+        auto pipeline = std::shared_ptr<int>(
+            new int(7), [&](int* value) { ++destroyed; delete value; });
+        Shader::Ampere::RetainNativeComputeUntilGpuTick(
+            scheduler, fences, std::move(pipeline));
+        assert(fences.signaled && fences.pending && scheduler.current_tick == 1);
+        assert(destroyed == 0 && scheduler.waited == 0);
+        scheduler.gpu_completed = true;
+        auto deferred = std::move(fences.pending);
+        fences.pending = {};
+        deferred();
+        assert(scheduler.waited == 1 && destroyed == 0);
+        deferred = {};
+        assert(destroyed == 1);
+    }
     Tegra::NativeQmdScheduler::Descriptor qmd{};
     qmd[8]=0x80;
     qmd[12]=3; qmd[13]=4; qmd[14]=5;

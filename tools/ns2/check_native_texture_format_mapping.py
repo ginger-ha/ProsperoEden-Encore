@@ -210,3 +210,24 @@ assert "std::scoped_lock channel_lock{config_mutex};" in impl
 assert impl.index("std::scoped_lock channel_lock{config_mutex};") < impl.index(
     "&channel_state->kepler_compute == &expected_compute")
 print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS config_mutex=acquired")
+
+# The generic guest fence callback can execute synchronously when delay is
+# false. Native pipeline retirement MUST wait a real GPU timeline tick via
+# SyncOperation, and must be used for both success and aborted submissions.
+generic_fence = (vendor / "sources/eden/src/video_core/fence_manager.h").read_text()
+assert "if (!delay_fence) {" in generic_fence
+assert "func();" in generic_fence
+assert "RetainNativeComputeUntilGpuTick(" in native_env
+assert "const u64 tick = scheduler.Flush();" in native_env
+assert "fences.SyncOperation(" in native_env
+assert "gpu_scheduler->Wait(tick);" in native_env
+assert "fences.SignalReference();" in native_env
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    code = (vendor / path).read_text()
+    assert code.count("RetainNativeComputeUntilGpuTick(") == 2, path
+    assert "fence_manager.SignalFence([pipeline = std::move(pipeline)] {})" not in code
+print("NS2_NATIVE_COMPUTE_GPU_TICK_RETENTION_PASS no_immediate_release=1"
+      " cancelled_submit=retained successful_submit=retained")
