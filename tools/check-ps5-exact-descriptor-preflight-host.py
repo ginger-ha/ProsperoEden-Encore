@@ -64,6 +64,13 @@ assert native_compute.count("PreflightExactGuestDraw(") == 1
 assert native_compute.index("PreflightExactGuestDraw(") < native_compute.index(
     "std::scoped_lock lock{buffer_cache.mutex};")
 assert "if (!registry.IsComputeCurrent(kepler_compute, *ticket))" in native_compute
+native_preflight_start = native_compute.index("const auto preflight_guest = [&] {")
+native_preflight_end = native_compute.index(
+    "        if (pipeline->CanUseDescriptorBuffer()", native_preflight_start)
+native_preflight_block = native_compute[native_preflight_start:native_preflight_end]
+assert native_preflight_block.count("PreflightExactGuestDraw(") == 1
+assert native_preflight_block.count("if (preflight_guest())") == 1
+assert "gpu_memory->FlushCaching();" in native_preflight_block
 assert native.count("if (!pipeline->HasDescriptorEntries() ||") == 2
 assert native.count(check_tag) == 4
 assert "PreflightLargeGuestDraw(" not in native
@@ -180,8 +187,27 @@ struct Rig {
     void ComputeLoop() { COMPUTE_LOOP }
     void ComputeReuse() { COMPUTE_REUSE }
     void ComputeCapacity() { COMPUTE_CAPACITY }
+    void NativePreflight() { NATIVE_PREFLIGHT }
 };
 using Method = void (Rig::*)();
+void check_native_preflight() {
+    // Exercise the EXACT separate QMD3 pre-lock lambda from the maintained
+    // Vulkan renderer; zero bindings must not wait or flush unnecessarily.
+    Rig empty(0, 4095);
+    empty.NativePreflight();
+    assert(empty.scheduler.waits == 0 && empty.memory.flushes == 0);
+    Rig one(1, 4095);
+    one.NativePreflight();
+    assert(one.scheduler.waits == 1 && one.memory.flushes == 1);
+    assert(one.guest_descriptor_queue.payload_cursor ==
+           one.guest_descriptor_queue.payload_start);
+    Rig room(1, 4000);
+    room.NativePreflight();
+    assert(room.scheduler.waits == 0 && room.memory.flushes == 0);
+    Rig many(2048, 3500);
+    many.NativePreflight();
+    assert(many.scheduler.waits == 1 && many.memory.flushes == 1);
+}
 void check(Method method) {
     // Even a nearly exhausted guest descriptor queue must not stall on
     // shaders that produce exactly zero descriptors.
@@ -243,14 +269,16 @@ int main() {
         &Rig::GraphLoop, &Rig::GraphReuse, &Rig::GraphCapacity,
         &Rig::ComputeLoop, &Rig::ComputeReuse, &Rig::ComputeCapacity
     }) check(method);
-    std::puts("SIX_NATIVE_DESCRIPTOR_PREFLIGHT_EXACT_PARITY_PASS");
+    check_native_preflight();
+    std::puts("SEVEN_NATIVE_DESCRIPTOR_PREFLIGHT_EXACT_PARITY_PASS");
 }
 """
 for tag, block in [
     ("OLD_HELPER", prior), ("HELPER", helper),
     ("GRAPH_LOOP", gl), ("GRAPH_REUSE", gb[0]), ("GRAPH_CAPACITY", gb[1]),
     ("COMPUTE_LOOP", cl), ("COMPUTE_REUSE", cb[0]),
-    ("COMPUTE_CAPACITY", cb[1])
+    ("COMPUTE_CAPACITY", cb[1]),
+    ("NATIVE_PREFLIGHT", native_preflight_block)
 ]:
     # Replace the longer OLD_HELPER placeholder first; replacing HELPER
     # before it would corrupt the old-method declaration.
@@ -273,7 +301,7 @@ with tempfile.TemporaryDirectory(prefix="encore-exact-preflight-") as d:
         assert built.returncode == 0, (opt, built.stderr[-5000:])
         run = subprocess.run([str(exe)], capture_output=True, text=True, timeout=20)
         assert run.returncode == 0, (opt, run.stdout, run.stderr[-5000:])
-        assert "SIX_NATIVE_DESCRIPTOR_PREFLIGHT_EXACT_PARITY_PASS" in run.stdout
+        assert "SEVEN_NATIVE_DESCRIPTOR_PREFLIGHT_EXACT_PARITY_PASS" in run.stdout
         print("DESCRIPTOR_PREFLIGHT_EXACT_SOURCE_PASS", opt)
 
 
