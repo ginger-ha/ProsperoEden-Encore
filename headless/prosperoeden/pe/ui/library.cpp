@@ -762,6 +762,35 @@ void Launcher::apply_games(std::vector<Game> games)
                                  library_.selected < static_cast<int>(games_.size()) ?
                                      games_[static_cast<std::size_t>(library_.selected)].file :
                                      std::string{};
+    // A settings/mod rescan may return fresh game metadata before the async
+    // artwork worker has populated its media paths. Keep already decoded
+    // media for the SAME confirmed game (file, order and nonzero TitleID).
+    // A title replacement, newly provided scan or changed title ID wins.
+    // The usual identical inventory is O(n), without a second disk walk.
+    if (same) {
+        for (std::size_t i = 0; i < games.size(); ++i) {
+            Game& incoming = games[i];
+            const Game& previous = games_[i];
+            if (!incoming.title_id || incoming.title_id != previous.title_id)
+                continue;
+            const auto keep_missing = [](auto& target, const auto& cached) {
+                if (target.empty()) target = cached;
+            };
+            keep_missing(incoming.cover, previous.cover);
+            keep_missing(incoming.box_front, previous.box_front);
+            keep_missing(incoming.box_back, previous.box_back);
+            keep_missing(incoming.hero, previous.hero);
+            keep_missing(incoming.screenshots, previous.screenshots);
+            keep_missing(incoming.intro, previous.intro);
+            keep_missing(incoming.description, previous.description);
+            keep_missing(incoming.publisher, previous.publisher);
+            keep_missing(incoming.developer, previous.developer);
+            keep_missing(incoming.release_date, previous.release_date);
+            keep_missing(incoming.categories, previous.categories);
+            if (incoming.max_players <= 0)
+                incoming.max_players = previous.max_players;
+        }
+    }
     games_ = std::move(games);
     games_loaded_ = true;
     library_back_focused_ = false;

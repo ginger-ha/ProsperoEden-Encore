@@ -193,6 +193,9 @@ print("NS2_TIC_TSC_LOCKED_SNAPSHOT_PASS same_channel=required snapshot=second_re
 # produces no Vulkan objects. The existing fail-closed dispatch remains.
 assert "struct NativeQmdTypedTextureRecord" in native_env
 assert "DecodeAdmitted(const NativeQmdResourcePlan& plan," in native_env
+assert "src.raw_handle != raw" in native_env
+assert "src.tic_index != (linked_tsc ? raw : (raw & 0xfffffU))" in native_env
+assert "src.tsc_index != (linked_tsc ? raw : (raw >> 20))" in native_env
 assert "std::memcpy(&entry.tic, src.tic_words.data(), sizeof(entry.tic))" in native_env
 assert "std::memcpy(&sampler, src.tsc_words.data(), sizeof(sampler))" in native_env
 for path in (

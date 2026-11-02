@@ -42,6 +42,7 @@ cpp = r"""
 #include <atomic>
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <exception>
 #include <future>
 #include <stdexcept>
@@ -51,6 +52,11 @@ cpp = r"""
 struct Game {
     std::string file;
     bool docked = false;
+    std::uint64_t title_id = 0;
+    std::string cover, box_front, box_back, hero;
+    std::vector<std::string> screenshots;
+    std::string intro, description, publisher, developer, release_date, categories;
+    int max_players = 0;
 };
 enum class Cue { error };
 namespace sys {
@@ -109,6 +115,43 @@ int main() {
         cold.finish_scan(true);
         assert(cold.games_loaded_ && cold.library_.count == 1);
         assert(cold.games_[0].file == "Switch 2 title");
+    }
+    // A same-title settings refresh must preserve already loaded cover/
+    // back/hero media, but never keep old art for a replaced TitleID.
+    {
+        Launcher media;
+        Game old{"MKW", true};
+        old.title_id = 0x1234;
+        old.cover = "icon.webp";
+        old.box_front = "front.webp";
+        old.box_back = "back.webp";
+        old.hero = "hero.webp";
+        old.screenshots = {"shot.webp"};
+        old.description = "existing summary";
+        old.max_players = 4;
+        media.apply_games({old});
+        Game refreshed{"MKW", false};
+        refreshed.title_id = old.title_id;
+        media.apply_games({refreshed});
+        assert(!media.games_[0].docked);
+        assert(media.games_[0].box_front == "front.webp");
+        assert(media.games_[0].box_back == "back.webp");
+        assert(media.games_[0].hero == "hero.webp");
+        assert(media.games_[0].cover == "icon.webp");
+        assert(media.games_[0].screenshots.size() == 1);
+        assert(media.games_[0].description == "existing summary");
+        assert(media.games_[0].max_players == 4);
+        Game newer{"MKW", false};
+        newer.title_id = old.title_id;
+        newer.box_front = "updated.webp";
+        media.apply_games({newer});
+        assert(media.games_[0].box_front == "updated.webp");
+        Game replaced{"MKW", false};
+        replaced.title_id = 0x4567;
+        media.apply_games({replaced});
+        assert(media.games_[0].box_front.empty());
+        assert(media.games_[0].hero.empty());
+        assert(media.games_[0].screenshots.empty());
     }
     Launcher v;
     v.apply_games({{"A", true}, {"B", false}});
