@@ -467,16 +467,16 @@ int main() {
         constexpr u64 texture_va = (u64{1} << 40) + 0x4000;
         constexpr u64 physical_va = (u64{1} << 41) + 0x8000;
         TICEntry tic{};
-        tic.header_version = TICHeaderVersion::BlockLinear;
-        tic.texture_type = TextureType::Texture2D;
-        tic.address_high = texture_va >> 32;
-        tic.address_low = static_cast<u32>(texture_va);
-        tic.width_minus_one = 63;
-        tic.height_minus_1 = 63;
-        tic.depth_minus_1 = 0;
-        tic.max_mip_level = 0;
-        tic.res_min_mip_level = 0;
-        tic.res_max_mip_level = 0;
+        tic.header_version.Assign(TICHeaderVersion::BlockLinear);
+        tic.texture_type.Assign(TextureType::Texture2D);
+        tic.address_high.Assign(texture_va >> 32);
+        tic.address_low.Assign(static_cast<u32>(texture_va));
+        tic.width_minus_one.Assign(63);
+        tic.height_minus_1.Assign(63);
+        tic.depth_minus_1.Assign(0);
+        tic.max_mip_level.Assign(0);
+        tic.res_min_mip_level.Assign(0);
+        tic.res_max_mip_level.Assign(0);
         TSCEntry tsc{};
         tsc.raw[0] = 1; // a non-null sampled sampler record
         const auto mapper = [&](u64 addr) -> std::optional<u64> {
@@ -530,21 +530,29 @@ int main() {
             textured, read_guest, admit);
         assert(image && image->size() == 1 && admissions == 1);
         assert((*image)[0].has_sampler && (*image)[0].tic_index == 0);
-        tic.header_version = static_cast<TICHeaderVersion>(7);
+        tic.header_version.Assign(static_cast<TICHeaderVersion>(7));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.header_version = TICHeaderVersion::BlockLinear;
-        tic.is_sparse = 1;
+        tic.header_version.Assign(TICHeaderVersion::BlockLinear);
+        tic.is_sparse.Assign(1);
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.is_sparse = 0;
-        tic.res_min_mip_level = 2;
+        tic.is_sparse.Assign(0);
+        tic.res_min_mip_level.Assign(2);
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.res_min_mip_level = 0;
-        tic.depth_minus_1 = 1; // plain 2D must be one layer
+        tic.res_min_mip_level.Assign(0);
+        tic.depth_minus_1.Assign(1); // plain 2D must be one layer
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
-        tic.depth_minus_1 = 0;
+        tic.depth_minus_1.Assign(0);
         tsc.raw.fill(0);
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tsc.raw[0] = 1;
+        tic.msaa_mode.Assign(static_cast<MsaaMode>(7));
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.msaa_mode.Assign(MsaaMode::Msaa1x1);
+        tic.width_minus_one.Assign(16383);
+        tic.height_minus_1.Assign(8191);
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.width_minus_one.Assign(63);
+        tic.height_minus_1.Assign(63);
         assert(!guest_tables.CaptureAdmissible(
             textured, read_guest, [&](const TICEntry&) { return false; }));
         assert(guest_tables.CaptureAdmissible(

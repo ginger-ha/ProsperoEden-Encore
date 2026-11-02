@@ -6282,3 +6282,10 @@ apply_reviewed_delta(
     "if (entry.header_version.Value() >\n            static_cast<u32>(Tegra::Texture::TICHeaderVersion::BlockLinearColorKey))",
     "if (static_cast<u32>(entry.header_version.Value()) >\n            static_cast<u32>(Tegra::Texture::TICHeaderVersion::BlockLinearColorKey))",
     "Native TIC strongly typed header version comparison")
+
+# Prevalidate native PixelFormat before constructing ImageInfo's u32 layout.
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "                [this](const Tegra::Texture::TICEntry& tic) {\n                    const VideoCommon::ImageInfo info{tic};",
+    "                [this](const Tegra::Texture::TICEntry& tic) {\n                    // PixelFormat::Invalid must be refused BEFORE ImageInfo\n                    // invokes block-size and mip-stride calculations.\n                    const auto format = VideoCommon::PixelFormatFromTextureInfo(\n                        tic.format, tic.r_type, tic.g_type, tic.b_type,\n                        tic.a_type, tic.srgb_conversion);\n                    if (format == VideoCore::Surface::PixelFormat::Invalid)\n                        return false;\n                    const VideoCommon::ImageInfo info{tic};",
+    "NS2 TIC reject unsupported image format before layout calculations")
