@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a tiny Switch-only front/back box-art index from public Metadata.zip.
+"""Build a Switch 1 + Switch 2 flat-box and scene index from Metadata.zip.
 
 The large archive is processed on a build host, NEVER by the console. Only
 normalized game names and safe CDN image basenames are packaged, no art assets.
@@ -109,7 +109,7 @@ def parse(source):
             continue
         tag = element.tag.rsplit("}", 1)[-1]
         if tag == "Game":
-            if element.findtext("Platform", "") == "Nintendo Switch":
+            if element.findtext("Platform", "") in ("Nintendo Switch", "Nintendo Switch 2"):
                 gid = element.findtext("DatabaseID", "")
                 if gid.isdecimal():
                     games[gid] = element.findtext("Name", "")
@@ -138,7 +138,7 @@ def parse(source):
             key = normalize(label)
             if key:
                 names.setdefault(key, set()).add(gid)
-    lines = ["# Eden Encore retail case index v6 (front, back, spine, fanart, game title, gameplay)\n"]
+    lines = ["# Eden Encore retail case index v7 (NS1+NS2, front, back, spine, fanart, game title, gameplay)\n"]
     for key, matching in sorted(names.items()):
         if len(matching) != 1:
             continue  # avoid colliding editions / ambiguous matching
@@ -184,6 +184,7 @@ def self_test():
     sample = """<LaunchBox>
     <Game><DatabaseID>1</DatabaseID><Platform>Nintendo Switch</Platform><Name>Example: Journey</Name></Game>
     <Game><DatabaseID>2</DatabaseID><Platform>Sony Playstation 5</Platform><Name>Example: Journey</Name></Game>
+    <Game><DatabaseID>5</DatabaseID><Platform>Nintendo Switch 2</Platform><Name>Example: Next Gen</Name></Game>
     <Game><DatabaseID>3</DatabaseID><Platform>Nintendo Switch</Platform><Name>Ambiguous</Name></Game>
     <Game><DatabaseID>4</DatabaseID><Platform>Nintendo Switch</Platform><Name>Ambiguous</Name></Game>
     <GameImage><DatabaseID>1</DatabaseID><Type>Box - Front</Type><Region>World</Region><FileName>11111111-1111-1111-1111-111111111111.jpg</FileName></GameImage>
@@ -195,6 +196,10 @@ def self_test():
     <GameImage><DatabaseID>1</DatabaseID><Type>Fanart - Background</Type><Region>World</Region><FileName>aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.png</FileName></GameImage>
     <GameImage><DatabaseID>1</DatabaseID><Type>Screenshot - Game Title</Type><Region>World</Region><FileName>bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb.jpg</FileName></GameImage>
     <GameImage><DatabaseID>2</DatabaseID><Type>Box - Back</Type><FileName>44444444-4444-4444-4444-444444444444.jpg</FileName></GameImage>
+    <GameImage><DatabaseID>5</DatabaseID><Type>Box - Front</Type><Region>Europe</Region><FileName>r2_22222222-2222-2222-2222-222222222222.png</FileName></GameImage>
+    <GameImage><DatabaseID>5</DatabaseID><Type>Box - Back</Type><Region>North America</Region><FileName>r2_33333333-3333-3333-3333-333333333333.jpg</FileName></GameImage>
+    <GameImage><DatabaseID>5</DatabaseID><Type>Box - Spine</Type><Region>North America</Region><FileName>r2_77777777-7777-7777-7777-777777777777.jpg</FileName></GameImage>
+    <GameImage><DatabaseID>5</DatabaseID><Type>Fanart - Background</Type><Region>World</Region><FileName>r2_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.png</FileName></GameImage>
     <GameImage><DatabaseID>3</DatabaseID><Type>Box - Back</Type><FileName>55555555-5555-5555-5555-555555555555.jpg</FileName></GameImage>
     <GameImage><DatabaseID>4</DatabaseID><Type>Box - Back</Type><FileName>66666666-6666-6666-6666-666666666666.jpg</FileName></GameImage>
     <GameAlternateName><DatabaseID>1</DatabaseID><AlternateName>Example Voyage</AlternateName></GameAlternateName>
@@ -205,6 +210,13 @@ def self_test():
     assert "example voyage\t" in result and "eu:22222222" in result
     assert "fr:33333333-3333-3333-3333-333333333333.jpg" in result
     assert "ambiguous\t" not in result and "44444444" not in result
+    assert "example next gen\t" in result
+    ns2 = next(row.split("\t") for row in result.splitlines()
+               if row.startswith("example next gen\t"))
+    assert ns2[1].startswith("eu:r2_22222222"), ns2
+    assert ns2[2].startswith("us:r2_33333333"), ns2
+    assert ns2[3].startswith("us:r2_77777777"), ns2
+    assert ns2[4].startswith("world:r2_aaaaaaaa"), ns2
     assert "eu:77777777-7777-7777-7777-777777777777.png" in result
     fields = next(row.split("\t") for row in result.splitlines()
                   if row.startswith("example journey\t"))
@@ -223,7 +235,7 @@ def self_test():
     assert "us:" in regional_candidates([("eu", EUROPE_FRONT_PINS["79189"][0]),
                                          ("us", "0" * 36 + ".jpg")])
     assert normalize("EA SPORTS FC 27!") == "ea sports fc 27"
-    print("PASS Switch-only regional case index, EU and North America, collision guards")
+    print("PASS NS1+NS2 regional case index, independent front/back/spine, collision guards")
 
 def main():
     cli = argparse.ArgumentParser()
