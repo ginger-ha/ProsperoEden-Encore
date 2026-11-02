@@ -175,3 +175,16 @@ for source_path in (
     assert "registry.IsComputeCurrent(kepler_compute, *ticket)" in before_close
 print("NS2_TEXTURE_CACHE_CHANNEL_GMMU_OWNER_PASS engine=exact gmmu=exact"
       " both_native_cache_apis=guarded images_still_closed=1")
+
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    bridge = (vendor / path).read_text()
+    locked = bridge.split("std::scoped_lock lock{texture_cache.mutex};", 1)[1]
+    assert locked.index("texture_cache.NativeChannelMatches(") < locked.index(
+        "tables.MatchesSnapshot("), path
+    assert locked.index("tables.MatchesSnapshot(") < locked.index(
+        "return false; // no unbacked image/sampler descriptor publication"), path
+print("NS2_TIC_TSC_LOCKED_SNAPSHOT_PASS same_channel=required snapshot=second_read"
+      " before_publication=1")
