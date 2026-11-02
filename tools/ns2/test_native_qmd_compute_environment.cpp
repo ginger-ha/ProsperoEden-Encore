@@ -615,6 +615,29 @@ int main() {
             return physical_va + addr - texture_va;
         };
         assert(NativeQmdContiguousGpuSpan(texture_va, 8192, mapper));
+        // P4.2: unaligned 49-bit image ranges cross the real 4 KiB
+        // boundary. Both endpoints and the interior must map to ONE
+        // contiguous physical allocation, not merely two mapped pages.
+        assert(NativeQmdContiguousGpuSpan(texture_va + 123, 8192 - 123, mapper));
+        assert(NativeQmdContiguousGpuSpan(texture_va + 4095, 2, mapper));
+        assert(NativeQmdContiguousGpuSpan(texture_va + 4096, 4096, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va + 123, 8192 - 122, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va + 4095, 2,
+            [&](u64 addr) -> std::optional<u64> {
+                if (addr == texture_va + 4096) return std::nullopt;
+                return mapper(addr);
+            }));
+        assert(!NativeQmdContiguousGpuSpan(texture_va + 4095, 2,
+            [&](u64 addr) -> std::optional<u64> {
+                if (addr == texture_va + 4096) return *mapper(addr) + 4096;
+                return mapper(addr);
+            }));
+        // A GMMU translation may itself be too near the physical address
+        // ceiling. Do not accept a range whose CPU end wraps u64.
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8192,
+            [&](u64 addr) -> std::optional<u64> {
+                return (~u64{0} - 4095) + (addr - texture_va);
+            }));
         assert(!NativeQmdContiguousGpuSpan(0, 8192, mapper));
         assert(!NativeQmdContiguousGpuSpan(texture_va, 0, mapper));
         assert(!NativeQmdContiguousGpuSpan((u64{1} << 49) - 4, 8, mapper));
