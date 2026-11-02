@@ -1905,10 +1905,18 @@ std::vector<pe::ui::Game> EdenServices::games(const std::atomic<bool>* cancel) {
         const std::string path = Eden::AssetsPath("roms/" + file);
         struct stat info {};
         if (stat(path.c_str(), &info) != 0) {
+            // ENOENT/ENOTDIR prove only this title was removed. EIO,
+            // EACCES, ENODEV and other unexpected errors are UNKNOWN,
+            // not missing: publishing a partial scan would evict usable
+            // ROMs and their enriched box art from the current snapshot.
+            const int stat_error = errno;
             ++stat_failures;
             if (stat_failures <= 3)
                 Eden::Report("library", ("EDEN_ROM_SCAN stat_failed=" + file +
-                                         " errno=" + std::to_string(errno)).c_str());
+                                         " errno=" + std::to_string(stat_error)).c_str());
+            if (stat_error != ENOENT && stat_error != ENOTDIR)
+                throw std::system_error{stat_error, std::generic_category(),
+                                        "ROM stat failed; keep the last-good library"};
             continue;
         }
         if (!S_ISREG(info.st_mode)) {

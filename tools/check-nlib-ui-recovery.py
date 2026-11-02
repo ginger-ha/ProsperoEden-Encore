@@ -16,6 +16,18 @@ assert "bool game_storage_available() override;" in svc_h
 assert "bool EdenServices::game_storage_available()" in svc
 assert 'std::filesystem::is_directory(Eden::AssetsPath("roms"), error)' in svc
 assert "if (!services_.game_storage_available())" in lib
+# A directory remaining mounted does not prove individual title stats
+# succeeded. Any unexpected I/O or permission error invalidates the WHOLE
+# scan; only a genuine missing path can be dropped.
+scan_owner = svc.split("std::vector<pe::ui::Game> EdenServices::games(const", 1)[1].split(
+    "pe::ui::Game EdenServices::", 1)[0]
+stat_failure = scan_owner.split("if (stat(path.c_str(), &info) != 0)", 1)[1].split(
+    "if (!S_ISREG(info.st_mode))", 1)[0]
+assert "const int stat_error = errno;" in stat_failure
+assert "stat_error != ENOENT && stat_error != ENOTDIR" in stat_failure
+assert 'throw std::system_error{stat_error, std::generic_category(),' in stat_failure
+assert "continue;" in stat_failure
+assert stat_failure.index("throw std::system_error") < stat_failure.index("continue;")
 assert "return errno != ENOENT && errno != ENOTDIR;" in svc
 assert "if (lstat(path.c_str(), &info) == 0)" in svc
 assert lib.count('if (!services_.game_storage_available())') == 2
