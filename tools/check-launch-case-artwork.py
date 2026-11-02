@@ -569,7 +569,8 @@ assert "flat_composed_ink(c, game, paper, rear);" in lib_sleeve
 assert 'draw_composed_case_face(ink, launch_case_game_,' in draw
 assert '{0.0f, 0.0f, 440.0f, 704.0f}, rear);' in draw
 assert 'const float top = shell.h * (13.0f / 730.0f);' in lib_sleeve
-assert "Rect uv" not in lib_sleeve
+assert "Rect uv{0.0f, 0.0f, 1.0f, 1.0f};" in lib_sleeve
+assert "if (!rear) {" in lib_sleeve
 assert "c.list.image(artwork.texture, fitted, {0.0f, 0.0f, 1.0f, 1.0f}," in lib_sleeve
 # The row label must finish before the detail panel begins. No overprinting
 # text onto the scan, and no loss of the cover's printed header/footer.
