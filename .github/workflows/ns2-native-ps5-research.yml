@@ -12,6 +12,7 @@ on:
       # TIC/TSC, images, full graphics stages and first guest frame remain
       # unqualified; no release or gameplay-compatibility assertion.
       # Rebuild consolidated source with explicit VI2 51/104/105 compatibility.
+      # Keep native GPU/VI2 TIPC event handles as copies, matching NX2 ABI.
       # Ordinary vendor/main pushes must not trigger repeated 4-hour PS5 jobs.
       - '.github/workflows/ns2-native-ps5-research.yml'
       # Workflow-only edits never cancel an already compiling native candidate.
