@@ -30,6 +30,23 @@ assert "std::set_intersection(observed_missing.begin(), observed_missing.end(),"
 assert lib.count("drop_missing_games(&missing);")==1
 candidate="return std::binary_search(known_missing->begin(), known_missing->end(), game.file);"
 assert lib.count(candidate)==1 and candidate in lib.split("bool Launcher::drop_missing_games(",1)[1]
+# The native library worker is allowed to return a shorter or empty
+# inventory only when the backing ROM volume is still available.
+# A disappearing volume must keep the previously populated UI list.
+scan=lib.split("void Launcher::start_scan()",1)[1].split(
+    "void Launcher::finish_scan(bool wait)",1)[0]
+assert "const bool preserve_loaded_games = games_loaded_ && !games_.empty();" in scan
+assert "std::async(std::launch::async, [this, preserve_loaded_games]" in scan
+assert "if (preserve_loaded_games && !services_.game_storage_available())" in scan
+assert 'throw std::runtime_error{"ROM storage vanished during scan; retaining last-good library"};' in scan
+assert (scan.index("services_.games(&scan_cancel_)") <
+        scan.index("services_.game_storage_available()") <
+        scan.index("return games;")), "storage availability must be checked on the worker after enumeration"
+finish=lib.split("void Launcher::finish_scan(bool wait)",1)[1].split(
+    "void Launcher::start_home_media()",1)[0]
+assert "apply_games(std::move(games));" in finish
+assert "catch (const std::exception &error)" in finish
+assert "games_loaded_ = true;" not in finish, "scan failures must not mark an empty list loaded"
 cpp=r"""
 #include <algorithm>
 #include <cassert>
