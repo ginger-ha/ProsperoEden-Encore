@@ -47,6 +47,7 @@ struct NativeRetirementMockFences {
     std::function<void()> pending{};
     bool signaled{};
     bool reject_registration{};
+    bool reject_signal{};
     void SyncOperation(std::function<void()>&& operation) {
         if (reject_registration) throw std::runtime_error{"mock fence registration failure"};
         assert(!pending);
@@ -55,6 +56,7 @@ struct NativeRetirementMockFences {
     void SignalReference() {
         // Guest callbacks would run immediately in this fence policy,
         // but the SyncOperation callback is still pending.
+        if (reject_signal) throw std::runtime_error{"mock guest fence signal failure"};
         signaled = true;
     }
 };
@@ -123,6 +125,35 @@ int main() {
         }
         assert(refused && scheduler.current_tick == 1 &&
                scheduler.waited == 1 && destroyed == 1);
+    }
+    {
+        // A guest-fence signal failure AFTER SyncOperation registration must
+        // still wait the real GPU timeline before the emergency reference
+        // is released. The pending callback owns a second reference, so
+        // dropping the failed registration must also remain safe.
+        NativeRetirementMockScheduler scheduler{};
+        scheduler.gpu_completed = true;
+        NativeRetirementMockFences fences{};
+        fences.reject_signal = true;
+        int destroyed{};
+        auto pipeline = std::shared_ptr<int>(
+            new int(11), [&](int* value) {
+                assert(scheduler.waited == scheduler.current_tick);
+                ++destroyed;
+                delete value;
+            });
+        bool refused{};
+        try {
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, fences, std::move(pipeline));
+        } catch (const std::runtime_error&) {
+            refused = true;
+        }
+        assert(refused && !fences.signaled && fences.pending &&
+               scheduler.current_tick == 1 && scheduler.waited == 1 &&
+               destroyed == 0);
+        fences.pending = {};
+        assert(destroyed == 1);
     }
     Tegra::NativeQmdScheduler::Descriptor qmd{};
     qmd[8]=0x80;
