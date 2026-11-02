@@ -202,6 +202,7 @@ assert "bool NativeQmdTicMatchesShaderType(" in native_env
 assert "bool NativeQmdTypedImageLayoutMatches(" in native_env
 assert "bool NativeQmdStorageImageFormatMatches(" in native_env, "typed storage TIC format guard missing"
 assert "NativeQmdStorageImageFormatMatches(desc.format, record.tic)" in native_env, "reflected image formats not enforced"
+assert "desc.is_integer != tic_integer" in native_env, "reflected integer image element type guard missing"
 for fmt in ("R8_UINT", "R8_SINT", "R16_UINT", "R16_SINT", "R32_UINT", "R32G32_UINT", "R32G32B32A32_UINT"):
     assert "Shader::ImageFormat::" + fmt in native_env, fmt
 assert "else if (tic_msaa)" in native_env and "Buffer images likewise cannot be multisampled" in native_env, "native buffer/storage MSAA guard missing"

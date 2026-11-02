@@ -1065,6 +1065,7 @@ int main() {
         storage_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa1x1);
         // A valid TIC dimension is not sufficient for typed SPIR-V
         // storage image descriptors; channel count and signedness matter.
+        storage_layout.image_descriptors[0].is_integer = true;
         storage_layout.image_descriptors[0].format = Shader::ImageFormat::R8_UINT;
         storage_typed[0].tic.format.Assign(TextureFormat::R8);
         storage_typed[0].tic.r_type.Assign(ComponentType::UINT);
@@ -1115,6 +1116,7 @@ int main() {
         Shader::ImageBufferDescriptor image_buffer_desc{};
         image_buffer_desc.count = 1;
         image_buffer_desc.is_written = true;
+        image_buffer_desc.is_integer = true;
         image_buffer_desc.format = Shader::ImageFormat::R16_SINT;
         image_buffer_layout.image_buffer_descriptors.push_back(image_buffer_desc);
         auto image_buffer_typed = buffer_typed;
@@ -1127,6 +1129,17 @@ int main() {
         image_buffer_typed[0].tic.r_type.Assign(ComponentType::UINT);
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
             image_buffer_layout, image_buffer_typed));
+        // The reflected SPIR-V scalar category must match the TIC even
+        // when the dimensions and sampler ownership already match.
+        auto integer_sampled = *typed;
+        integer_sampled[0].tic.format.Assign(TextureFormat::R8);
+        integer_sampled[0].tic.r_type.Assign(ComponentType::UINT);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            layout, integer_sampled));
+        layout.texture_descriptors[0].is_integer = true;
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            layout, integer_sampled));
+        layout.texture_descriptors[0].is_integer = false;
         layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2D;
