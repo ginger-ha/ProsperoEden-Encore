@@ -310,6 +310,56 @@ for name, member in (
     )
 print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS owner_check_and_both_acquisitions_locked")
 
+# Native TIC acquisition can enter CreateImageView/PrepareImageView while
+# holding config_mutex. Those cache paths call getStorageID(), which takes
+# that same lock. A non-recursive mutex would deadlock on a cache miss.
+# Prove native NS2 is reentrant, while NS1 retains std::mutex.
+import subprocess
+import tempfile
+import shutil
+
+channel_header = (vendor / "sources/eden/src/video_core/control/channel_state_cache.h").read_text()
+channel_impl = (vendor / "sources/eden/src/video_core/control/channel_state_cache.inc").read_text()
+assert "auto storage_id = getStorageID(as_id);" in impl
+assert channel_header.count("std::unique_lock lk(config_mutex);") == 2
+assert channel_impl.count("std::unique_lock lk(config_mutex);") == 3
+assert "std::unique_lock<std::mutex> lk(config_mutex);" not in channel_impl
+channel_policy = re.search(
+    r"(#if defined[(]PS5_NATIVE[)] && defined[(]EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL[)]"
+    r"\s+mutable std::recursive_mutex config_mutex;"
+    r"\s+#else\s+mutable std::mutex config_mutex;\s+#endif)",
+    channel_header,
+)
+assert channel_policy, "NS2 reentrant config mutex not isolated from NS1"
+fixture = (
+    "#include <mutex>\n#include <type_traits>\n"
+    "struct CacheOwner { public:\n" + channel_policy.group(1) +
+    "\nvoid nested() { std::scoped_lock hold{config_mutex}; lookup(); }\n"
+    "void lookup() { std::unique_lock hold{config_mutex}; }\n};\n"
+    "int main() {\n#ifdef PS5_NATIVE\n"
+    "static_assert(std::is_same_v<decltype(CacheOwner::config_mutex),"
+    " std::recursive_mutex>);\nCacheOwner{}.nested();\n#else\n"
+    "static_assert(std::is_same_v<decltype(CacheOwner::config_mutex),"
+    " std::mutex>);\n#endif\n}\n"
+)
+compilers = [tool for tool in ("clang++", "g++") if shutil.which(tool)]
+assert compilers, "no C++ compiler for native channel reentrancy witness"
+with tempfile.TemporaryDirectory(prefix="ns2-native-channel-owner-") as temp_dir:
+    source = Path(temp_dir) / "channel.cpp"
+    source.write_text(fixture)
+    for compiler in compilers:
+        for name, flags in (
+            ("ns1", []),
+            ("ns2", ["-DPS5_NATIVE=1",
+                     "-DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1"]),
+        ):
+            executable = Path(temp_dir) / f"{compiler}-{name}"
+            subprocess.run([compiler, "-std=c++20", "-O0", "-pthread",
+                            *flags, str(source), "-o", str(executable)],
+                           capture_output=True, text=True, check=True, timeout=20)
+            subprocess.run([str(executable)], check=True, timeout=5)
+print("NS2_CACHE_CHANNEL_REENTRANCY_PASS compiled=1 ns1_mutex=unchanged")
+
 # The generic guest fence callback can execute synchronously when delay is
 # false. Native pipeline retirement MUST wait a real GPU timeline tick via
 # SyncOperation, and must be used for both success and aborted submissions.
