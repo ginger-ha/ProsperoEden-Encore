@@ -157,7 +157,8 @@ assert not native_typed_texture_owners.intersection(
 )
 typed_cache_header = (active / next(iter(native_typed_texture_owners))).read_text()
 assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in typed_cache_header
-assert "AcquireNativeImageView(const TICEntry& descriptor" in typed_cache_header
+assert "AcquireNativeImageView(" in typed_cache_header
+assert "NativeChannelMatches(" in typed_cache_header
 assert "AcquireNativeSampler(const TSCEntry& descriptor)" in typed_cache_header
 assert 'target_include_directories(video_core BEFORE PUBLIC "${PORT_BUILD_DIR}/vulkan-cache")' in (
     root / "headless/vulkan.cmake").read_text()

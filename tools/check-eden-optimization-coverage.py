@@ -160,7 +160,8 @@ assert not post_f07_ns2_typed_cache_owners & (
     post_f07_launcher_handoff_owners
 )
 cache_header = (ROOT / next(iter(post_f07_ns2_typed_cache_owners))).read_text()
-assert "AcquireNativeImageView(const TICEntry& descriptor" in cache_header
+assert "AcquireNativeImageView(" in cache_header
+assert "NativeChannelMatches(" in cache_header
 assert "AcquireNativeSampler(const TSCEntry& descriptor)" in cache_header
 assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in cache_header
 print("NS2_POST_F07_TYPED_CACHE_ABI_ISOLATION_PASS",

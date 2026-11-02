@@ -155,3 +155,23 @@ for path in (
     assert owner.index(guard) < owner.index("tables.CaptureAdmissible("), path
 print("NS2_NATIVE_SPIRV_IMAGE_LAYOUT_OWNER_PASS order=4 rights=verified"
       " unsound_wrap=refused native_image_dispatch=closed")
+
+# P2.2 native cache preflight uses the active GMMU and engine identity, not
+# merely a process ticket: never mix two GPU channels sharing TIC bytes.
+assert "NativeChannelMatches(" in header
+assert "kepler_compute == &expected_compute" in impl
+assert "gpu_memory == &expected_memory" in impl
+assert "&channel_state->kepler_compute == &expected_compute" in impl
+assert "&channel_state->gpu_memory == &expected_memory" in impl
+assert impl.count("NativeChannelMatches(expected_compute, expected_memory)") == 2
+for source_path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    caller = (vendor / source_path).read_text()
+    assert "texture_cache.NativeChannelMatches(" in caller
+    assert "std::scoped_lock lock{texture_cache.mutex};" in caller
+    before_close = caller.split("return false; // no unbacked image/sampler descriptor publication", 1)[0]
+    assert "registry.IsComputeCurrent(kepler_compute, *ticket)" in before_close
+print("NS2_TEXTURE_CACHE_CHANNEL_GMMU_OWNER_PASS engine=exact gmmu=exact"
+      " both_native_cache_apis=guarded images_still_closed=1")
