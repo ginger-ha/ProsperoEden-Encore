@@ -289,7 +289,23 @@ print("NS2_TYPED_TIC_TSC_DECODE_PASS real_cache_ABI=1"
 assert "std::scoped_lock channel_lock{config_mutex};" in impl
 assert impl.index("std::scoped_lock channel_lock{config_mutex};") < impl.index(
     "&channel_state->kepler_compute == &expected_compute")
-print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS config_mutex=acquired")
+# A one-shot NativeChannelMatches lookup can race the next BindToChannel.
+# Each actual acquisition must KEEP the config lock from owner validation
+# through its per-channel image/sampler operation; otherwise a check is
+# technically correct but the published slot can belong to another GMMU.
+for name, member in (
+    ("ImageViewId TextureCache<P>::AcquireNativeImageView(", "channel_state->image_views.try_emplace(descriptor)"),
+    ("SamplerId TextureCache<P>::AcquireNativeSampler(", "return FindSampler(descriptor, true);"),
+):
+    body = impl.split(name, 1)[1].split("\ntemplate <class P>", 1)[0]
+    lock = body.index("std::scoped_lock channel_lock{config_mutex};")
+    owner = body.index("gpu_memory != &expected_memory")
+    operation = body.index(member)
+    assert lock < owner < operation, name
+    assert "if (!NativeChannelMatches(" not in body, (
+        "owner check unlocks config mutex before native acquisition", name
+    )
+print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS owner_check_and_both_acquisitions_locked")
 
 # The generic guest fence callback can execute synchronously when delay is
 # false. Native pipeline retirement MUST wait a real GPU timeline tick via
