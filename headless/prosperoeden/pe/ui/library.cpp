@@ -845,6 +845,14 @@ void Launcher::apply_games(std::vector<Game> games)
                 merge_media(incoming, *found->second);
         }
     }
+    // A same-order scan may carry changed per-title mod preferences.
+    // Update the selected Mods switch without a full selection refresh
+    // (which would reset its detail animation and restart media requests).
+    const bool selected_mods_changed =
+        same && library_.selected >= 0 &&
+        library_.selected < static_cast<int>(games.size()) &&
+        games[static_cast<std::size_t>(library_.selected)].mods_enabled !=
+            games_[static_cast<std::size_t>(library_.selected)].mods_enabled;
     games_ = std::move(games);
     games_loaded_ = true;
     library_back_focused_ = false;
@@ -852,8 +860,12 @@ void Launcher::apply_games(std::vector<Game> games)
     // Even if file order stayed identical, a preferences refresh may
     // have changed the selected game's effective docked mode.
     if (same && library_.selected >= 0 &&
-        library_.selected < static_cast<int>(games_.size()))
-        selected_docked_ = games_[static_cast<std::size_t>(library_.selected)].docked;
+        library_.selected < static_cast<int>(games_.size())) {
+        const Game& selected_game = games_[static_cast<std::size_t>(library_.selected)];
+        selected_docked_ = selected_game.docked;
+        if (selected_mods_changed)
+            mods_switch_.snap(selected_game.mods_enabled ? 1.0f : 0.0f);
+    }
     // Mod counts were resolved by the background scan; never perform a
     // second synchronous per-title disk walk while applying the list.
     if (!same)
