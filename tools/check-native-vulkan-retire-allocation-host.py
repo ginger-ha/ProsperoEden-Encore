@@ -82,7 +82,10 @@ struct ImageView : Owner {
     }
     static void operator delete(void* p) noexcept { ::operator delete(p); }
 };
-struct AllocFailure { static inline bool next = false; };
+struct AllocFailure {
+    static inline bool next = false;
+    static inline int vector_allocations = 0;
+};
 template<class T> struct ThrowAllocator {
     using value_type = T;
     ThrowAllocator() noexcept = default;
@@ -92,6 +95,7 @@ template<class T> struct ThrowAllocator {
             AllocFailure::next = false;
             throw std::bad_alloc();
         }
+        ++AllocFailure::vector_allocations;
         return std::allocator<T>{}.allocate(n);
     }
     void deallocate(T* ptr, std::size_t n) noexcept {
@@ -187,6 +191,73 @@ int main() {
         cache.scheduler.Finish();
         cache.pending_retired_views.clear();
         cache.pending_retired_images.clear();
+        assert(state.premature_destructions == 0);
+    }
+    // Texture churn must amortize vector growth. The 128 Vulkan owners
+    // are distinct allocations; count ONLY the retirement queue's allocator.
+    // A reserve(size() + 1) regression does 128 full relocations here.
+    {
+        State state;
+        TextureCacheRuntime cache(state);
+        const int before = AllocFailure::vector_allocations;
+        for (int i = 0; i < 128; ++i) {
+            Image image(state);
+            cache.RetireGpuImage(std::move(image));
+        }
+        assert(cache.pending_retired_images.size() == 128);
+        assert(AllocFailure::vector_allocations - before <= 5);
+        assert(state.gpu_drains == 0);
+        cache.scheduler.Finish();
+        cache.pending_retired_images.clear();
+        assert(state.premature_destructions == 0);
+    }
+    {
+        State state;
+        TextureCacheRuntime cache(state);
+        const int before = AllocFailure::vector_allocations;
+        for (int i = 0; i < 128; ++i) {
+            ImageView view(state);
+            cache.RetireGpuImageView(std::move(view));
+        }
+        assert(cache.pending_retired_views.size() == 128);
+        assert(AllocFailure::vector_allocations - before <= 5);
+        assert(state.gpu_drains == 0);
+        cache.scheduler.Finish();
+        cache.pending_retired_views.clear();
+        assert(state.premature_destructions == 0);
+    }
+    // An allocation failure while growing a NONEMPTY queue must retain all
+    // earlier GPU owners and drain before the caller's new owner can die.
+    {
+        State state;
+        TextureCacheRuntime cache(state);
+        for (int i = 0; i < 8; ++i) {
+            Image image(state);
+            cache.RetireGpuImage(std::move(image));
+        }
+        AllocFailure::next = true;
+        Image ninth(state);
+        bool rejected = false;
+        try { cache.RetireGpuImage(std::move(ninth)); }
+        catch (const std::bad_alloc&) { rejected = true; }
+        assert(rejected && state.gpu_drains == 1);
+        assert(cache.pending_retired_images.size() == 8);
+        assert(state.premature_destructions == 0);
+    }
+    {
+        State state;
+        TextureCacheRuntime cache(state);
+        for (int i = 0; i < 8; ++i) {
+            ImageView view(state);
+            cache.RetireGpuImageView(std::move(view));
+        }
+        AllocFailure::next = true;
+        ImageView ninth(state);
+        bool rejected = false;
+        try { cache.RetireGpuImageView(std::move(ninth)); }
+        catch (const std::bad_alloc&) { rejected = true; }
+        assert(rejected && state.gpu_drains == 1);
+        assert(cache.pending_retired_views.size() == 8);
         assert(state.premature_destructions == 0);
     }
     std::puts("P2_2_GPU_RETIRE_ALLOCATION_FAILURE_PASS");
