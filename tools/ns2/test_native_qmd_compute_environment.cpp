@@ -8,6 +8,7 @@
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <new>
 #include <stdexcept>
 #include <utility>
 #include "shader_recompiler/frontend/ampere/native_qmd_compute_environment.h"
@@ -568,6 +569,20 @@ int main() {
             throw std::runtime_error{"Vulkan descriptor pool exhausted"};
         },rollback));
     assert(rollback_count==3);
+    // Simulate descriptor-pool OOM during the FIRST Vulkan binding, before
+    // SSBO staging. Even this early partial operation must roll back exactly
+    // once and must not advance to a later binding or submit a dispatch.
+    const unsigned storage_before_oom = storage_binds;
+    stage_order = 0;
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,
+        [&](u32,u32,u64,u32)->bool {
+            ++uniform_binds;
+            throw std::bad_alloc{};
+        },
+        storage, rollback));
+    assert(rollback_count == 4 && stage_order == 0 &&
+           storage_binds == storage_before_oom);
     assert(!plan->ValidateGpuMappings([](u64, std::size_t) {
         return false;
     })); // A mapped QMD is not proof of mapped descriptor targets.
