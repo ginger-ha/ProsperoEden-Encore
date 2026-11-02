@@ -137,6 +137,7 @@ on:
       - 'headless/prosperoeden/pe/gfx/gl_batch.cpp'
       - 'tools/check-launcher-release-hotpaths-host.py'
       - 'tools/check-release-case-index-dedup-host.py'
+      - 'tools/check-launcher-atomic-scan-host.py'
       - 'tools/check-release-font-fit-alloc-host.py'
       - 'tools/check-release-font-wrap-alloc-host.py'
       - 'tools/check-release-font-sdf-scratch-host.py'
@@ -351,6 +352,7 @@ jobs:
           python3 -B tools/check-launcher-gl-scissor-reuse-host.py
           python3 -B tools/check-launcher-release-hotpaths-host.py
           python3 -B tools/check-release-case-index-dedup-host.py
+          python3 -B tools/check-launcher-atomic-scan-host.py
           python3 -B tools/check-release-font-fit-alloc-host.py
           python3 -B tools/check-release-font-wrap-alloc-host.py
           python3 -B tools/check-release-font-sdf-scratch-host.py
