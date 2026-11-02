@@ -25,7 +25,7 @@
     <td align="center"><a href="#compatibility"><strong>Compatibility</strong></a></td>
     <td align="center"><a href="#faq"><strong>FAQ</strong></a></td>
     <td align="center"><a href="TROUBLESHOOTING.md"><strong>Help</strong></a></td>
-    <td align="center"><a href="https://github.com/niakw/ProsperoEden-Encore/blob/feat/graphics-network-achievements/docs/ROADMAP_ENCORE_COLLAB_2026-10-25.md"><strong>Roadmap</strong></a></td>
+    <td align="center"><a href="https://github.com/niakw/ProsperoEden-Encore/issues/15"><strong>Roadmap / progress</strong></a></td>
   </tr>
 </table>
 
@@ -40,7 +40,7 @@
 <sub>Preview: the games, illustrated covers and descriptions are **fictional demonstration content**, not a compatibility list. The screenshot is rendered by Encore’s actual launcher.</sub>
 
 > [!IMPORTANT]
-> **FC27 performance — live master tracker:** [F07 P0/P1/P2 priorities and sparse-JIT qualification](docs/FC27_F07_MASTER_TRACKER.md). [F01–F06 host exit gates](docs/FC27_EXIT_GATES_2026-10-22.md) are separate from on-console playability. Source-review totals are not remaining optimization counts.
+> **Unified NS1/NS2 engine roadmap:** [live milestone checklist (#15)](https://github.com/niakw/ProsperoEden-Encore/issues/15) · [acceptance criteria](docs/ROADMAP_NS1_NS2_UNIFIED.md). **NS2 games have not produced a confirmed first guest-rendered PS5 frame**; source/host tests and native builds are not console compatibility proof. Native PS5 builds are currently blocked by the maintainer until host and source gates are complete.\n>\n> **FC27 performance — live master tracker:** [F07 P0/P1/P2 priorities and sparse-JIT qualification](docs/FC27_F07_MASTER_TRACKER.md). [F01–F06 host exit gates](docs/FC27_EXIT_GATES_2026-10-22.md) are separate from on-console playability. Source-review totals are not remaining optimization counts.
 >
 > **Recommended/tested firmware: 13.60, the only firmware actually tested with Encore on a console.** Earlier firmware versions **may work** when the homebrew loader, PS5 native APIs, Vulkan and filesystem access are compatible; this remains **unverified**, and no minimum firmware has been established. Newer versions are also untested. Even on 13.60, frame pacing and gameplay freezes remain under investigation. This is **not** advice to update your console.
 >
