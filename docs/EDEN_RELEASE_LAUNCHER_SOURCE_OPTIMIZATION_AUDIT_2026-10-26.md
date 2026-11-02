@@ -91,3 +91,9 @@ The new official repository is `niakw/ProsperoEden-Encore`. The single change to
 - `headless/prosperoeden/eden_services.cpp`, blob Git `8a25564b3588720d4e9e78c699f495d137272f09` (précédemment `b8aeeafb7c8ce6d9993a34498e9701d851d7df12`). Pour un TitleID déjà répertorié par `Ns2Catalog`, l'enrichissement cherche les véritables scans LaunchBox avec le nom canonique en premier ; exemple : `DonkeyKongBananza` contre `Donkey Kong Bananza`. Ce choix intervient hors du rendu et avant les appels Nlib.
 - Le fallback des jeux NS1 et des titres inconnus est inchangé. Le fichier de référence F07 conserve exactement 518 sources, dont cette unique empreinte revue, les 517 autres restant intactes.
 - `tools/check-launch-case-artwork.py` vérifie le branchement, `tools/check-release-case-index-dedup-host.py` garde la preuve de déduplication. **Aucun FPS, téléchargement console ni image NS2 prouvés**.
+
+## Revue preview hôte — zoom réel 130 % (2 novembre 2026)
+
+- `headless/prosperoeden/host/preview_main.cpp` : `e87eb1f64bcbc24e8d6263df493064d79dcbbd3f` (précédemment `e1576cbf8a41a34fdd58e387062316fb95a40350`). Le scénario de reconstruction sans scans appelle désormais `Cross` puis `R2` pour vérifier le passage du viewer de 100 % à 130 %. Si le viewer n'ouvre pas, `R2` n'a aucun effet et le contrôle d'écart entre pixels doit encore échouer.
+- **Aucun seuil relâché** : variabilité des trois régions au-dessus de 17 et différence des images zoomées/non zoomées au-dessus de 4 restent exigées dans `.github/workflows/launcher-production-preview.yml`.
+- Changement strictement dans le scénario de prévisualisation hôte ; aucune modification du code d'entrée PS5. La CI du nouveau SHA reste la preuve requise.
