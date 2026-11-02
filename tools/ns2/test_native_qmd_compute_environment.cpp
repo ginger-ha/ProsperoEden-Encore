@@ -539,6 +539,26 @@ int main() {
             textured, read_guest, admit);
         assert(image && image->size() == 1 && admissions == 1);
         assert((*image)[0].has_sampler && (*image)[0].tic_index == 0);
+        // TIC/TSC can mutate in guest memory independently of the channel
+        // epoch. Do not accept a mixed or stale descriptor-table snapshot.
+        assert(guest_tables.MatchesSnapshot(textured, *image, read_guest));
+        tic.width_minus_one.Assign(64);
+        assert(!guest_tables.MatchesSnapshot(textured, *image, read_guest));
+        tic.width_minus_one.Assign(63);
+        tsc.raw[1] ^= 1;
+        assert(!guest_tables.MatchesSnapshot(textured, *image, read_guest));
+        tsc.raw[1] ^= 1;
+        assert(guest_tables.MatchesSnapshot(textured, *image, read_guest));
+        assert(!guest_tables.MatchesSnapshot(
+            textured, *image, [](u64, void*, std::size_t) { return false; }));
+        auto changed_during_admission = guest_tables.CaptureAdmissible(
+            textured, read_guest, [&](const TICEntry&) {
+                tic.width_minus_one.Assign(65);
+                return true;
+            });
+        assert(!changed_during_admission);
+        tic.width_minus_one.Assign(63);
+        assert(guest_tables.MatchesSnapshot(textured, *image, read_guest));
         tic.header_version.Assign(static_cast<TICHeaderVersion>(7));
         assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
         tic.header_version.Assign(TICHeaderVersion::BlockLinear);
