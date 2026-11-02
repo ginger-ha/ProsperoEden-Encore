@@ -180,6 +180,9 @@ on:
       - 'tools/check-ps5-compute-guest-descriptor-preflight-host.py'
       - 'tools/check-ps5-compute-descriptor-ring-preflight-host.py'
       - 'tools/check-shared-compute-storage-descriptors-host.py'
+      - 'tools/check-ns2-production-flags-host.py'
+      - 'docs/NS1_NS2_PRODUCTION_FLAG_MIGRATION.md'
+      - 'docs/ROADMAP_NS1_NS2_UNIFIED.md'
       - 'tools/check-ps5-compute-descriptor-scratch-host.py'
       - 'tools/check-ps5-f07-compute-descriptor-payload-reuse-host.py'
       - 'tools/check-ps5-dma-buffer-copy-span-host.py'
@@ -377,6 +380,7 @@ jobs:
           python3 -B tools/check-ps5-compute-guest-descriptor-preflight-host.py
           python3 -B tools/check-ps5-compute-descriptor-ring-preflight-host.py
           python3 -B tools/check-shared-compute-storage-descriptors-host.py
+          python3 -B tools/check-ns2-production-flags-host.py
           python3 -B tools/check-ps5-compute-descriptor-scratch-host.py
           python3 -B tools/check-ps5-f07-compute-descriptor-payload-reuse-host.py
           python3 -B tools/check-ps5-f07-sampler-memo-collisions-host.py
