@@ -2011,7 +2011,7 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass, VkPipelineCreateFl
 adapt('src/video_core/renderer_vulkan/vk_compute_pipeline.h',
       'include/video_core/renderer_vulkan/vk_compute_pipeline.h', [
     ("namespace Vulkan {",
-     "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\\nnamespace Shader::Ampere { struct NativeQmdResourcePlan; }\\n#endif\\nnamespace Vulkan {"),
+     "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\nnamespace Shader::Ampere { struct NativeQmdResourcePlan; }\n#endif\nnamespace Vulkan {"),
     ("    bool IsBound() const noexcept {\n        return static_cast<bool>(pipeline);\n    }",
      "#ifdef PS5_NATIVE\n    [[nodiscard]] bool CanUseDescriptorBuffer() const noexcept {\n        return uses_descriptor_buffer;\n    }\n    [[nodiscard]] size_t DescriptorEntryReservation() const noexcept {\n        return num_descriptor_entries != 0 ? num_descriptor_entries : 0x400;\n    }\n    [[nodiscard]] VkDeviceSize DescriptorRingPreflightSize() const noexcept {\n        // Unlike graphics, every descriptor-buffer compute dispatch allocates.\n        return uses_descriptor_buffer ? descriptor_buffer_layout.size : 0;\n    }\n#endif\n#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n    [[nodiscard]] bool ConfigureNative(\n        const Shader::Ampere::NativeQmdResourcePlan& resources,\n        Tegra::MemoryManager& gpu_memory, Scheduler& scheduler,\n        BufferCache& buffer_cache);\n#endif\n    bool IsBound() const noexcept {\n        return static_cast<bool>(pipeline);\n    }"),
 ])
