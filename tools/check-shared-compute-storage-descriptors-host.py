@@ -76,6 +76,15 @@ int main() {
     }));
     const std::array<Desc,1> off_by_one{{{7,0xfffffffcu,2,false}}};
     assert(!ForEach(off_by_one, 2, collect));
+    // The first word can fit in the 32-bit CBUF index while the rest of
+    // the 16-byte SSBO descriptor overflows. Both generations must reject
+    // this reflection BEFORE touching BufferCache or guest CBUF state.
+    const std::array<Desc,1> partial_tail{{{7,0xfffffff4u,1,false}}};
+    assert(!ForEach(partial_tail, 1, collect));
+    const std::array<Desc,1> last_word_only{{{7,0xfffffffcu,1,false}}};
+    assert(!ForEach(last_word_only, 1, collect));
+    const std::array<Desc,1> tail_count_overflow{{{7,0xfffffff0u,2,false}}};
+    assert(!ForEach(tail_count_overflow, 2, collect));
     // Fail-closed callbacks (e.g. mismatched QMD3 reflection or write flag).
     assert(!ForEach(descriptors, 4, [](auto f, auto, auto, auto) {
         return f < 2;
