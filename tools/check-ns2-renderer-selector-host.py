@@ -13,6 +13,22 @@ assert start in source and end in source
 selector = start + source.split(start,1)[1].split(end,1)[0]
 target = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
 assert target.is_file() and "target_sources(video_core PRIVATE" in selector
+# P2.2: production-selected native renderer obtains TIC metadata exclusively
+# from the authenticated QMD channel tables, not from fake defaults or a
+# second Switch 2 texture cache. This source witness is not PS5 runtime proof.
+rasterizer = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
+native = rasterizer.split("bool RasterizerVulkan::DispatchNativeCompute(", 1)[1].split(
+    "void RasterizerVulkan::DispatchCompute(", 1)[0]
+assert "class NativeQmdTextureMetadata final : public Shader::Environment" in rasterizer
+assert "NativeBufferOnlyMetadata" not in rasterizer
+assert "VideoCommon::PixelFormatFromTextureInfo(" in rasterizer
+assert "VideoCommon::ReadNs2GpuShader(" in rasterizer
+assert "NativeQmdTextureTables" in native
+assert "kepler_compute.regs" in native
+assert "launch.linked_tsc" in native
+assert "return false; // no unbacked image/sampler descriptor publication" in native
+assert "resources->HasResolvedBufferBindings()" in native
+print("NS2_NATIVE_TIC_METADATA_SOURCE_PASS real_tables=1 no_false_vk_images=1")
 
 def test(root, title, values, succeed):
     args = ["cmake","-S",str(root),"-B",str(root/title)]
