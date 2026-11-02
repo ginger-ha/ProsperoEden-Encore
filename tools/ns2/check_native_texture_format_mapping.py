@@ -252,3 +252,36 @@ assert "catch (...) {" in native_env.split(
 assert "scheduler.Wait(tick);" in native_env
 print("NS2_NATIVE_COMPUTE_FENCE_REGISTRATION_FALLBACK_PASS"
       " owner_retained_on_exception=1")
+
+# P2.2 GPU-owner safety: the PS5 Vulkan cache must not retire VkImage or
+# VkImageView on an assumed number of frames. The GPU completion semaphore
+# owns their final release, independently of the native compute fence owner.
+vk_runtime_header = (vendor / (
+    "encore-active/ns2-astc/include/video_core/renderer_vulkan/vk_texture_cache.h"
+)).read_text()
+vk_runtime = (vendor / "encore-active/eden-vulkan/vk_texture_cache_cost.cpp").read_text()
+assert "void RetireGpuImage(Image&& image);" in vk_runtime_header
+assert "void RetireGpuImageView(ImageView&& view);" in vk_runtime_header
+assert "pending_retired_images" in vk_runtime_header
+assert "pending_retired_views" in vk_runtime_header
+assert "const u64 tick = scheduler.CurrentTick();" in vk_runtime
+assert "scheduler.GetMasterSemaphore().KnownGpuTick()" in vk_runtime
+assert "std::erase_if(pending_retired_views" in vk_runtime
+assert "std::erase_if(pending_retired_images" in vk_runtime
+assert vk_runtime.index("std::erase_if(pending_retired_views") < vk_runtime.index(
+    "std::erase_if(pending_retired_images"), "destroy Vulkan image before view"
+assert "scheduler.Finish();" in vk_runtime.split(
+    "TextureCacheRuntime::~TextureCacheRuntime()", 1)[1].split(
+    "void TextureCacheRuntime::RetireGpuImage(", 1)[0]
+for symbol in ("RetireGpuImage(Image&& image)", "RetireGpuImageView(ImageView&& view)"):
+    block = vk_runtime.split("void TextureCacheRuntime::" + symbol, 1)[1].split(
+        "\n}\n", 1)[0]
+    assert "scheduler.Finish();" in block, "OOM path must drain submitted GPU work"
+for site in ("void TextureCache<P>::InvalidateScale(", "void TextureCache<P>::DeleteImage("):
+    block = impl.split(site, 1)[1].split("\ntemplate <class P>", 1)[0]
+    assert "runtime.RetireGpuImageView(" in block, site
+assert "runtime.RetireGpuImage(std::move(slot_images[image_id]));" in impl
+assert "return false; // no unbacked image/sampler descriptor publication" in (
+    vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
+print("NS1_NS2_VULKAN_IMAGE_TIMELINE_RETIREMENT_SOURCE_PASS"
+      " views_before_images=1 OOM_fallback=wait_gpu native_image_dispatch=closed")
