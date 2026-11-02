@@ -396,7 +396,10 @@ assert set(unlinked_by_role) == {
     "données générées"}
 assert unlinked_by_role.get("en-tête/fragment", 0) == 0, (
     "new unowned headless header or fragment", unlinked_by_role)
-assert all(path.startswith("headless/prosperoeden/")
+# The launcher/Vulkan frame mailbox is a true shared UI boundary, not a
+# vendor override. It lives at headless root because both renderers include it.
+assert all(path.startswith("headless/prosperoeden/") or
+           path == "headless/launch_handoff.hpp"
            for path, role, _, _ in headless_rows if role == "launcher/UI")
 assert all(path in headless_graph for path, role, _, _ in headless_rows
            if role == "runtime/bridge")
@@ -405,7 +408,7 @@ for role, count in unlinked_by_role.items():
         "unlinked headless role summary stale", role, count)
 assert f"| **Total non indexé** | **{sum(unlinked_by_role.values())}** |" in headless_doc
 
-assert "**179** chemins" in headless_doc
+assert "**180** chemins" in headless_doc
 assert f"**{headless_linked}** chemins déjà présents" in headless_doc
 assert f"**{len(headless_actual)-headless_linked}** chemins sans propriétaire exact" in headless_doc
 print("ENCORE_HEADLESS_SOURCE_CATALOG_PASS",
