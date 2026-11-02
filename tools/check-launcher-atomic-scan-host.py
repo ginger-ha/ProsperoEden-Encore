@@ -56,6 +56,7 @@ cpp = r"""
 struct Game {
     std::string file;
     bool docked = false;
+    bool mods_enabled = false;
     std::uint64_t title_id = 0;
     std::string name;
     bool artwork_changed = false;
@@ -104,8 +105,9 @@ public:
     } library_;
     struct Mode {
         int snaps = 0;
-        void snap(float) { ++snaps; }
-    } mode_;
+        float last = 0.0f;
+        void snap(float value) { last = value; ++snaps; }
+    } mode_, mods_switch_;
     std::vector<Game> games_;
     std::future<std::vector<Game>> scan_;
     std::atomic<bool> scan_cancel_{false};
@@ -134,6 +136,29 @@ public:
 };
 """ + finish + "\n" + apply + "\n" + media_finish + "\n" + home_finish + r"""
 int main() {
+    // An unchanged ROM list may still carry a changed Mods preference.
+    // This must update the selected switch once, without resetting cards,
+    // restarting image requests or triggering a full selection animation.
+    {
+        Launcher same;
+        Game old{"Bananza", true};
+        old.title_id = 0x111;
+        old.mods_enabled = false;
+        same.games_ = {old};
+        same.games_loaded_ = true;
+        same.library_.selected = 0;
+        same.library_.count = 1;
+        Game updated = old;
+        updated.mods_enabled = true;
+        same.apply_games({updated});
+        assert(same.mods_switch_.snaps == 1 && same.mods_switch_.last == 1.0f);
+        assert(same.library_.resets == 0 && same.refreshed == 0);
+        same.apply_games({updated});
+        assert(same.mods_switch_.snaps == 1 && same.library_.resets == 0);
+        updated.mods_enabled = false;
+        same.apply_games({updated});
+        assert(same.mods_switch_.snaps == 2 && same.mods_switch_.last == 0.0f);
+    }
     // A HOME-origin enrichment must also reach every installed physical
     // copy of a TitleID. This uses the actual asynchronous owner method.
     {
