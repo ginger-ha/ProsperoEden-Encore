@@ -2,7 +2,7 @@
 
 **Branche :** `dev/ps5-sparse-jit`. **Date du relevé :** 30 octobre 2026.
 
-Ce registre complémentaire couvre les **178 chemins** de code, en-têtes et
+Ce registre complémentaire couvre les **180 chemins** de code, en-têtes et
 fragments `.c/.cc/.cpp/.h/.hpp/.inc/.cl` du dossier `headless/`.
 Il ne remplace pas `EDEN_ACTIVE_SOURCE_CATALOG.md` : les 326 fichiers
 de `vendor/encore-active` sont déjà inventoriés séparément.
@@ -13,9 +13,9 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **179** chemins sous `headless/`, dont **60** sources C/C++ et **119** en-têtes/fragments.
+- **180** chemins sous `headless/`, dont **60** sources C/C++ et **120** en-têtes/fragments.
 - **98** chemins déjà présents dans le graphe moteur.
-- **81** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
+- **82** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
   sont des entrées de l'inventaire, **pas** de nouveaux patchs CMake.
@@ -28,14 +28,14 @@ toujours 176/177 chemins ; il n'y a pas 80 overrides de dépendances oubliés.
 
 | Rôle indicatif | Chemins sans ID exact |
 | --- | ---: |
-| `launcher/UI` | **65** |
+| `launcher/UI` | **66** |
 | `harness/test` | **10** |
 | `outil auxiliaire` | **4** |
 | `données générées` | **2** |
 | `en-tête/fragment` | **0** |
-| **Total non indexé** | **81** |
+| **Total non indexé** | **82** |
 
-Les 65 chemins du launcher sont réservés au périmètre UI séparé.
+Les 66 chemins du launcher et de son handoff sont réservés au périmètre UI séparé.
 Les 10 harnais, 4 outils et 2 ressources générées ne sont pas déclarés
 comme unités de correction moteur. `ps5_amd_topology_evidence.h` porte désormais l'ID U79 au statut
 **PARKED** : ses fonctions sont inventoriées, mais le commit d'origine
@@ -124,6 +124,7 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/jit-sparse-commit.h` | en-tête/fragment | J05 | Chemin indexé, preuve dépend du graphe |
 | `headless/jit-startup-retry.h` | en-tête/fragment | U22 | Chemin indexé, preuve dépend du graphe |
 | `headless/jit_list.h` | en-tête/fragment | J11 | Chemin indexé, preuve dépend du graphe |
+| `headless/launch_handoff.hpp` | launcher/UI | — | À qualifier |
 | `headless/log_pipe.h` | en-tête/fragment | U37 | Chemin indexé, preuve dépend du graphe |
 | `headless/main.cpp` | runtime/bridge | U01 | Chemin indexé, preuve dépend du graphe |
 | `headless/memory_check.cpp` | harness/test | J08 | Chemin indexé, preuve dépend du graphe |
