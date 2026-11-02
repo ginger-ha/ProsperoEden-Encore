@@ -1332,6 +1332,7 @@ adapt('src/video_core/renderer_vulkan/renderer_vulkan.h',
      '    u32 loading_jacket_width{};\n'
      '    u32 loading_jacket_height{};\n'
      '    bool loading_jacket_attempted{};\n'
+     '    u32 loading_jacket_attempts{};\n'
      '#endif\n'
      '    StateTracker state_tracker;'),
 ])
