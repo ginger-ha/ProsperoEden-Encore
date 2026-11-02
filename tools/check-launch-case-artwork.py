@@ -87,8 +87,8 @@ assert "progress%" not in draw
 for fragment in (
     "draw_composed_case_face(ink, launch_case_game_",
     "c.textures.render_case_page(",
-    "if (!retail.empty() && !c.textures.cover(retail, 760.0f).missing)",
-    "const bool use_composed = (scan.empty() || artwork.missing) &&",
+    "if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)",
+    "const bool use_composed = artwork.texture == 0 && composed_page != 0;",
     "c.list.case_face(composed_page, face, angle, back, kWhite,",
     "{0.0f, 1.0f, 1.0f, -1.0f}",
     "EDEN_CASE_COMPOSE title=%016llX side=%s status=%s page=%u",
@@ -174,8 +174,8 @@ assert 'Color::rgb(0x030507, 0.98f)' not in library_src
 
 # A cached original face is authoritative even while its texture is pending.
 # Independent reconstruction occurs ONLY for the specific missing face.
-assert "if (!retail.empty() && !c.textures.cover(retail, 760.0f).missing)" in draw
-assert "const bool use_composed = (scan.empty() || artwork.missing) &&" in draw
+assert "if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)" in draw
+assert "const bool use_composed = artwork.texture == 0 && composed_page != 0;" in draw
 assert "if (scan.empty() || artwork.texture == 0)" not in draw
 assert "if (rear)\n                flat_back_fallback(c, game, paper);" not in library_src
 assert 'if (std::getenv("PE_PREVIEW_NO_BOX_FRONT") == nullptr)' in (
@@ -236,7 +236,7 @@ assert "std::max(paper.w, paper.h) * texture_scale" in library
 assert "fitted.x += rear ? paper.w - fitted.w : (paper.w - fitted.w) * 0.5f;" in library
 assert "c.list.image(artwork.texture, fitted, {0.0f, 0.0f, 1.0f, 1.0f}," in library
 assert "Rect fitted = paper;" in library and "if (source > target)" in library
-assert "paper_uv.x = back ? 1.0f - paper_uv.w : 0.0f;" in draw
+assert "paper_uv.x = (1.0f - paper_uv.w) * 0.5f;" in draw
 assert "flat_retail_sleeve(c, game, sleeve, false, 0.24f);" in library
 assert "const Rect paper{shell.x + (rear ? side : 0.0f), shell.y + top," in library
 assert "flat_back_fallback(c, game, paper);" in library
@@ -275,8 +275,8 @@ assert 'glClearColor(17.0f / 255.0f, 34.0f / 255.0f,' in textures_cpp
 assert '53.0f / 255.0f, 1.0f);' in textures_cpp
 assert 'const Cover artwork = scan.empty() ? Cover{} : c.textures.cover(scan, 760.0f);' in draw
 assert 'std::string fallback;' not in draw
-assert "if (!scan.empty() && !artwork.missing) {" in library
-assert library.index("if (!scan.empty() && !artwork.missing) {") < library.index("flat_composed_ink(c, game, paper, rear);")
+assert "if (artwork.texture != 0) {" in library
+assert library.index("if (artwork.texture != 0) {") < library.index("flat_composed_ink(c, game, paper, rear);")
 # The non-official fallback footer must never invent regulatory labels,
 # game ratings or scan-style barcodes.
 assert "const Rect footer" in back_fallback, "Back footer removed"
@@ -364,7 +364,7 @@ assert '"EDEN_CASE_LOOKUP title=%016llX status=no-match' in native
 assert '"EDEN_CASE_LOOKUP title=%016llX status=match' in native
 assert "std::chrono::minutes(5)" in native
 assert "std::chrono::hours(4)" not in native.split("unsigned EnsureRetailCase(", 1)[1].split("NlibEnrichment CachedNlibEnrichment(", 1)[0]
-assert "both_faces_cached_at_start" in native
+assert "both_faces_cached_at_start" not in native
 # A competing background Home/Library request must wait for the atomic
 # retail-case writer instead of disappearing behind the five-minute retry.
 case_fetch = native.split("unsigned EnsureRetailCase(", 1)[1].split(
@@ -381,12 +381,11 @@ assert "if (cancel && cancel->load(std::memory_order_acquire)) {" in case_fetch
 assert "return changed_faces;" in case_fetch
 # The first successful front/back download permits the optional spine in the
 # same background pass; no enforced five-minute wait for an empty case side.
-assert 'if (side == 2 && !both_faces_cached_at_start &&' in case_fetch
-assert '!ValidNlibTga(CaseFacePath(title_id, "front"))' in case_fetch
-assert '!ValidNlibTga(CaseFacePath(title_id, "back"))' in case_fetch
+assert 'if (side == 2 && !both_faces_cached_at_start &&' not in case_fetch
+assert 'side >= 3 && ValidNlibTga(CaseFacePath(title_id, "back"))' in case_fetch
 assert "attempts >= 3" in native
 assert 'std::fprintf(stderr, "EDEN_CASE_FACE title=%016llX side=%d status=unavailable' in native
-assert "const bool both_faces_cached_at_start =" in native
+assert "const bool both_faces_cached_at_start =" not in native
 # Preserve the already resident GPU jacket when a background metadata scan
 # found the same file; explicitly distinguish successful front/back replacement.
 service = (root / "headless/prosperoeden/pe/ui/services.hpp").read_text()
@@ -471,6 +470,7 @@ assert "float d = round_box(v_local, v_half, 0.0);" in shader
 assert "float scan_inside = v_params.z > 0.5 ?" in shader
 assert "paper_uv.h = source_aspect / target_aspect;" in draw
 assert "paper_uv.w = target_aspect / source_aspect;" in draw
+assert "paper_uv.y = (1.0f - paper_uv.h) * 0.5f;" in draw
 assert "w < (narrow_spine ? 64 : 128)" in native
 assert "h < (narrow_spine ? 600 : 200)" in native
 assert "c.list.case_spine(side_strip, angle, 3.2f," not in draw
