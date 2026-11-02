@@ -13,6 +13,9 @@ GENERATOR = (ROOT / "tools/prepare-vulkan-port.py").read_text()
 assert HEADER.exists(), "pinned vendor lacks shared Compute storage layout"
 assert CPP.count("ComputeStorageLayout::ForEach(") == 3
 assert "ASSERT(desc.count == 1)" not in CPP
+assert "const u32 max_storage_slots = num_descriptor_entries > 32" in CPP
+assert CPP.count("max_storage_slots,") == 2
+assert "max_storage_slots" in GENERATOR
 assert '#include "video_core/renderer_vulkan/vk_compute_storage_layout.h"' in CPP
 assert "ComputeStorageLayout::ForEach(" in GENERATOR
 assert CPP.index("const auto valid_storage_layout =") < CPP.index("guest_descriptor_queue.Acquire(")
