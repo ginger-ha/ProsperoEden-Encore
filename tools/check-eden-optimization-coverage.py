@@ -128,7 +128,24 @@ assert "python3 -B tools/check-shared-compute-storage-descriptors-host.py" in (
     ROOT / ".github/workflows/encore-core-fast-gate.yml"
 ).read_text()
 print("NS1_NS2_SHARED_COMPUTE_F07_ISOLATION_PASS", f"new_shared_headers={len(post_f07_shared_compute_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners
+# The launcher -> Vulkan RGBA mailbox is a new ordinary production header,
+# not part of the immutable F07 518-owner optimization snapshot. Validate
+# the real handoff and its independent host gate instead of inflating F07.
+post_f07_launcher_handoff_owners = {"headless/launch_handoff.hpp"}
+assert post_f07_launcher_handoff_owners <= all_owners
+handoff_header = (ROOT / "headless/launch_handoff.hpp").read_text()
+assert "namespace Eden::LaunchHandoff {" in handoff_header
+assert "inline std::shared_ptr<const Frame> Peek()" in handoff_header
+assert "std::exchange(pending_frame, {})" in handoff_header
+assert "tools/check-ps5-vulkan-loading-stages-host.py" in tracked
+assert not post_f07_launcher_handoff_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners |
+    post_f07_native_vulkan_owners | post_f07_shared_compute_owners
+)
+print("ENCORE_SHARED_LOADER_F07_ISOLATION_PASS",
+      f"new_shipping_headers={len(post_f07_launcher_handoff_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
