@@ -138,6 +138,16 @@ void flat_front_fallback(Canvas& c, const Game& game, const Rect& r)
     // with preserved source proportions (UV crop only).
     const auto* painting = case_media::FrontPaper(
         game.hero, game.cover, game.screenshots);
+    // A confirmed missing Hero must not hide a valid screenshot or icon.
+    // An in-flight decode keeps priority until it actually fails.
+    const float front_bucket = std::max(r.w, r.h);
+    if (painting && c.textures.cover(*painting, front_bucket).missing) {
+        painting = case_media::FrontPaperAvailable(
+            game.hero, game.cover, game.screenshots,
+            [&](const std::string& path) {
+                return !c.textures.cover(path, front_bucket).missing;
+            });
+    }
     if (painting) reconstructed_cover(c, *painting, r);
     // A very light FULL-PAPER print tint, not a boxed title background.
     if (painting)
@@ -468,8 +478,16 @@ bool composed_case_face_ready(Textures& textures, const Game& game,
     };
     const auto* front = case_media::FrontPaper(
         game.hero, game.cover, game.screenshots);
-    if (!rear)
+    if (!rear) {
+        if (front && textures.cover(*front, 704.0f).missing) {
+            front = case_media::FrontPaperAvailable(
+                game.hero, game.cover, game.screenshots,
+                [&](const std::string& path) {
+                    return !textures.cover(path, 704.0f).missing;
+                });
+        }
         return !front || ready(*front, 704.0f);
+    }
 
     constexpr float paper_w = 440.0f;
     constexpr float dynamic_h = 704.0f * (1.0f - 0.41f);

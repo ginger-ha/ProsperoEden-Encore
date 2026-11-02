@@ -23,6 +23,19 @@ inline const std::string* FrontPaper(
     return cover.empty() ? nullptr : &cover;
 }
 
+// Skip only confirmed missing image sources, never a pending async decode.
+// Both NS1 and NS2 share this full-paper fallback with no fabricated media.
+template <typename Usable>
+inline const std::string* FrontPaperAvailable(
+    const std::string& featured, const std::string& cover,
+    const std::vector<std::string>& screenshots, Usable&& usable)
+{
+    if (!featured.empty() && usable(featured)) return &featured;
+    for (const auto& shot : screenshots)
+        if (!shot.empty() && usable(shot)) return &shot;
+    return !cover.empty() && usable(cover) ? &cover : nullptr;
+}
+
 // Front: choose the first genuine alternate scene, not a duplicate of
 // the feature image. Fall back to an independent cached app icon/poster.
 inline const std::string* FrontAlternate(

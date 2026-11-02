@@ -773,7 +773,7 @@ int main() {
         oversize_plan.image_handles.resize(257, textured.image_handles[0]);
         rereads = 0;
         assert(!guest_tables.MatchesSnapshot(
-            oversize_plan, std::vector<NativeQmdImageTableRecord>(257), counted_read));
+            oversize_plan, std::vector<Shader::Ampere::NativeQmdImageTableRecord>(257), counted_read));
         assert(rereads == 0);
         // TIC/TSC can mutate in guest memory independently of the channel
         // epoch. Do not accept a mixed or stale descriptor-table snapshot.

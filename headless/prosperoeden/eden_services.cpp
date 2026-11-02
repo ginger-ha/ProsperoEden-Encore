@@ -2035,8 +2035,17 @@ pe::ui::Game EdenServices::enrich_game_media(pe::ui::Game game,
     // Prioritize the requested ORIGINAL retail scans before any optional
     // metadata/banner/icon requests. Nlib may perform multiple slow calls;
     // previously a complete retail front could remain invisible for minutes.
-    game.case_artwork_changed = EnsureRetailCase(game.title_id, scanned_name, CleanTitle(game.file),
-                     language_choice, cancel);
+    // Resolve canonical retail names locally before any Nlib request. NS2
+    // extracted folders often omit spaces (e.g. DonkeyKongBananza).
+    // NS1 preserves the exact previous name/filename fallback.
+    if (const auto* ns2 = Eden::Ns2Catalog::Find(game.title_id)) {
+        game.case_artwork_changed = EnsureRetailCase(
+            game.title_id, std::string(ns2->name), scanned_name,
+            language_choice, cancel);
+    } else {
+        game.case_artwork_changed = EnsureRetailCase(game.title_id, scanned_name, CleanTitle(game.file),
+                         language_choice, cancel);
+    }
     if (!(cancel && cancel->load(std::memory_order_acquire))) {
         const auto cached_case = box_art(game.title_id);
         game.box_front = cached_case.front;

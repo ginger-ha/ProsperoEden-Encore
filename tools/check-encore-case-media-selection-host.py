@@ -36,6 +36,8 @@ assert 'reconstructed_paper(c, paper);' in renderer
 assert 'scene(game.cover,' not in renderer
 assert 'glClearColor' not in renderer
 assert 'const auto shots = case_media::BackScenes(' in renderer
+assert 'case_media::FrontPaperAvailable(' in renderer
+assert 'textures.cover(*front, 704.0f).missing' in renderer
 assert 'constexpr std::array<std::string_view, 3> kSceneMarkers{' in header.read_text()
 assert 'const std::string marker =' not in header.read_text()
 assert 'const std::string* third = shots[2];' in renderer
@@ -112,6 +114,18 @@ int main() {
     assert(*FrontPaper(empty, icon, shots) == "hero.tga");
     assert(*FrontPaper(empty, icon, {}) == icon);
     assert(FrontPaper(empty, empty, {}) == nullptr);
+    // Hero fails: use a distinct cached screenshot; preserve pending Hero
+    // priority and last-resort icon. Never invent a new image.
+    const auto usable = [](const std::string& path) {
+        return path != "hero.tga" && path != "scene-2.tga";
+    };
+    assert(FrontPaperAvailable(hero, icon, shots, usable) == &shots[4]);
+    assert(FrontPaperAvailable(
+        hero, icon, shots, [](const std::string&) { return true; }) == &hero);
+    assert(FrontPaperAvailable(
+        hero, icon, shots, [&](const std::string& path) { return path == icon; }) == &icon);
+    assert(FrontPaperAvailable(
+        hero, icon, shots, [](const std::string&) { return false; }) == nullptr);
     const auto excluded_cover = BackScenes(hero, icon, {"icon.tga", "scene.tga"});
     assert(excluded_cover[0] && *excluded_cover[0] == "scene.tga");
     assert(!excluded_cover[1]);

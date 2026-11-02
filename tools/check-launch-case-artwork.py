@@ -369,6 +369,8 @@ assert 'regions = {"us", "ca", "world", "uk", "eu", "fr"};' in native
 assert 'regions = {"fr", "eu", "world", "uk", "ca", "us"};' in native
 assert "face == 1" in native
 assert "EnsureRetailCase(game.title_id, scanned_name, CleanTitle(game.file)," in native
+assert "Eden::Ns2Catalog::Find(game.title_id)" in native
+assert "game.title_id, std::string(ns2->name), scanned_name," in native
 assert "9524e5f7-ccc8-4ce6-a581-03f82c51825e.jpg" in indexer
 assert "a8bcb4cc-a3b0-4cf0-82f3-cb10dd18b27c.jpg" in indexer
 assert "BotW_NA_Switch_Box_Art" not in (root / "tools/launcher/preview-botw-media.py").read_text()
