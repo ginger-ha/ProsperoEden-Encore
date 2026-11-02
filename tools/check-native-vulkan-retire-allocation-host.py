@@ -37,6 +37,7 @@ for name, extracted in (
     assert "scheduler.Finish();" in extracted
 
 cpp = r"""
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
