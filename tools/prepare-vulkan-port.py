@@ -6199,3 +6199,27 @@ apply_reviewed_delta(
     "        if (item.is_written) {\n            buffer_cache.ObtainBuffer(\n                item.gpu, item.bytes,\n                VideoCommon::ObtainBufferSynchronize::NoSynchronize,\n                VideoCommon::ObtainBufferOperation::MarkAsWritten);\n        }",
     "        if (item.is_written) {\n            // MarkAsWritten is the intentional side effect; no returned\n            // buffer handle is consumed by this native descriptor path.\n            static_cast<void>(buffer_cache.ObtainBuffer(\n                item.gpu, item.bytes,\n                VideoCommon::ObtainBufferSynchronize::NoSynchronize,\n                VideoCommon::ObtainBufferOperation::MarkAsWritten));\n        }",
     "U97 mark-only native buffer operation acknowledges nodiscard")
+
+# Shared NS1/NS2 compute descriptor reflection: one bounded 16-byte array
+# walker lives in the maintained Vulkan source owner. Never reinterpret
+# Ampere GMMU addresses as Switch 1 Kepler launch words.
+apply_reviewed_delta(
+    "vk_compute_pipeline_cost.cpp",
+    "#include \"video_core/renderer_vulkan/vk_pipeline_cache.h\"\n",
+    "#include \"video_core/renderer_vulkan/vk_pipeline_cache.h\"\n#include \"video_core/renderer_vulkan/vk_compute_storage_layout.h\"\n",
+    "Common compute descriptor visitor header")
+apply_reviewed_delta(
+    "vk_compute_pipeline_cost.cpp",
+    "    // A descriptor-free compute shader must not reserve the legacy 1024\n    // guest entries or wait for a GPU worker while holding both cache locks.\n",
+    "    // Same reflection walker as native Ampere: validate the flattened SSBO\n    // layout *before* changing any guest descriptor state. Maxwell's one-\n    // element descriptors preserve the exact existing binding and order.\n    const auto valid_storage_layout = ComputeStorageLayout::ForEach(\n        info.storage_buffers_descriptors,\n        static_cast<u32>(num_descriptor_entries),\n        [](u32, u32, u32, bool) { return true; });\n    if (!valid_storage_layout) return false;\n    // A descriptor-free compute shader must not reserve the legacy 1024\n    // guest entries or wait for a GPU worker while holding both cache locks.\n",
+    "Common storage array validation precedes NS1 GPU descriptor acquisition")
+apply_reviewed_delta(
+    "vk_compute_pipeline_cost.cpp",
+    "    size_t ssbo_index{};\n    for (const auto& desc : info.storage_buffers_descriptors) {\n        ASSERT(desc.count == 1);\n        buffer_cache.BindComputeStorageBuffer(ssbo_index, desc.cbuf_index, desc.cbuf_offset,\n                                              desc.is_written);\n        ++ssbo_index;\n    }",
+    "    // Reflected descriptor arrays are a sequence of 16-byte CBUF records.\n    // This shared walker handles 1-element NS1 descriptors unchanged and\n    // also admits valid arrays; no Kepler/Ampere decoding is performed here.\n    const bool bound_storage = ComputeStorageLayout::ForEach(\n        info.storage_buffers_descriptors,\n        static_cast<u32>(num_descriptor_entries),\n        [&](u32 index, u32 bank, u32 offset, bool writable) {\n            buffer_cache.BindComputeStorageBuffer(index, bank, offset, writable);\n            return true;\n        });\n    if (!bound_storage) return false;",
+    "NS1 compute binds flattened storage arrays through common walker")
+apply_reviewed_delta(
+    "vk_compute_pipeline_cost.cpp",
+    "    size_t storage_count{};\n    for (const auto& entry : info.storage_buffers_descriptors) {\n        if (!entry.count || storage_count > resources.storage_buffers.size() ||\n            entry.count > resources.storage_buffers.size() - storage_count)\n            return false;\n        for (u32 index = 0; index < entry.count; ++index) {\n            // Match flattened QMD3 records to SPIR-V descriptor reflection.\n            if (resources.storage_buffers[storage_count++].is_written != entry.is_written)\n                return false;\n        }\n    }\n    if (storage_count != resources.storage_buffers.size())\n        return false;",
+    "    // Match the same flattened SPIR-V layout used by Switch 1. Native GPU\n    // VA mapping/epoch safety still belongs to its QMD3 owner below.\n    size_t storage_count{};\n    const bool native_layout_valid = ComputeStorageLayout::ForEach(\n        info.storage_buffers_descriptors,\n        static_cast<u32>(resources.storage_buffers.size()),\n        [&](u32 index, u32, u32, bool writable) {\n            ++storage_count;\n            return resources.storage_buffers[index].is_written == writable;\n        });\n    if (!native_layout_valid || storage_count != resources.storage_buffers.size())\n        return false;",
+    "NS2 compute verifies flattened descriptor layout through common walker")
