@@ -111,5 +111,47 @@ int main() {
         NativeQmdComputeEnvironment invalid_block{
             bad,Read,&memory,std::make_unique<TextureMetadata>()};
     }));
+    // Shader descriptor metadata must produce the SAME 49-bit SSBO base
+    // encoded in QMD CBUF words, rather than Kepler's 40-bit address alias.
+    memory.mapped=true;
+    memory.reads=0;
+    memory.words={0x12345000U,0x10000U,0x40U,0U};
+    Shader::Info shader_info{};
+    shader_info.constant_buffer_mask=1;
+    shader_info.constant_buffer_used_sizes[0]=16;
+    shader_info.constant_buffer_descriptors.push_back({0,1});
+    shader_info.storage_buffers_descriptors.push_back({0,0,1,true});
+    const auto plan=env.BuildResourcePlan(shader_info);
+    assert(plan && plan->uniform_buffers.size()==1 &&
+           plan->storage_buffers.size()==1 &&
+           plan->storage_buffers[0].gpu_address==0x1000012345000ULL &&
+           plan->storage_buffers[0].bytes==0x40 &&
+           plan->storage_buffers[0].is_written &&
+           plan->storage_buffers[0].known_size &&
+           !plan->requires_memory_layout && !plan->requires_tic_tsc &&
+           memory.reads==4);
+    // Never infer an SSBO size from a high packed tag: the upstream
+    // BufferCache must resolve the real memory layout before submission.
+    memory.words[3]=1;
+    const auto unresolved=env.BuildResourcePlan(shader_info);
+    assert(unresolved && unresolved->requires_memory_layout &&
+           !unresolved->storage_buffers[0].known_size);
+    memory.words[3]=0;
+    shader_info.constant_buffer_mask=1U<<9;
+    assert(!env.BuildResourcePlan(shader_info));
+    shader_info.constant_buffer_mask=1;
+    shader_info.storage_buffers_descriptors.clear();
+    shader_info.storage_buffers_descriptors.push_back({0,4,1,true});
+    assert(!env.BuildResourcePlan(shader_info)); // 16 bytes exceed CBUF
+    shader_info.storage_buffers_descriptors.clear();
+    shader_info.storage_buffers_descriptors.push_back({0,0,1,true});
+    memory.words[1]=0x20000U;
+    assert(!env.BuildResourcePlan(shader_info)); // >49-bit target
+    memory.words[1]=0x10000U;
+    shader_info.uses_cbuf_indirect=true;
+    assert(!env.BuildResourcePlan(shader_info)); // no invented indirect binding
+    shader_info.uses_cbuf_indirect=false;
+    memory.mapped=false;
+    assert(!env.BuildResourcePlan(shader_info)); // no stale GMMU read
     return 0;
 }
