@@ -986,7 +986,9 @@ void Launcher::draw_launch(Canvas &c)
         // A path in the metadata is not proof that the scan exists. Wait
         // while it decodes, but use the composed print after a failed load;
         // the authentic scan automatically resumes priority if retried.
-        if (!retail.empty() && !c.textures.cover(retail, 760.0f).missing)
+        // The texture may still be decoding even when "missing" is false.
+        // Never suppress reconstruction until an actual GPU texture exists.
+        if (!retail.empty() && c.textures.cover(retail, 760.0f).texture != 0)
             return;
         if ((page != 0 && !provisional) ||
             (page == 0 && attempted) || failures >= 3u) return;
@@ -1037,8 +1039,9 @@ void Launcher::draw_launch(Canvas &c)
     prepare_case_page(true);
     const std::uint32_t composed_page =
         back ? launch_composed_back_ : launch_composed_front_;
-    const bool use_composed = (scan.empty() || artwork.missing) &&
-                              composed_page != 0;
+    // A queued retail decode is NOT a drawable face. Keep the composed,
+    // opaque paper visible until the actual image texture is uploaded.
+    const bool use_composed = artwork.texture == 0 && composed_page != 0;
     const std::uint32_t visible_texture =
         use_composed ? composed_page : artwork.texture;
     // One event per visible paper face and state, NEVER a per-frame log.
@@ -1061,7 +1064,10 @@ void Launcher::draw_launch(Canvas &c)
     // One fully opaque paper sheet underneath either face. A narrow genuine
     // scan and the first frames of an async composition can never reveal
     // transparent black or molded plastic through its upper/lower margins.
-    c.list.case_face(0, face, angle, back, Color::rgb(0x112235));
+    // The opaque printed-paper substrate is identical for NS1/NS2. The
+    // red spine or clear plastic must never be visible THROUGH a missing
+    // picture while remote imagery is decoding.
+    c.list.case_face(0, face, angle, back, Color::rgb(0xf4f5f7));
     if (use_composed) {
         // OpenGL framebuffer textures have bottom-left origin. Flip Y once,
         // then let the existing 3D case-face shader project both printed
