@@ -189,7 +189,13 @@ assert "pending_settings_file_.clear();" in nav
 assert "(void)open_game_settings_at_file(file);" in nav
 
 assert "drop_missing_games();" not in library_entry
-assert "start_scan();" in library_entry
+assert "if (!games_loaded_ && !scan_.valid()) start_scan();" in library_entry
+assert library_entry.count("start_scan();") == 1, "tab navigation must not trigger a ROM rescan"
+assert "if (library_.count != static_cast<int>(games_.size()))" in library_entry
+draw_library = lib.split("void Launcher::draw_library(", 1)[1].split("void Launcher::", 1)[0]
+assert 'if (!games_loaded_) {' in draw_library
+assert 'tr("Loading game library...")' in draw_library
+assert draw_library.index("if (!games_loaded_) {") < draw_library.index('tr("No ROM files found.")')
 assert "library_.selected >= 0 &&" in lib
 # Per-title mod directories/config are resolved on the scan worker, not
 # synchronously when finish_scan() updates the visible Library.
