@@ -46,7 +46,9 @@ struct NativeRetirementMockScheduler {
 struct NativeRetirementMockFences {
     std::function<void()> pending{};
     bool signaled{};
+    bool reject_registration{};
     void SyncOperation(std::function<void()>&& operation) {
+        if (reject_registration) throw std::runtime_error{"mock fence registration failure"};
         assert(!pending);
         pending = std::move(operation);
     }
@@ -97,6 +99,30 @@ int main() {
         assert(scheduler.waited == 1 && destroyed == 0);
         deferred = {};
         assert(destroyed == 1);
+    }
+    {
+        // A failed SyncOperation registration must not destroy the
+        // pipeline before the submitted GPU tick has been waited.
+        NativeRetirementMockScheduler scheduler{};
+        scheduler.gpu_completed = true;
+        NativeRetirementMockFences fences{};
+        fences.reject_registration = true;
+        int destroyed{};
+        auto pipeline = std::shared_ptr<int>(
+            new int(9), [&](int* value) {
+                assert(scheduler.waited == scheduler.current_tick);
+                ++destroyed;
+                delete value;
+            });
+        bool refused{};
+        try {
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, fences, std::move(pipeline));
+        } catch (const std::runtime_error&) {
+            refused = true;
+        }
+        assert(refused && scheduler.current_tick == 1 &&
+               scheduler.waited == 1 && destroyed == 1);
     }
     Tegra::NativeQmdScheduler::Descriptor qmd{};
     qmd[8]=0x80;

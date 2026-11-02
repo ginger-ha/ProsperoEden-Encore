@@ -241,3 +241,14 @@ for name in ("Msaa4x2_VC8", "Msaa4x2_VC24"):
     assert ("MsaaMode::" + name + ":") in maxwell_msaa
     assert ("MsaaMode::" + name + ":") in cache_samples
 print("NS2_MSAA_VC8_VC24_SHARED_MAPPING_PASS sample_count=8")
+
+# If deferred fence registration itself throws, a second shared owner must
+# survive until the already submitted GPU tick finishes. The test fixture
+# injects this failure and validates the destruction order on the real helper.
+assert "auto emergency_owner = owner;" in native_env
+assert "catch (...) {" in native_env.split(
+    "void RetainNativeComputeUntilGpuTick(", 1)[1].split(
+    "// Shared NS2 GMMU preflight", 1)[0]
+assert "scheduler.Wait(tick);" in native_env
+print("NS2_NATIVE_COMPUTE_FENCE_REGISTRATION_FALLBACK_PASS"
+      " owner_retained_on_exception=1")
