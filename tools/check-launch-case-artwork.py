@@ -4,6 +4,7 @@ from pathlib import Path
 import math
 import shutil
 import subprocess
+import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
@@ -317,6 +318,14 @@ assert "c.list.case_spine(side_strip, angle, 3.2f," not in draw
 indexer = (root / "tools/launcher/build-box-art-index.py").read_text()
 workflow = (root / ".github/workflows/build-040-zbic.yml").read_text()
 packager = (root / "tools/package-headless-native.sh").read_text()
+assert '"Nintendo Switch", "Nintendo Switch 2"' in indexer
+assert '"https://gamesdb-images.launchbox.gg"' in native
+assert 'const bool r2 = filename.rfind("r2_", 0) == 0;' in native
+assert "return FetchKnownNs2Front" not in native
+# Execute the actual streaming Metadata.xml parser with both console types.
+# No HTTP access or native console build needed for this self-test.
+subprocess.run([sys.executable, str(root / "tools/launcher/build-box-art-index.py"),
+                "--self-test"], check=True)
 assert "Nintendo Switch" in indexer
 assert "def candidates(items, limit=6):" in indexer
 assert "fanart" in indexer and "title_screen" in indexer and "gameplay" in indexer
