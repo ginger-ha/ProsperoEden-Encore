@@ -721,6 +721,18 @@ int main() {
         tic.max_mip_level.Assign(0);
         tic.res_min_mip_level.Assign(0);
         tic.res_max_mip_level.Assign(0);
+        // ImageInfo asserts on a pitch-linear TIC outside 2D; neither
+        // malformed 3D nor zero-row-pitch 2D may reach the shared cache.
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(tic));
+        TICEntry pitch_tic = tic;
+        pitch_tic.header_version.Assign(TICHeaderVersion::Pitch);
+        pitch_tic.pitch_high.Assign(8);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
+        pitch_tic.texture_type.Assign(TextureType::Texture3D);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
+        pitch_tic.texture_type.Assign(TextureType::Texture2D);
+        pitch_tic.pitch_high.Assign(0);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
         TSCEntry tsc{};
         tsc.mag_filter.Assign(TextureFilter::Nearest);
         tsc.min_filter.Assign(TextureFilter::Linear);
