@@ -71,6 +71,11 @@ native_header = (vendor / (
 compute = (vendor / "encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
 assert "bool NativeQmdContiguousGpuSpan(" in native_header
 assert "bool SameBufferBindings(const NativeQmdResourcePlan& other)" in native_header
+assert "image_handles.size() != other.image_handles.size()" in native_header
+assert "a.primary_shift != b.primary_shift" in native_header
+assert "a.secondary_shift != b.secondary_shift" in native_header
+assert "a.is_written != b.is_written" in native_header
+assert "bool SameRegisters(u64 live_tic, u32 live_tic_limit," in native_header
 assert "bool ForEachCapturedRecord(const NativeQmdResourcePlan& plan," in native_header
 snapshot_body = native_header.split("MatchesSnapshot(", 1)[1].split(
     "    // Transcode already admitted snapshot bytes", 1)[0]
@@ -108,6 +113,9 @@ for filename in (
 ):
     source = (vendor / filename).read_text()
     assert "tables.CaptureAdmissible(" in source, filename
+    assert "tables.SameRegisters(" in source, filename
+    assert source.index("tables.SameRegisters(") < source.index(
+        "tables.MatchesSnapshot("), filename
     assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in source, filename
     assert "const VideoCommon::ImageInfo info{tic};" in source, filename
     admission = source.split("[this](const Tegra::Texture::TICEntry& tic) {", 1)[1]

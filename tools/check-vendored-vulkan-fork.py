@@ -163,6 +163,16 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         assert expected["vulkan_rasterizer.cpp"].read_text().count(new) == 1, (
             "native pipeline retirement reviewed source drift")
         raster = raster.replace(old, new)
+    # P2.2: the native table-register lifetime check is shared by both
+    # Vulkan owners. Mirror only this audited delta from the pinned source,
+    # preserving the generator's final full-file byte-for-byte comparison.
+    table_register_previous = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // TIC/TSC can be rewritten while the shader is compiled."
+    table_register_reviewed = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // The engine epoch can stay valid while guest code rewrites\n                // TIC/TSC base/limit registers. Never authenticate bytes from\n                // an OLD table and bind them as the currently active one.\n                if (same_cache_channel) {\n                    const auto& live_regs = kepler_compute.regs;\n                    same_cache_channel = tables.SameRegisters(\n                        live_regs.tic.Address(), live_regs.tic.limit,\n                        live_regs.tsc.Address(), live_regs.tsc.limit,\n                        launch.linked_tsc);\n                }\n                // TIC/TSC can be rewritten while the shader is compiled."
+    assert raster.count(table_register_previous) == 1, (
+        "generated native TIC/TSC table ownership drift")
+    assert expected["vulkan_rasterizer.cpp"].read_text().count(
+        table_register_reviewed) == 1, "reviewed TIC/TSC register guard drift"
+    raster = raster.replace(table_register_previous, table_register_reviewed)
     raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.

@@ -640,6 +640,54 @@ int main() {
         sampled.kind = NativeQmdImageKind::SampledTexture;
         sampled.primary_word = 0;
         textured.image_handles.push_back(sampled);
+        // A live CBUF rewrite may change only a texture handle, its bank
+        // shift, kind or write rights while every UBO/SSBO VA remains mapped.
+        // All such mutations must invalidate the complete native QMD plan.
+        assert(textured.SameBufferBindings(textured));
+        auto changed_image = textured;
+        ++changed_image.image_handles[0].primary_word;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        ++changed_image.image_handles[0].secondary_word;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        ++changed_image.image_handles[0].primary_shift;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        ++changed_image.image_handles[0].secondary_shift;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        changed_image.image_handles[0].has_secondary = true;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        changed_image.image_handles[0].is_written = true;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        changed_image.image_handles[0].kind = NativeQmdImageKind::StorageImage;
+        assert(!textured.SameBufferBindings(changed_image));
+        changed_image = textured;
+        changed_image.image_handles.clear();
+        assert(!textured.SameBufferBindings(changed_image));
+        // The native table base/limit must still belong to the same active
+        // GPU channel even if the process ticket did not change.
+        assert(guest_tables.SameRegisters(
+            guest_tables.tic_base, guest_tables.tic_limit,
+            guest_tables.tsc_base, guest_tables.tsc_limit, false));
+        assert(!guest_tables.SameRegisters(
+            guest_tables.tic_base + 0x20, guest_tables.tic_limit,
+            guest_tables.tsc_base, guest_tables.tsc_limit, false));
+        assert(!guest_tables.SameRegisters(
+            guest_tables.tic_base, guest_tables.tic_limit + 1,
+            guest_tables.tsc_base, guest_tables.tsc_limit, false));
+        assert(!guest_tables.SameRegisters(
+            guest_tables.tic_base, guest_tables.tic_limit,
+            guest_tables.tsc_base + 0x20, guest_tables.tsc_limit, false));
+        assert(!guest_tables.SameRegisters(
+            guest_tables.tic_base, guest_tables.tic_limit,
+            guest_tables.tsc_base, guest_tables.tsc_limit + 1, false));
+        assert(!guest_tables.SameRegisters(
+            guest_tables.tic_base, guest_tables.tic_limit,
+            guest_tables.tsc_base, guest_tables.tsc_limit, true));
         // Match flattened SPIR-V layout before touching guest TIC/TSC:
         // texture buffers, image buffers, samples, writable storage images.
         Shader::Info layout{};
