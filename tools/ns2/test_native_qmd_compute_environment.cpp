@@ -953,6 +953,16 @@ int main() {
         // SAME typed TIC before acquiring any shared Vulkan cache slot.
         layout.texture_descriptors[0].type = Shader::TextureType::Color2DRect;
         assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
+        // MSAA is an independent SPIR-V image type bit. Even matching TIC
+        // dimensions must be refused when the shader expects other samples.
+        layout.texture_descriptors[0].is_multisample = true;
+        assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
+        auto msaa_view = *typed;
+        msaa_view[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
+        assert(NativeQmdTypedImageLayoutMatches(layout, msaa_view));
+        layout.texture_descriptors[0].is_multisample = false;
+        assert(!NativeQmdTypedImageLayoutMatches(layout, msaa_view));
+        assert(NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
         assert(!NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2D;
