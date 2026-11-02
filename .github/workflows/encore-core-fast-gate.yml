@@ -138,6 +138,7 @@ on:
       - 'tools/check-launcher-release-hotpaths-host.py'
       - 'tools/check-release-case-index-dedup-host.py'
       - 'tools/check-launcher-atomic-scan-host.py'
+      - 'tools/check-native-vulkan-retire-allocation-host.py'
       - 'tools/check-release-font-fit-alloc-host.py'
       - 'tools/check-release-font-wrap-alloc-host.py'
       - 'tools/check-release-font-sdf-scratch-host.py'
@@ -518,6 +519,7 @@ jobs:
           python3 -B tools/check-ps5-f07-readback-dirty-rollback-host.py
           python3 -B tools/check-ps5-f07-download-staging-runtime-host.py
           python3 -B tools/check-ps5-f07-msaa-upload-retire-host.py
+          python3 -B tools/check-native-vulkan-retire-allocation-host.py
           python3 -B tools/check-ps5-f07-async-dma-rollback-host.py
           python3 -B tools/check-ps5-f07-async-flush-staging-rollback-host.py
           python3 -B tools/check-ps5-f07-memory-pressure-sampling-host.py
