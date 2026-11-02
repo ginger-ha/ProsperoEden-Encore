@@ -39,12 +39,10 @@ concurrency:
 
 jobs:
   build:
-    if: >-
-      ${{ !contains(github.event.head_commit.message || '', '[publish-existing]') &&
-          (github.ref == 'refs/heads/main' &&
-           github.event_name == 'workflow_dispatch' ||
-           contains(github.event.head_commit.message || '', '[full-build]') ||
-           contains(github.event.head_commit.message || '', '[resume-stage:37728435816]')) }}
+    # Owner hard stop: no full PS5 compile/package until NS1/NS2 are
+    # complete, optimized, and console-validated with one jacket loader.
+    # Explicitly re-enable after the acceptance gates are satisfied.
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     env:
