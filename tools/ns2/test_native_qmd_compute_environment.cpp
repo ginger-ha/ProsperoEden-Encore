@@ -141,6 +141,50 @@ int main() {
                (addr==0x1000012345000ULL && bytes==0x40);
     }));
     assert(mapped_spans==2);
+    // Vulkan BufferCache entrypoint receives the native QMD3 descriptor
+    // order without copying the legacy Kepler launch descriptor. Refuse all
+    // guest spans before any staging; rollback partial renderer submissions.
+    unsigned uniform_binds{}, storage_binds{}, rollback_count{}, stage_order{};
+    const auto mapped_all=[&](u64 addr, std::size_t bytes) {
+        return (addr==memory.address && bytes==16) ||
+               (addr==0x1000012345000ULL && bytes==0x40);
+    };
+    auto uniform=[&](u32 index,u32 bank,u64 addr,u32 bytes) {
+        assert(index==0 && bank==0 && addr==memory.address && bytes==16);
+        assert(stage_order++==0);
+        ++uniform_binds; return true;
+    };
+    auto storage=[&](u32 index,u64 addr,u32 bytes,bool written) {
+        assert(index==0 && addr==0x1000012345000ULL &&
+               bytes==0x40 && written);
+        assert(stage_order++==1);
+        ++storage_binds; return true;
+    };
+    auto rollback=[&] { ++rollback_count; stage_order=0; };
+    assert(plan->StageVulkanBufferBindings(
+        mapped_all,uniform,storage,rollback));
+    assert(uniform_binds==1 && storage_binds==1 && rollback_count==0);
+    stage_order=0;
+    assert(!plan->StageVulkanBufferBindings(
+        [](u64,std::size_t){return false;},uniform,storage,rollback));
+    assert(uniform_binds==1 && storage_binds==1 && rollback_count==0);
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,
+        [&](u32,u32,u64,u32){++uniform_binds; return false;},
+        storage,rollback));
+    assert(uniform_binds==2 && storage_binds==1 && rollback_count==1);
+    stage_order=0;
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,uniform,
+        [&](u32,u64,u32,bool){++storage_binds; return false;},rollback));
+    assert(uniform_binds==3 && storage_binds==2 && rollback_count==2);
+    stage_order=0;
+    assert(!plan->StageVulkanBufferBindings(
+        mapped_all,uniform,
+        [&](u32,u64,u32,bool)->bool{
+            throw std::runtime_error{"Vulkan descriptor pool exhausted"};
+        },rollback));
+    assert(rollback_count==3);
     assert(!plan->ValidateGpuMappings([](u64, std::size_t) {
         return false;
     })); // A mapped QMD is not proof of mapped descriptor targets.
