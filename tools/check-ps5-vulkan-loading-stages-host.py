@@ -27,6 +27,12 @@ assert 'if (first) sceSystemServiceHideSplashScreen();' in loading
 assert 'return true;' in loading
 constructor = source.split("GraphicsWindow::GraphicsWindow(", 1)[1]
 assert constructor.index("vulkan_loading_diagnostic_stage = 0;") < constructor.index("vulkan_loading_pace = {};")
+# OpenGL titles must drop launcher jacket pixels on window creation.
+# Vulkan titles must retain the same mailbox until upload completes.
+assert '#include "launch_handoff.hpp"' in source
+assert constructor.count('if (!vulkan) LaunchHandoff::Clear();') == 1
+assert constructor.index('if (!vulkan) LaunchHandoff::Clear();') < constructor.index("vulkan_loading = vulkan;")
+print("ENCORE_OPENGL_JACKET_LIFETIME_SOURCE_PASS clear_only_opengl=1 vulkan_mailbox_preserved=1")
 # Validate stage boundary behavior under monotonic time (not the real GPU).
 def stages(elapsed_values):
     stage = 0
