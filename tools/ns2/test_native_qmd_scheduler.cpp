@@ -59,6 +59,26 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // MKW native Compute hot path: side-effect-free register writes avoid
+    // KeplerCompute::CallMethod. The special methods MUST still execute
+    // their original upload, semaphore, QMD and legacy side effects.
+    for (const unsigned reg : {0x00U, 0x60U, 0x6bU, 0x6eU, 0xadU,
+                               0xb1U, 0x106U, 0x108U, 0x557U,
+                               0x55dU, 0x582U, 0x6c0U, 0x6c2U,
+                               0x982U, 0xcffU})
+        assert(Tegra::NativeComputePlainRegister(reg));
+    for (const unsigned reg : {0x45U, 0x46U, 0x47U, 0x48U,
+                               0x6cU, 0x6dU, 0xaeU, 0xafU, 0xb0U,
+                               0x107U, 0x6c3U, 0xe00U, 0xffffU})
+        assert(!Tegra::NativeComputePlainRegister(reg));
+    // A native burst to one plain register has last-value-wins semantics
+    // for its entire span. No method trigger may be coalesced this way.
+    std::array<unsigned, 4> burst{10, 11, 12, 13};
+    unsigned sequential{};
+    for (const auto word : burst) sequential=word;
+    const unsigned collapsed=burst.back();
+    assert(sequential==collapsed);
+    assert(!Tegra::NativeComputePlainRegister(0x107U));
     // Native 0xC7C0 SET_REPORT_SEMAPHORE_D reductions are performed after
     // a real GPU fence, not by reusing the Switch 1 semaphore decoder.
     assert(Tegra::NativeComputeSemaphoreReduction(6,4,0)==10);
