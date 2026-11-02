@@ -142,9 +142,31 @@ shared_compute_cpp = (active / "eden-vulkan/vk_compute_pipeline_cost.cpp").read_
 assert '#include "video_core/renderer_vulkan/vk_compute_storage_layout.h"' in shared_compute_cpp
 assert shared_compute_cpp.count("ComputeStorageLayout::ForEach(") == 3
 print("ENCORE_SHARED_COMPUTE_SOURCE_PASS", f"owners={len(shared_compute_owners)}")
+# New native-only cache ABI owner, after the locked 337-file history.
+# It is generated from the already-reviewed shipping source, not a new Eden
+# backport and not evidence of completion of the NS2 Vulkan image path.
+native_typed_texture_owners = {
+    "eden-vulkan/vulkan-cache/video_core/texture_cache/texture_cache_base.h",
+}
+assert native_typed_texture_owners <= set(physical_all), (
+    "Native TIC/TSC cache interface missing",
+    sorted(native_typed_texture_owners - set(physical_all)))
+assert not native_typed_texture_owners.intersection(
+    set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
+    shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners | shared_compute_owners
+)
+typed_cache_header = (active / next(iter(native_typed_texture_owners))).read_text()
+assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in typed_cache_header
+assert "AcquireNativeImageView(const TICEntry& descriptor" in typed_cache_header
+assert "AcquireNativeSampler(const TSCEntry& descriptor)" in typed_cache_header
+assert 'target_include_directories(video_core BEFORE PUBLIC "${PORT_BUILD_DIR}/vulkan-cache")' in (
+    root / "headless/vulkan.cmake").read_text()
+print("ENCORE_POST_F07_NS2_TYPED_TEXTURE_CACHE_OWNER_PASS",
+      f"owners={len(native_typed_texture_owners)}")
 physical = [p for p in physical_all
             if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
-            shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners | shared_compute_owners]
+            shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners |
+            shared_compute_owners | native_typed_texture_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {
