@@ -158,6 +158,12 @@ int main() {
     shader_info.constant_buffer_mask=1U<<9;
     assert(!env.BuildResourcePlan(shader_info));
     shader_info.constant_buffer_mask=1;
+    shader_info.constant_buffer_descriptors.clear();
+    assert(!env.BuildResourcePlan(shader_info)); // mandatory bank is not declared
+    shader_info.constant_buffer_descriptors.push_back({0,1});
+    shader_info.constant_buffer_descriptors.push_back({0,1});
+    assert(!env.BuildResourcePlan(shader_info)); // two descriptors alias bank 0
+    shader_info.constant_buffer_descriptors.pop_back();
     shader_info.storage_buffers_descriptors.clear();
     shader_info.storage_buffers_descriptors.push_back({0,4,1,true});
     assert(!env.BuildResourcePlan(shader_info)); // 16 bytes exceed CBUF
