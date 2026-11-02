@@ -2783,7 +2783,28 @@ if(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
     target_sources(video_core PRIVATE "${EDEN_NS2_VULKAN_SHADER_BRIDGE}")
     target_sources(video_core PRIVATE "${EDEN_NS2_NATIVE_GPU_SPIRV_CAPTURE}")
     target_include_directories(video_core BEFORE PRIVATE "${PORT_ROOT}/vendor/encore-active/ns2-runtime/hle")
-    target_compile_definitions(video_core PRIVATE EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)
+    # Native Vulkan's RasterizerVulkan::DispatchNativeCompute overrides a
+    # RasterizerInterface virtual method. The pinned build-source archive
+    # otherwise provides the pre-NS2 interface, causing an 'override' error
+    # when unrelated Vulkan consumers compile. Select the REVIEWED vendor
+    # interface only in this opt-in NS2 research profile.
+    set(EDEN_NS2_RASTERIZER_INTERFACE
+        "${PORT_ROOT}/vendor/sources/eden/src/video_core/rasterizer_interface.h")
+    if(NOT EXISTS "${EDEN_NS2_RASTERIZER_INTERFACE}")
+        message(FATAL_ERROR "Missing reviewed native QMD3 RasterizerInterface ABI")
+    endif()
+    file(READ "${EDEN_NS2_RASTERIZER_INTERFACE}" eden_ns2_rasterizer_interface_text)
+    if(NOT eden_ns2_rasterizer_interface_text MATCHES
+           "virtual bool DispatchNativeCompute\\(const Tegra::NativeComputeLaunch&\\)")
+        message(FATAL_ERROR "Reviewed native QMD3 RasterizerInterface ABI changed")
+    endif()
+    file(MAKE_DIRECTORY "${PORT_BUILD_DIR}/include/video_core")
+    configure_file("${EDEN_NS2_RASTERIZER_INTERFACE}"
+        "${PORT_BUILD_DIR}/include/video_core/rasterizer_interface.h" COPYONLY)
+    # The virtual table is shared by core, video_core and their consumers.
+    # Do not give video_core a private, incompatible interpretation.
+    target_compile_definitions(video_core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)
+    target_compile_definitions(core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)
 endif()
 
 # N50: versioned device-memory page-run guard in the single PS5 owner.
