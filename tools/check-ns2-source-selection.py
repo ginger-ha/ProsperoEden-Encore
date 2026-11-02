@@ -334,6 +334,9 @@ def main() -> int:
                 "const bool known_size = tag == 0 && bytes != 0" in qmd_environment.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in qmd_api.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in pipeline_source.read_text() and
+                "CompileCapturedNs2QmdComputeSpirvWithResources(" in qmd_api.read_text() and
+                "CompileCapturedNs2QmdComputeSpirvWithResources(" in pipeline_source.read_text() and
+                "resource_owner->BuildResourcePlan(*compiled.info)" in pipeline_source.read_text() and
                 "CompileCapturedNs2ComputeSpirv(" in pipeline_source.read_text() and
                 (ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").is_file(),
                 "QMD3 49-bit Compute metadata must reach authenticated SPIR-V compilation")
