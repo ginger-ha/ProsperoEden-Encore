@@ -240,7 +240,10 @@ assert "kepler_compute == &expected_compute" in impl
 assert "gpu_memory == &expected_memory" in impl
 assert "&channel_state->kepler_compute == &expected_compute" in impl
 assert "&channel_state->gpu_memory == &expected_memory" in impl
-assert impl.count("NativeChannelMatches(expected_compute, expected_memory)") == 2
+# Returning from NativeChannelMatches unlocks config_mutex, permitting a
+# channel switch before the native slot access. The acquisition functions
+# deliberately compare the same identity while still holding that lock.
+assert impl.count("NativeChannelMatches(expected_compute, expected_memory)") == 0
 for source_path in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
