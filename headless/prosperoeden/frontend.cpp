@@ -3,6 +3,7 @@
 // pe::ui::Launcher. Everything here is created when the launcher appears and gone before a game
 // starts: the game's own window takes over the screen.
 #include "frontend.h"
+#include "launch_handoff.hpp"
 
 #include "assets_dir.h"
 #include "audio_out_init.h"
@@ -291,6 +292,9 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
         unsigned ui_frames = 0, ui_late_20 = 0, ui_late_33 = 0, ui_late_50 = 0;
         long long ui_max_update_us = 0, ui_max_draw_us = 0, ui_max_present_us = 0;
 #endif
+        Eden::LaunchHandoff::Clear();
+        Clock::time_point selected_since{};
+        bool handoff_captured = false;
         while (running && !launcher.done() && !launcher.restart_requested()) {
             const auto frame_start = Clock::now();
             // Start-to-start frame time; a long frame does not make the animations jump.
@@ -382,6 +386,60 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
             batch.draw(list, viewport, display.width(), display.height());
+            // Preserve the ACTUAL jacket/hero/title composition before EGL
+            // is destroyed and Vulkan takes over. Capture once, near the
+            // end of the case rotation but before the black fade. The PS5
+            // Vulkan warm-up reuses this frame until the first guest frame.
+            if (!handoff_captured && !launcher.selected_game().empty()) {
+                const auto now = Clock::now();
+                if (selected_since == Clock::time_point{}) selected_since = now;
+                if (std::chrono::duration<float>(now - selected_since).count() >=
+                    pe::ui::theme::kLaunchSeconds - 0.75f) {
+                    handoff_captured = true;
+                    const int width = display.width();
+                    const int height = display.height();
+                    if (width > 0 && height > 0 && width <= 4096 && height <= 2160) {
+                        try {
+                            Eden::LaunchHandoff::Frame snapshot;
+                            snapshot.width = static_cast<std::uint32_t>(width);
+                            snapshot.height = static_cast<std::uint32_t>(height);
+                            const std::size_t row_bytes =
+                                static_cast<std::size_t>(width) * 4;
+                            snapshot.rgba.resize(row_bytes * static_cast<std::size_t>(height));
+                            glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                            glReadPixels(0, 0, width, height, GL_RGBA,
+                                         GL_UNSIGNED_BYTE, snapshot.rgba.data());
+                            const GLenum error = glGetError();
+                            glPixelStorei(GL_PACK_ALIGNMENT, 4);
+                            if (error == GL_NO_ERROR) {
+                                // GL readback starts at the lower left; Vulkan
+                                // buffer copies expect image rows from the top.
+                                std::vector<std::uint8_t> row(row_bytes);
+                                for (int y = 0; y < height / 2; ++y) {
+                                    auto* top = snapshot.rgba.data() +
+                                        static_cast<std::size_t>(y) * row_bytes;
+                                    auto* bottom = snapshot.rgba.data() +
+                                        static_cast<std::size_t>(height - y - 1) * row_bytes;
+                                    std::memcpy(row.data(), top, row_bytes);
+                                    std::memcpy(top, bottom, row_bytes);
+                                    std::memcpy(bottom, row.data(), row_bytes);
+                                }
+                                Eden::LaunchHandoff::Publish(std::move(snapshot));
+                                std::fprintf(stderr,
+                                    "EDEN_LOADER_JACKET_HANDOFF_CAPTURE size=%dx%d ready=1\n",
+                                    width, height);
+                            } else {
+                                std::fprintf(stderr,
+                                    "EDEN_LOADER_JACKET_HANDOFF_CAPTURE ready=0 gl_error=%x\n",
+                                    static_cast<unsigned>(error));
+                            }
+                        } catch (const std::bad_alloc&) {
+                            std::fprintf(stderr,
+                                "EDEN_LOADER_JACKET_HANDOFF_CAPTURE ready=0 memory=insufficient\n");
+                        }
+                    }
+                }
+            }
             const auto drawn = Clock::now();
             bool captured = false;
 #ifdef EDEN_DEV_ROM_ID
