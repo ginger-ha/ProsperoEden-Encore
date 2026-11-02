@@ -187,6 +187,24 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert expected["vulkan_rasterizer.cpp"].read_text().count(typed_reviewed) == 1, (
         "reviewed native TIC reflected type contract drift")
     raster = raster.replace(typed_previous, typed_reviewed)
+    # P2.2: shader translation must reject invalid TIC layout/size/MSAA
+    # using the SAME admission contract as the later typed cache replay.
+    shader_tic_previous = (
+        "        if (static_cast<u32>(entry.header_version.Value()) >\\n"
+        "            static_cast<u32>(Tegra::Texture::TICHeaderVersion::BlockLinearColorKey))\\n"
+        "            throw std::runtime_error{\\"unsupported native Compute TIC header\\"};"
+    ).replace("\\n", "\n").replace('\\"', '"')
+    shader_tic_reviewed = (
+        "        // Shader metadata must not be translated from a TIC the later\\n"
+        "        // shared TextureCache cannot admit. Reject an invalid format layout,\\n"
+        "        // MSAA mode or overflow budget before spending CPU on native SPIR-V.\\n"
+        "        if (!Shader::Ampere::NativeQmdTicLayoutSupported(entry))\\n"
+        "            throw std::runtime_error{\\"unsupported native Compute TIC layout\\"};"
+    ).replace("\\n", "\n").replace('\\"', '"')
+    assert raster.count(shader_tic_previous) == 1, "generated TIC translation guard moved"
+    assert expected["vulkan_rasterizer.cpp"].read_text().count(shader_tic_reviewed) == 1, (
+        "reviewed early TIC shader admission guard drift")
+    raster = raster.replace(shader_tic_previous, shader_tic_reviewed)
     raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.

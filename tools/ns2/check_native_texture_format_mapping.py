@@ -181,6 +181,14 @@ assert "bool NativeQmdTicLayoutSupported(" in native_env
 assert native_env.count("NativeQmdTicLayoutSupported(") == 4  # helper + capture + replay + typed layout
 assert "if (!NativeQmdTicLayoutSupported(tic)) return std::nullopt;" in native_env
 assert "if (!NativeQmdTicLayoutSupported(entry.tic)) return std::nullopt;" in native_env
+# Translate from the exact TIC layout policy used by capture/replay.
+for owner in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    native_owner = (vendor / owner).read_text()
+    assert native_owner.count("NativeQmdTicLayoutSupported(entry)") == 1, owner
+    assert "unsupported native Compute TIC header" not in native_owner, owner
 assert "bool NativeQmdTicMatchesShaderType(" in native_env
 assert "bool NativeQmdTypedImageLayoutMatches(" in native_env
 for owner in (
