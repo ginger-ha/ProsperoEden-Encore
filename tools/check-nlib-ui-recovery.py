@@ -28,6 +28,41 @@ assert "stat_error != ENOENT && stat_error != ENOTDIR" in stat_failure
 assert 'throw std::system_error{stat_error, std::generic_category(),' in stat_failure
 assert "continue;" in stat_failure
 assert stat_failure.index("throw std::system_error") < stat_failure.index("continue;")
+# Compile/execute the EXACT production stat-error refusal expression
+# instead of accepting a regex that would still swallow an EIO at runtime.
+# Two optimization levels guard the ENOENT/ENOTDIR vs EIO/EACCES contract.
+import subprocess
+import tempfile
+policy = "if (stat_error" + stat_failure.split("if (stat_error", 1)[1].split(
+    "continue;", 1)[0]
+cpp = """
+#include <cassert>
+#include <cerrno>
+#include <system_error>
+bool publish(int stat_error) {
+    try {
+""" + policy + """
+    } catch (const std::system_error& error) {
+        assert(error.code().value() == stat_error);
+        return false;
+    }
+    return true;
+}
+int main() {
+    assert(publish(ENOENT) && publish(ENOTDIR));
+    assert(!publish(EIO) && !publish(EACCES) && !publish(ENODEV));
+}
+"""
+with tempfile.TemporaryDirectory(prefix="encore-rom-stat-") as temp:
+    source = Path(temp) / "stat_policy.cpp"
+    source.write_text(cpp)
+    for optimization in ("-O0", "-O2"):
+        binary = Path(temp) / ("stat_policy" + optimization[2:])
+        subprocess.run(
+            ["c++", "-std=c++20", "-Wall", "-Wextra", "-Werror",
+             optimization, str(source), "-o", str(binary)],
+            check=True, capture_output=True, text=True)
+        subprocess.run([str(binary)], check=True, capture_output=True, text=True)
 assert "return errno != ENOENT && errno != ENOTDIR;" in svc
 assert "if (lstat(path.c_str(), &info) == 0)" in svc
 assert lib.count('if (!services_.game_storage_available())') == 2
