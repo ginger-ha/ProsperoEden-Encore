@@ -36,11 +36,13 @@ struct TextureMetadata final : Shader::Environment {
 struct NativeRetirementMockScheduler {
     u64 current_tick{};
     u64 waited{};
-    bool gpu_completed{};
+    // The GPU may complete an earlier dispatch while a later one is queued.
+    // A Wait for the earlier tick must not require it to be the latest tick.
+    u64 completed_tick{};
     u64 Flush() { return ++current_tick; }
     void Wait(u64 tick) {
-        assert(gpu_completed && tick == current_tick);
-        waited = tick;
+        assert(tick && tick <= current_tick && tick <= completed_tick);
+        if (tick > waited) waited = tick;
     }
 };
 struct NativeRetirementMockFences {
@@ -94,7 +96,7 @@ int main() {
             scheduler, fences, std::move(pipeline));
         assert(fences.signaled && fences.pending && scheduler.current_tick == 1);
         assert(destroyed == 0 && scheduler.waited == 0);
-        scheduler.gpu_completed = true;
+        scheduler.completed_tick = 1;
         auto deferred = std::move(fences.pending);
         fences.pending = {};
         deferred();
@@ -106,7 +108,7 @@ int main() {
         // A failed SyncOperation registration must not destroy the
         // pipeline before the submitted GPU tick has been waited.
         NativeRetirementMockScheduler scheduler{};
-        scheduler.gpu_completed = true;
+        scheduler.completed_tick = 1;
         NativeRetirementMockFences fences{};
         fences.reject_registration = true;
         int destroyed{};
@@ -132,7 +134,7 @@ int main() {
         // is released. The pending callback owns a second reference, so
         // dropping the failed registration must also remain safe.
         NativeRetirementMockScheduler scheduler{};
-        scheduler.gpu_completed = true;
+        scheduler.completed_tick = 1;
         NativeRetirementMockFences fences{};
         fences.reject_signal = true;
         int destroyed{};
@@ -154,6 +156,47 @@ int main() {
                destroyed == 0);
         fences.pending = {};
         assert(destroyed == 1);
+    }
+    {
+        // Two native submissions may retain the same cached pipeline even
+        // when one fence retires ahead of the other. GPU completion at tick
+        // one must not release an owner still referenced by tick two.
+        // Also cover an out-of-order callback after both GPU ticks complete.
+        for (const bool reverse : {false, true}) {
+            NativeRetirementMockScheduler scheduler{};
+            NativeRetirementMockFences first{}, second{};
+            int destroyed{};
+            auto pipeline = std::shared_ptr<int>(
+                new int(13), [&](int* value) {
+                    assert(scheduler.completed_tick >= 2);
+                    ++destroyed;
+                    delete value;
+                });
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, first, pipeline);
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, second, pipeline);
+            pipeline.reset(); // Only the two deferred GPU owners remain.
+            assert(scheduler.current_tick == 2 && scheduler.waited == 0 &&
+                   first.signaled && second.signaled && destroyed == 0);
+            if (reverse) {
+                scheduler.completed_tick = 2;
+                second.pending();
+                second.pending = {};
+                assert(scheduler.waited == 2 && destroyed == 0);
+                first.pending();
+                first.pending = {};
+            } else {
+                scheduler.completed_tick = 1;
+                first.pending();
+                first.pending = {};
+                assert(scheduler.waited == 1 && destroyed == 0);
+                scheduler.completed_tick = 2;
+                second.pending();
+                second.pending = {};
+            }
+            assert(scheduler.waited == 2 && destroyed == 1);
+        }
     }
     Tegra::NativeQmdScheduler::Descriptor qmd{};
     qmd[8]=0x80;
