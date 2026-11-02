@@ -1323,10 +1323,20 @@ adapt('src/video_core/renderer_vulkan/vk_blit_screen.h',
 adapt('src/video_core/renderer_vulkan/renderer_vulkan.h',
       'include/video_core/renderer_vulkan/renderer_vulkan.h', [
     ('    void Composite(', '    void PresentLoading();\n    void Composite('),
+    ('    MemoryAllocator memory_allocator;\n    StateTracker state_tracker;',
+     '    MemoryAllocator memory_allocator;\n'
+     '#ifdef PS5_NATIVE\n'
+     '    // The last real launcher frame is kept until all GPU work retires.\n'
+     '    vk::Buffer loading_jacket_buffer{};\n'
+     '    u32 loading_jacket_width{};\n'
+     '    u32 loading_jacket_height{};\n'
+     '    bool loading_jacket_attempted{};\n'
+     '#endif\n'
+     '    StateTracker state_tracker;'),
 ])
 adapt('src/video_core/renderer_vulkan/renderer_vulkan.cpp', 'vulkan_renderer.cpp', [
     ('#include "video_core/renderer_vulkan/renderer_vulkan.h"',
-     '#include "video_core/renderer_vulkan/renderer_vulkan.h"\n#include "display_refresh.h"'),
+     '#include "video_core/renderer_vulkan/renderer_vulkan.h"\n#include "launch_handoff.hpp"\n#include "display_refresh.h"\n#include "frame_metrics.h"'),
     # A frame the display has no refresh for is not presented: a game patched for more frames
     # than the output shows keeps its pace instead of waiting for a refresh per frame
     # (headless/display_refresh.h). The frame still ends as any other.
