@@ -454,5 +454,101 @@ int main() {
     shader_info.uses_cbuf_indirect=false;
     memory.mapped=false;
     assert(!env.BuildResourcePlan(shader_info)); // no stale GMMU read
+    // P2.2 native image preflight: authentic 32-byte TIC/TSC ABI, 49-bit
+    // backing and entire 4 KiB GMMU span before shared cache admission.
+    // No Vulkan image allocation is claimed by this host-only witness.
+    {
+        using namespace Tegra::Texture;
+        using Shader::Ampere::NativeQmdContiguousGpuSpan;
+        using Shader::Ampere::NativeQmdImageHandle;
+        using Shader::Ampere::NativeQmdImageKind;
+        using Shader::Ampere::NativeQmdResourcePlan;
+        using Shader::Ampere::NativeQmdTextureTables;
+        constexpr u64 texture_va = (u64{1} << 40) + 0x4000;
+        constexpr u64 physical_va = (u64{1} << 41) + 0x8000;
+        TICEntry tic{};
+        tic.header_version = TICHeaderVersion::BlockLinear;
+        tic.texture_type = TextureType::Texture2D;
+        tic.address_high = texture_va >> 32;
+        tic.address_low = static_cast<u32>(texture_va);
+        tic.width_minus_one = 63;
+        tic.height_minus_1 = 63;
+        tic.depth_minus_1 = 0;
+        tic.max_mip_level = 0;
+        tic.res_min_mip_level = 0;
+        tic.res_max_mip_level = 0;
+        TSCEntry tsc{};
+        tsc.raw[0] = 1; // a non-null sampled sampler record
+        const auto mapper = [&](u64 addr) -> std::optional<u64> {
+            if (addr < texture_va || addr - texture_va >= 8192)
+                return std::nullopt;
+            return physical_va + addr - texture_va;
+        };
+        assert(NativeQmdContiguousGpuSpan(texture_va, 8192, mapper));
+        assert(!NativeQmdContiguousGpuSpan(0, 8192, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 0, mapper));
+        assert(!NativeQmdContiguousGpuSpan((u64{1} << 49) - 4, 8, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8193, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 256 * 1024 * 1024 + 1U, mapper));
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8192,
+            [&](u64 addr) -> std::optional<u64> {
+                if (addr >= texture_va + 4096) return std::nullopt;
+                return mapper(addr);
+            }));
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8192,
+            [&](u64 addr) -> std::optional<u64> {
+                if (addr >= texture_va + 4096) return *mapper(addr) + 4096;
+                return mapper(addr);
+            }));
+        NativeQmdTextureTables guest_tables{
+            .tic_base = 0x1000001000000ULL, .tsc_base = 0x1000002000000ULL,
+            .tic_limit = 0, .tsc_limit = 0
+        };
+        NativeQmdResourcePlan textured{};
+        textured.requires_tic_tsc = true;
+        NativeQmdImageHandle sampled{};
+        sampled.kind = NativeQmdImageKind::SampledTexture;
+        sampled.primary_word = 0;
+        textured.image_handles.push_back(sampled);
+        const auto read_guest = [&](u64 addr, void* dst, std::size_t bytes) {
+            if (!dst || bytes != 32) return false;
+            if (addr == guest_tables.tic_base) {
+                std::memcpy(dst, &tic, bytes); return true;
+            }
+            if (addr == guest_tables.tsc_base) {
+                std::memcpy(dst, &tsc, bytes); return true;
+            }
+            return false;
+        };
+        unsigned admissions{};
+        const auto admit = [&](const TICEntry& entry) {
+            ++admissions;
+            return entry.Address() == texture_va &&
+                NativeQmdContiguousGpuSpan(entry.Address(), 8192, mapper);
+        };
+        const auto image = guest_tables.CaptureAdmissible(
+            textured, read_guest, admit);
+        assert(image && image->size() == 1 && admissions == 1);
+        assert((*image)[0].has_sampler && (*image)[0].tic_index == 0);
+        tic.header_version = static_cast<TICHeaderVersion>(7);
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.header_version = TICHeaderVersion::BlockLinear;
+        tic.is_sparse = 1;
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.is_sparse = 0;
+        tic.res_min_mip_level = 2;
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.res_min_mip_level = 0;
+        tic.depth_minus_1 = 1; // plain 2D must be one layer
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tic.depth_minus_1 = 0;
+        tsc.raw.fill(0);
+        assert(!guest_tables.CaptureAdmissible(textured, read_guest, admit));
+        tsc.raw[0] = 1;
+        assert(!guest_tables.CaptureAdmissible(
+            textured, read_guest, [&](const TICEntry&) { return false; }));
+        assert(guest_tables.CaptureAdmissible(
+            textured, read_guest, admit)); // no stale rejection state
+    }
     return 0;
 }
