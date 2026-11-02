@@ -25,8 +25,9 @@ host_workflow = (root / ".github/workflows/encore-core-preflight.yml").read_text
 native_toolchain = workflow.split("      - name: Install build toolchain", 1)[1].split(
     "      - name: Upgrade Meson", 1)[0]
 # Native source changes now trigger core verification independent of commit
-# message suffixes. Narrow push paths mean docs/UI pushes do not start a
-# competing run; a newer native push intentionally supersedes an older one.
+# message suffixes. Narrow push paths avoid unnecessary runs.
+# Per-SHA groups keep previous long-running audits conclusive while new native
+# pushes validate independently; no cancellation of an older SHA.
 host_push = host_workflow.split("  push:", 1)[1].split("  workflow_dispatch:", 1)[0]
 host_group = host_workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0]
 assert "branches: [main]" in host_push
@@ -42,7 +43,8 @@ assert "'docs/**'" not in host_push
 assert "'launcher/**'" not in host_push
 assert "${{ github.ref }}" in host_group
 assert "${{ github.event_name }}" in host_group
-assert "cancel-in-progress: true" in host_group
+assert "${{ github.sha }}" in host_group
+assert "cancel-in-progress: false" in host_group
 assert "if: ${{ github.event_name == 'workflow_dispatch' ||" not in host_workflow
 
 assert "libboost-container-dev" in host_workflow
