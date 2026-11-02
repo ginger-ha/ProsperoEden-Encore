@@ -76,31 +76,31 @@ The native build previously inherited a boilerplate `param.json` without the opt
 <!-- BEGIN AUTO-UPSTREAM-COMPARISON -->
 ### Automated comparison (daily + manual)
 
-Checked in UTC: **2026-10-31 10:58 UTC**. Changes are commits relative to pins, not proven missing fixes.
+Checked in UTC: **2026-11-02 13:31 UTC**. Changes are commits relative to pins, not proven missing fixes.
 This workflow never imports source patches, modifies dependencies, or reads console data.
 
 | Dependency | Source | Pinned revision | Ahead / behind | Status |
 |---|---|---|---:|---|
-| eden | [eden-emulator/mirror](https://github.com/eden-emulator/mirror) | 5f142c7926d0 | +114 / -0 | upstream ahead |
-| ffmpeg | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | c7b5f1537d9c | +5283 / -0 | upstream ahead |
-| fmt | [fmtlib/fmt](https://github.com/fmtlib/fmt) | 12.1.0 | +374 / -0 | upstream ahead |
+| eden | [eden-emulator/mirror](https://github.com/eden-emulator/mirror) | 5f142c7926d0 | +129 / -0 | upstream ahead |
+| ffmpeg | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | c7b5f1537d9c | +5353 / -0 | upstream ahead |
+| fmt | [fmtlib/fmt](https://github.com/fmtlib/fmt) | 12.1.0 | +379 / -0 | upstream ahead |
 | zbic | [kinnay/zbic](https://github.com/kinnay/zbic) | 11b08f271226 | +0 / -0 | identical |
 | compiler-rt | frozen archive / binary | — | — | not comparable |
 | pacbrew | frozen archive / binary | — | — | not comparable |
 | opengl-source | [blackbearreloaded/ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl) | ad2807d41cef | — | repository unavailable |
 | harfbuzz | frozen archive / binary | — | — | not comparable |
 | boilerplate | [blackbearreloaded/ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | dd44bbdc7543 | — | repository unavailable |
-| ps5-vulkan-tools | [mihawk-99/PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan) | 3f3ee6960701 | +19 / -0 | upstream ahead |
-| ps5-mesa | [mihawk-99/PS5_Mesa](https://github.com/mihawk-99/PS5_Mesa) | 0b2d6d1a61d9 | +115 / -103 | diverged |
-| ps5-payload-sdk-fork | [mihawk-99/PS5_PayloadSDK](https://github.com/mihawk-99/PS5_PayloadSDK) | 95c08f27386f | +104 / -48 | diverged |
+| ps5-vulkan-tools | [mihawk-99/PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan) | 3f3ee6960701 | +74 / -0 | upstream ahead |
+| ps5-mesa | [mihawk-99/PS5_Mesa](https://github.com/mihawk-99/PS5_Mesa) | 0b2d6d1a61d9 | +125 / -103 | diverged |
+| ps5-payload-sdk-fork | [mihawk-99/PS5_PayloadSDK](https://github.com/mihawk-99/PS5_PayloadSDK) | 95c08f27386f | +105 / -48 | diverged |
 | encore-overrides | [niakw/encore-overrides](https://github.com/niakw/encore-overrides) | 4fdb329e732a | +0 / -0 | identical |
 | opengl-opengnm-psbc | [PS4-OpenGNM/opengnm-psbc](https://github.com/PS4-OpenGNM/opengnm-psbc) | a92a1228ea3a | +4 / -0 | upstream ahead |
 | opengl-opengnm | [PS4-OpenGNM/opengnm](https://github.com/PS4-OpenGNM/opengnm) | 4b295ca54c82 | +0 / -0 | identical |
 | opengl-spirv-headers | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | 0d25db97cb9b | +12 / -0 | upstream ahead |
 | opengl-vulkan-headers | [KhronosGroup/Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) | b51f6b865c18 | +10 / -0 | upstream ahead |
-| opengl-imgui | [ocornut/imgui](https://github.com/ocornut/imgui) | f5befd2d29e6 | +1539 / -0 | upstream ahead |
+| opengl-imgui | [ocornut/imgui](https://github.com/ocornut/imgui) | f5befd2d29e6 | +1540 / -0 | upstream ahead |
 | opengl-nanovg | [memononen/nanovg](https://github.com/memononen/nanovg) | ce3bf745eb2d | +0 / -0 | identical |
-| opengl-sokol | [floooh/sokol](https://github.com/floooh/sokol) | 48c85905aeaa | +316 / -0 | upstream ahead |
+| opengl-sokol | [floooh/sokol](https://github.com/floooh/sokol) | 48c85905aeaa | +341 / -0 | upstream ahead |
 | opengl-native-boilerplate | [blackbearreloaded/ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | 4f531c4b517f | — | repository unavailable |
 | opengl-mesa-26-2 | frozen archive / binary | — | — | not comparable |
 
@@ -176,14 +176,14 @@ These are upstream commit titles, not validated Encore integrations.
 - [2eda43e9be17](https://github.com/fmtlib/fmt/commit/2eda43e9be17) — Add FMT_USE_FLOCKFILE macro to force has_flockfile trait to false (#4666)
 
 **ps5-vulkan-tools**
-- [403ea46701eb](https://github.com/mihawk-99/PS5_Vulkan/commit/403ea46701eb) — Provide a shared GPU broker and optional Windows Zink build
-- [5b5e4fc2d80f](https://github.com/mihawk-99/PS5_Vulkan/commit/5b5e4fc2d80f) — build-mesa-windows-zink: PS5 Mesa b3588f78dd7, Zink's persistent buffers host-visible
-- [2d414b13cfb2](https://github.com/mihawk-99/PS5_Vulkan/commit/2d414b13cfb2) — gpu-broker: count shown frames and take a picture of the next one
-- [4d7e053de9f3](https://github.com/mihawk-99/PS5_Vulkan/commit/4d7e053de9f3) — gpu-broker: take the memory a client maps from the application, when it gives a maker
-- [7786fe42b49b](https://github.com/mihawk-99/PS5_Vulkan/commit/7786fe42b49b) — gpu-broker: a client maps its memory again where the application places it
-- [4e41388958f8](https://github.com/mihawk-99/PS5_Vulkan/commit/4e41388958f8) — gpu-broker: the application chooses each client's host-visible memory
-- [252bf912a745](https://github.com/mihawk-99/PS5_Vulkan/commit/252bf912a745) — build-radv: PS5 Mesa 47e9eb6, 119.88 Hz counts only when offered and taken
-- [f410e67a0241](https://github.com/mihawk-99/PS5_Vulkan/commit/f410e67a0241) — RADV: fragment shader barycentrics in order, the survey that found why, and the Mesa pin
+- [8cc2e4dc9eea](https://github.com/mihawk-99/PS5_Vulkan/commit/8cc2e4dc9eea) — gpu-broker: an application's panel over every frame, the frame passed through outside it
+- [6224e4cb925d](https://github.com/mihawk-99/PS5_Vulkan/commit/6224e4cb925d) — gpu-broker: a capture asked for while the panel is shown over a waiting game is of the frame shown again
+- [47b3fc84acc6](https://github.com/mihawk-99/PS5_Vulkan/commit/47b3fc84acc6) — gpu-broker: say how long the panel waits for the display and how long its re-show takes
+- [98bf667e7743](https://github.com/mihawk-99/PS5_Vulkan/commit/98bf667e7743) — gpu-broker: a panel's re-show streams the frame from a cached shadow, not a read-back of the display
+- [8bbd74419ee0](https://github.com/mihawk-99/PS5_Vulkan/commit/8bbd74419ee0) — gpu-broker: a see-through panel blended over the frame blurred under it, with bubbles rising in its margins
+- [64e105099d09](https://github.com/mihawk-99/PS5_Vulkan/commit/64e105099d09) — gpu-broker: say what the see-through panel costs, every 120 composes
+- [a62b05d9fe7f](https://github.com/mihawk-99/PS5_Vulkan/commit/a62b05d9fe7f) — gpu-broker: a panel change over a waiting game is shown at once, not at the bubbles' next re-show
+- [66dad9f1670e](https://github.com/mihawk-99/PS5_Vulkan/commit/66dad9f1670e) — gpu-broker: the panel's blur made every second frame, and a rare glass sweep (1 s after it opens, then at most ever
 
 **ps5-mesa** (history excerpt; some commits omitted)
 - [ff437af31b9b](https://github.com/mihawk-99/PS5_Mesa/commit/ff437af31b9b) — radv/ps5: mesh workgroups in parts run once and publish their outputs
