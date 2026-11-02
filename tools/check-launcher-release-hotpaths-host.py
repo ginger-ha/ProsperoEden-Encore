@@ -6,6 +6,7 @@ root=Path(__file__).resolve().parents[1]
 hdr=(root/"headless/prosperoeden/pe/ui/textures.hpp").read_text()
 src=(root/"headless/prosperoeden/pe/ui/textures.cpp").read_text()
 lib=(root/"headless/prosperoeden/pe/ui/library.cpp").read_text()
+native=(root/"headless/prosperoeden/eden_services.cpp").read_text()
 cmake=(root/"headless/CMakeLists.txt").read_text()
 begin="Cover Textures::cover(const std::string &path, float size)"
 end="\nvoid Textures::invalidate("
@@ -56,14 +57,29 @@ assert scan.count(guard_anchor) == 1
 guard_body = guard_anchor + scan.split(guard_anchor, 1)[1].split(
     "            return games;", 1)[0]
 assert guard_body.count("throw std::runtime_error") == 1
+# Exercise the actual per-file stat() refusal code too. The ROM root
+# can remain accessible while a single stat fails with EIO/EACCES; that
+# failure must not evict previously loaded box art and title metadata.
+scan_native=native.split(
+    "std::vector<pe::ui::Game> EdenServices::games(const",1)[1].split(
+    "pe::ui::Game EdenServices::",1)[0]
+stat_block=scan_native.split("if (stat(path.c_str(), &info) != 0)",1)[1].split(
+    "if (!S_ISREG(info.st_mode))",1)[0]
+assert stat_block.count("const int stat_error = errno;") == 1
+assert "stat_error != ENOENT && stat_error != ENOTDIR" in stat_block
+stat_policy="if (stat_error" + stat_block.split("if (stat_error",1)[1].split(
+    "continue;",1)[0]
+assert stat_policy.count("throw std::system_error") == 1
 cpp=r"""
 #include <algorithm>
 #include <cassert>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <deque>
 #include <iterator>
 #include <stdexcept>
+#include <system_error>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -91,10 +107,21 @@ struct Scanner {
  return true;
  }
 };
+bool publish_stat(int stat_error) {
+ try {
+""" + stat_policy + r"""
+ } catch (const std::system_error& error) {
+   assert(error.code().value()==stat_error);
+   return false;
+ }
+ return true;
+}
 bool absent(const std::vector<std::string>* known_missing,const Game& game){
 """ + candidate + r"""
 }
 int main(){
+ assert(publish_stat(ENOENT) && publish_stat(ENOTDIR));
+ assert(!publish_stat(EIO) && !publish_stat(EACCES) && !publish_stat(ENODEV));
  for (const bool loaded : {false,true})
    for (const bool available : {false,true}) {
      Scanner scanner{Storage{available}};
