@@ -654,7 +654,7 @@ void Launcher::finish_home_media()
         // If the library scan completed while the Home request was in flight, keep both views
         // on the same cache result without another network request.
         for (Game& game : games_) {
-            if (game.title_id != enriched.title_id) continue;
+            if (!enriched.title_id || game.title_id != enriched.title_id) continue;
             if (!enriched.cover.empty()) game.cover = enriched.cover;
             if (!enriched.box_front.empty()) game.box_front = enriched.box_front;
             if (!enriched.box_back.empty()) game.box_back = enriched.box_back;
@@ -668,7 +668,9 @@ void Launcher::finish_home_media()
             if (!enriched.developer.empty()) game.developer = enriched.developer;
             if (!enriched.release_date.empty()) game.release_date = enriched.release_date;
             if (!enriched.categories.empty()) game.categories = enriched.categories;
-            break;
+            // Home's Nlib result must refresh every installed copy of this
+            // TitleID, not just the first item encountered in a rescan.
+            // A zero or changed identity never inherits its metadata.
         }
     }
     catch (const std::exception& error)
