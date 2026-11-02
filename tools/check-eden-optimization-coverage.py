@@ -87,7 +87,26 @@ assert ns2_shared_gpu_access_owners <= all_owners, sorted(ns2_shared_gpu_access_
 assert not ns2_shared_gpu_access_owners & (research_owners | hygiene_owners | ns2_shared_release_owners | ns2_shared_audio_owners)
 assert 'set(EDEN_SHARED_NS2_GPU_ACCESS_SVC ON)' in release_cmake
 print("NS2_GPU_ACCESS_F07_ISOLATION_PASS", f"new_release_sources={len(ns2_shared_gpu_access_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners
+# The newly selected rasterizer header is a post-F07 NS2 Compute ABI owner.
+# Assert its source and native-only guard rather than silently raising the
+# frozen 518-source F07 optimization proof count.
+post_f07_native_vulkan_owners = {
+    "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_rasterizer.h",
+}
+assert post_f07_native_vulkan_owners <= all_owners, sorted(post_f07_native_vulkan_owners-all_owners)
+assert not post_f07_native_vulkan_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners
+)
+native_rasterizer_header = (ROOT / next(iter(post_f07_native_vulkan_owners))).read_text()
+assert native_rasterizer_header.count("DispatchNativeCompute(") == 1
+assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in native_rasterizer_header
+assert "[[nodiscard]] bool DispatchNativeCompute(const Tegra::NativeComputeLaunch& launch) override;" in native_rasterizer_header
+assert 'file(COPY "${EDEN_ACTIVE_VULKAN}/" DESTINATION "${PORT_BUILD_DIR}")' in (
+    ROOT / "headless/vulkan.cmake"
+).read_text()
+print("NS2_POST_F07_VULKAN_ABI_ISOLATION_PASS", f"new_native_headers={len(post_f07_native_vulkan_owners)}")
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
