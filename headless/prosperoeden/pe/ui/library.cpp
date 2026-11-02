@@ -507,9 +507,13 @@ bool composed_case_face_ready(Textures& textures, const Game& game,
 
 void Launcher::start_scan()
 {
+    // Capture the last-good ownership on the UI thread. A transiently
+    // unmounted ROM volume must not replace a populated library with zero
+    // entries, even if enumeration returned successfully.
+    const bool preserve_loaded_games = games_loaded_ && !games_.empty();
     if (!scan_cancel_.load(std::memory_order_acquire) &&
         !scan_.valid() && home_.setup_ready)
-        scan_ = std::async(std::launch::async, [this] {
+        scan_ = std::async(std::launch::async, [this, preserve_loaded_games] {
             std::vector<Game> games = services_.games(&scan_cancel_);
             if (scan_cancel_.load(std::memory_order_acquire))
                 return std::vector<Game>{};
@@ -546,6 +550,13 @@ void Launcher::start_scan()
                                  static_cast<unsigned long long>(game.title_id), error.what());
                 }
             }
+            // Check the root only on this worker, after enumeration and
+            // per-title enrichment. A device disappearing mid-scan can
+            // yield an empty OR truncated success-shaped result.
+            // Keep the old immutable UI snapshot; an intentionally empty
+            // but accessible collection is still applied normally.
+            if (preserve_loaded_games && !services_.game_storage_available())
+                throw std::runtime_error{"ROM storage vanished during scan; retaining last-good library"};
             return games;
         });
 }
