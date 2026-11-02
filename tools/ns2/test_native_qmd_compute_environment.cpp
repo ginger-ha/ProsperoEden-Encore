@@ -751,6 +751,37 @@ int main() {
         cube_tic.depth_minus_1.Assign(1);
         cube_tic.height_minus_1.Assign(2047);
         assert(!Shader::Ampere::NativeQmdTicLayoutSupported(cube_tic));
+        // ImageInfo counts 2D array depth as layers, not a separate 3D
+        // image dimension. Exactly 64 * 1024^2 texels fit the budget.
+        TICEntry array_tic = tic;
+        array_tic.texture_type.Assign(TextureType::Texture2DArray);
+        array_tic.width_minus_one.Assign(1023);
+        array_tic.height_minus_1.Assign(1023);
+        array_tic.depth_minus_1.Assign(63);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(array_tic));
+        array_tic.depth_minus_1.Assign(64);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(array_tic));
+        // BaseLayer is additive, not multiplied by the array depth.
+        array_tic.layer_base_0_2.Assign(1);
+        array_tic.depth_minus_1.Assign(62);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(array_tic));
+        array_tic.depth_minus_1.Assign(63);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(array_tic));
+        // A 1D array's height is ignored by ImageInfo; this same guest
+        // record must not be budgeted as a 1024-pixel-high 2D image.
+        array_tic.texture_type.Assign(TextureType::Texture1DArray);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(array_tic));
+        // Cube arrays expand only the real Depth cubes to six faces.
+        TICEntry cube_array = tic;
+        cube_array.texture_type.Assign(TextureType::TextureCubeArray);
+        cube_array.depth_minus_1.Assign(3);
+        cube_array.layer_base_0_2.Assign(1);
+        cube_array.width_minus_one.Assign(1535);
+        cube_array.height_minus_1.Assign(1535);
+        assert(Shader::Ampere::NativeQmdTicLayoutSupported(cube_array));
+        cube_array.width_minus_one.Assign(2047);
+        cube_array.height_minus_1.Assign(2047);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(cube_array));
         TSCEntry tsc{};
         tsc.mag_filter.Assign(TextureFilter::Nearest);
         tsc.min_filter.Assign(TextureFilter::Linear);
