@@ -39,4 +39,49 @@ def stages(elapsed_values):
 assert stages([0, 1, 9.999, 10, 10, 20, 29.999, 30, 30, 100]) == ([10, 30], 2)
 assert stages([0, 31, 32]) == ([10, 30], 2)
 assert stages([0, 1, 9.9]) == ([], 0)
+# Continuous jacket-to-Vulkan loading must use the launcher frame itself,
+# not the old purple scene, a black second interstitial, or fake guest frames.
+root = Path(__file__).resolve().parents[1]
+frontend = (root / "headless/prosperoeden/frontend.cpp").read_text()
+handoff = (root / "headless/launch_handoff.hpp").read_text()
+renderer = (root / "vendor/encore-active/eden-vulkan/vulkan_renderer.cpp").read_text()
+oracle = (root / "vendor/encore-active/eden-vulkan-oracles/vulkan_loading.inc").read_text()
+renderer_header = (root / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/renderer_vulkan.h").read_text()
+generator = (root / "tools/prepare-vulkan-port.py").read_text()
+assert frontend.count("glReadPixels(") == 1
+assert frontend.count("LaunchHandoff::Publish(") == 1
+assert frontend.index("batch.draw(list, viewport,") < frontend.index("glReadPixels(") < frontend.index("display.swap()")
+assert "handoff_captured = true;" in frontend
+assert "pe::ui::theme::kLaunchSeconds - 0.75f" in frontend
+assert "LaunchHandoff::Clear()" in frontend
+assert "inline bool Valid(const Frame& frame)" in handoff
+assert "frame.width <= max_width && frame.height <= max_height" in handoff
+assert "std::exchange(pending_frame, {})" in handoff
+for evidence in (
+    '#include "launch_handoff.hpp"',
+    "Eden::LaunchHandoff::Take()",
+    "loading_jacket_attempted = true;",
+    "loading_jacket_buffer = std::move(buffer);",
+    "buffer.Flush();",
+    "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL",
+    "cmdbuf.CopyBufferToImage(upload, target,",
+    "loading_jacket_width == frame->width",
+):
+    assert evidence in renderer, evidence
+assert "vk::Buffer loading_jacket_buffer{};" in renderer_header
+assert "loading_jacket_buffer{}" in generator
+assert "launch_handoff.hpp" in generator
+assert "loading_jacket_buffer = std::move(buffer);" in oracle
+assert "cmdbuf.CopyBufferToImage(upload, target," in oracle
+assert renderer.count("EDEN_LOADER_JACKET_HANDOFF_VULKAN") == 2  # success + fallback
+# A native build has been deliberately blocked until full NS2 / NS1
+# compatibility and console validation; host-only tests remain enabled.
+research = (root / ".github/workflows/ns2-native-ps5-research.yml").read_text()
+release = (root / ".github/workflows/build-040-zbic.yml").read_text()
+assert "  workflow_dispatch:" in research
+assert "  push:" not in research
+assert "    if: ${{ false }}" in research
+assert "    if: ${{ false }}" in release
+print("ENCORE_SINGLE_LOADER_HANDOFF_SOURCE_PASS build_ps5_blocked=1")
+
 print("ENCORE_VULKAN_LOADING_DIAGNOSTIC_PASS first_guest_frame_not_claimed=1 max_reports=2 reset_per_title=1")
