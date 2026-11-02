@@ -11,6 +11,20 @@
 #include <tuple>
 #include "video_core/native_qmd.h"
 
+// Overflow and underflow must refuse malformed cross-channel PCAS counts
+// before touching scheduler state. The ordinary QMD count path is exercised
+// by the existing release/dependency integration fixtures below.
+static_assert(!Tegra::NativeQmdDependencyAdd(
+    std::numeric_limits<std::int32_t>::max(), 1));
+static_assert(!Tegra::NativeQmdDependencyAdd(
+    std::numeric_limits<std::int32_t>::min(), -1));
+static_assert(Tegra::NativeQmdDependencyAdd(
+    std::numeric_limits<std::int32_t>::max() - 1, 1) ==
+    std::numeric_limits<std::int32_t>::max());
+static_assert(Tegra::NativeQmdDependencyAdd(
+    std::numeric_limits<std::int32_t>::min() + 1, -1) ==
+    std::numeric_limits<std::int32_t>::min());
+
 using Q=Tegra::NativeQmdScheduler;
 using Address=Q::Address;
 using Descriptor=Q::Descriptor;
