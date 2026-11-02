@@ -130,6 +130,17 @@ native_factory_start = (
 )
 assert reconstructed.count(native_factory_start) == 1, (
     'U92 native Compute factory missing or duplicated')
+# U94: the production-side QMD3 compiler wrapper is not the original U92
+# native Vulkan pipeline factory. Remove only its exact reviewed bytes
+# before checking the older factory signature and original NS1 blob hash.
+native_compute_compiler = "// Use the device's actual SPIR-V profile/translation features for QMD3.\n// The host synthetic test is not a substitute for device capability checks.\nShader::Ampere::NativeSpirvResult PipelineCache::CompileNativeComputeSpirv(\n    Shader::Ampere::NativeMaxwellEnvironment& env) const {\n    return Shader::Ampere::CompileReviewedNativeComputeSpirv(\n        env, host_info, profile, Shader::RuntimeInfo{});\n}\n\n"
+assert reconstructed.count(native_compute_compiler) == 1, (
+    'U94 QMD3 shader compiler drift in N56 baseline')
+runtime_info_include = '#include "shader_recompiler/runtime_info.h"\n'
+assert reconstructed.count(runtime_info_include) == 1, (
+    'U94 QMD3 RuntimeInfo include moved or duplicated')
+reconstructed = reconstructed.replace(native_compute_compiler, '', 1)
+reconstructed = reconstructed.replace(runtime_info_include, '', 1)
 factory_begin = reconstructed.index(native_factory_start)
 factory_end = reconstructed.index('#endif\n', factory_begin) + len('#endif\n')
 native_factory = reconstructed[factory_begin:factory_end]
