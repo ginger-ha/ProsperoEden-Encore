@@ -21,6 +21,14 @@ assert set(forwarded) == set(declared), (
     sorted(set(forwarded) - set(declared))
 )
 assert '"${ns2_cmake_args[@]}"' in script, "native CMake does not receive selector array"
+# Native RasterizerVulkan::DispatchNativeCompute must override the SAME
+# RasterizerInterface ABI seen by core and all Vulkan consumers.
+rasterizer_header = (root / "vendor/sources/eden/src/video_core/rasterizer_interface.h").read_text()
+assert 'virtual bool DispatchNativeCompute(const Tegra::NativeComputeLaunch&)' in rasterizer_header
+assert 'file(STRINGS "${EDEN_NS2_RASTERIZER_INTERFACE}"' in cmake
+assert 'configure_file("${EDEN_NS2_RASTERIZER_INTERFACE}"' in cmake
+assert 'target_compile_definitions(video_core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)' in cmake
+assert 'target_compile_definitions(core PUBLIC EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1)' in cmake
 assert 'EDEN_FINAL_RELEASE_PROFILE=ON' in gate
 assert 'EDEN_NS2_NATIVE_EXPERIMENTAL=ON' in gate
 
