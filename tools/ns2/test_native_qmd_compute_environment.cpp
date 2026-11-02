@@ -66,6 +66,20 @@ int main() {
     qmd[50]=0x100040U;
     qmd[32]=0x12340000U;
     qmd[33]=0x10000U | (1U<<19); // 49-bit CBUF, exactly 16 bytes.
+    // Bound the product, not only individual block axes: Ampere has a
+    // maximum of 1024 threads per CTA. Invalid launch resource requests
+    // must fail before a Vulkan shader or descriptor allocation is started.
+    auto oversized=qmd;
+    oversized[18]=0x30U | (64U<<16);
+    oversized[19]=(2U<<16)|16U; // 2048 threads
+    assert(!Tegra::DecodeNativeComputeLaunch(oversized));
+    auto boundary=qmd;
+    boundary[18]=0x30U | (32U<<16);
+    boundary[19]=(2U<<16)|16U; // exactly 1024 threads
+    assert(Tegra::DecodeNativeComputeLaunch(boundary));
+    auto zero_block=qmd;
+    zero_block[19]=(2U<<16); // zero Y dimension
+    assert(!Tegra::DecodeNativeComputeLaunch(zero_block));
     const auto decoded=Tegra::DecodeNativeComputeLaunch(qmd);
     assert(decoded && decoded->constant_buffers[0].enabled);
     assert(decoded->constant_buffers[0].gpu_address==0x1000012340000ULL);
