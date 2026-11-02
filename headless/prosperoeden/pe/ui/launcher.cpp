@@ -1075,20 +1075,19 @@ void Launcher::draw_launch(Canvas &c)
         c.list.case_face(composed_page, face, angle, back, kWhite,
                          {0.0f, 1.0f, 1.0f, -1.0f});
     } else if (!scan.empty() && artwork.texture != 0) {
-        // Keep the WHOLE printed back visible: never stretch a scan or crop
-        // its French description. Letterbox only for unmatched source ratios.
-        // Transparent excess UV is discarded by the case-face fragment shader.
+        // Never sample outside [0,1]. The old UV "letterbox" expanded
+        // above 1 and sampled clamped white source edges, visibly turning
+        // NS2 sleeves into white-bordered retail images. Fit with a small
+        // centered UV crop, preserving proportions on the rigid paper plane.
         const float target_aspect = face.w / face.h;
         const float source_aspect = std::max(0.01f, artwork.aspect);
         Rect paper_uv{0.0f, 0.0f, 1.0f, 1.0f};
         if (source_aspect > target_aspect) {
+            paper_uv.w = target_aspect / source_aspect;
+            paper_uv.x = (1.0f - paper_uv.w) * 0.5f;
+        } else if (source_aspect < target_aspect) {
             paper_uv.h = source_aspect / target_aspect;
             paper_uv.y = (1.0f - paper_uv.h) * 0.5f;
-        } else {
-            paper_uv.w = target_aspect / source_aspect;
-            // The printed paper meets the spine with NO UV letterbox gap:
-            // the front attaches at the left, the back at the right.
-            paper_uv.x = back ? 1.0f - paper_uv.w : 0.0f;
         }
         c.list.case_face(artwork.texture, face, angle, back, kWhite, paper_uv);
     }
