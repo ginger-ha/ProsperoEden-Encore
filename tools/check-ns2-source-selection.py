@@ -320,6 +320,20 @@ def main() -> int:
                 "CompileReviewedNativeComputeSpirv(" in pipeline_source.read_text() and
                 "NativeSpirvStatus::InactiveSession" in pipeline_source.read_text(),
                 "Real GMMU-to-SPIR-V owner is missing")
+        # Native QMD3 metadata must reach the authenticated SPIR-V compiler
+        # without going through Switch 1's 40-bit Kepler launch format.
+        qmd_environment = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h"
+        qmd_api = ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.h"
+        require(qmd_environment.is_file() and
+                "class NativeQmdComputeEnvironment final" in qmd_environment.read_text() and
+                "cbuf.gpu_address + offset" in qmd_environment.read_text() and
+                "launch.block" in qmd_environment.read_text() and
+                "launch.local_pos_bytes + launch.local_crs_bytes" in qmd_environment.read_text() and
+                "CompileCapturedNs2QmdComputeSpirv(" in qmd_api.read_text() and
+                "CompileCapturedNs2QmdComputeSpirv(" in pipeline_source.read_text() and
+                "CompileCapturedNs2ComputeSpirv(" in pipeline_source.read_text() and
+                (ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").is_file(),
+                "QMD3 49-bit Compute metadata must reach authenticated SPIR-V compilation")
         bridge_source = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
         stage_policy = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"
         require(stage_policy.is_file() and
