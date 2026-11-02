@@ -1062,6 +1062,40 @@ int main() {
         storage_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
             storage_layout, storage_typed));
+        storage_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa1x1);
+        // A valid TIC dimension is not sufficient for typed SPIR-V
+        // storage image descriptors; channel count and signedness matter.
+        storage_layout.image_descriptors[0].format = Shader::ImageFormat::R8_UINT;
+        storage_typed[0].tic.format.Assign(TextureFormat::R8);
+        storage_typed[0].tic.r_type.Assign(ComponentType::UINT);
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_typed[0].tic.r_type.Assign(ComponentType::SINT);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_layout.image_descriptors[0].format = Shader::ImageFormat::R8_SINT;
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_layout.image_descriptors[0].format = Shader::ImageFormat::R32G32_UINT;
+        storage_typed[0].tic.format.Assign(TextureFormat::R32G32);
+        storage_typed[0].tic.r_type.Assign(ComponentType::UINT);
+        storage_typed[0].tic.g_type.Assign(ComponentType::UINT);
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_typed[0].tic.g_type.Assign(ComponentType::SINT);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_layout.image_descriptors[0].format =
+            Shader::ImageFormat::R32G32B32A32_UINT;
+        storage_typed[0].tic.format.Assign(TextureFormat::R32G32B32A32);
+        storage_typed[0].tic.g_type.Assign(ComponentType::UINT);
+        storage_typed[0].tic.b_type.Assign(ComponentType::UINT);
+        storage_typed[0].tic.a_type.Assign(ComponentType::UINT);
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
+        storage_typed[0].tic.a_type.Assign(ComponentType::FLOAT);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            storage_layout, storage_typed));
         Shader::Info buffer_layout{};
         Shader::TextureBufferDescriptor buffer_desc{};
         buffer_desc.count = 1;
@@ -1076,6 +1110,23 @@ int main() {
         buffer_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa2x1);
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
             buffer_layout, buffer_typed));
+        buffer_typed[0].tic.msaa_mode.Assign(MsaaMode::Msaa1x1);
+        Shader::Info image_buffer_layout{};
+        Shader::ImageBufferDescriptor image_buffer_desc{};
+        image_buffer_desc.count = 1;
+        image_buffer_desc.is_written = true;
+        image_buffer_desc.format = Shader::ImageFormat::R16_SINT;
+        image_buffer_layout.image_buffer_descriptors.push_back(image_buffer_desc);
+        auto image_buffer_typed = buffer_typed;
+        image_buffer_typed[0].kind = NativeQmdImageKind::ImageBuffer;
+        image_buffer_typed[0].is_written = true;
+        image_buffer_typed[0].tic.format.Assign(TextureFormat::R16);
+        image_buffer_typed[0].tic.r_type.Assign(ComponentType::SINT);
+        assert(Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            image_buffer_layout, image_buffer_typed));
+        image_buffer_typed[0].tic.r_type.Assign(ComponentType::UINT);
+        assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(
+            image_buffer_layout, image_buffer_typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color3D;
         assert(!Shader::Ampere::NativeQmdTypedImageLayoutMatches(layout, *typed));
         layout.texture_descriptors[0].type = Shader::TextureType::Color2D;

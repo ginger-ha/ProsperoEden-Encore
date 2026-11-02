@@ -200,6 +200,10 @@ for owner in (
     assert "unsupported native Compute TIC header" not in native_owner, owner
 assert "bool NativeQmdTicMatchesShaderType(" in native_env
 assert "bool NativeQmdTypedImageLayoutMatches(" in native_env
+assert "bool NativeQmdStorageImageFormatMatches(" in native_env, "typed storage TIC format guard missing"
+assert "NativeQmdStorageImageFormatMatches(desc.format, record.tic)" in native_env, "reflected image formats not enforced"
+for fmt in ("R8_UINT", "R8_SINT", "R16_UINT", "R16_SINT", "R32_UINT", "R32G32_UINT", "R32G32B32A32_UINT"):
+    assert "Shader::ImageFormat::" + fmt in native_env, fmt
 assert "else if (tic_msaa)" in native_env and "Buffer images likewise cannot be multisampled" in native_env, "native buffer/storage MSAA guard missing"
 for owner in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
