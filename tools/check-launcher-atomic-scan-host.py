@@ -139,7 +139,9 @@ int main() {
     {
         Launcher home;
         home.home_.last_title_id = 0x777;
-        home.home_.recents.push_back(Recent{.title_id = 0x777});
+        Recent last_played;
+        last_played.title_id = 0x777;
+        home.home_.recents.push_back(std::move(last_played));
         Game a{"MKW alpha", true}; a.title_id = 0x777;
         Game b{"MKW beta", true}; b.title_id = 0x777;
         Game other{"Different", true}; other.title_id = 0x888;
