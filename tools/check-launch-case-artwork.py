@@ -384,6 +384,18 @@ assert '"Box - Spine"' in indexer
 assert "unsigned EnsureRetailCase(" in native
 assert "RetailCaseIndex()" in native
 assert 'Eden::AppResourceFile("ui/box-art-index.tsv")' in native
+# The supplemental metadata is a deterministic packaging fallback, not a
+# replacement for the large generated index and never embeds copyrighted art.
+fallback_index = (root / "headless/prosperoeden/ui/box-art-fallback.tsv").read_text()
+assert "mario kart world\t" in fallback_index
+assert "donkey kong bananza\t" in fallback_index
+assert "r2_22b0967c-08e4-4988-9eeb-c5d7a1c34408.png" in fallback_index
+assert "991fd827-5f47-47ee-a400-4c6f22266b4f.jpg" in fallback_index
+assert "r2_02551e34-3f1e-4bf6-88d5-d083b700cf9f.jpg" in fallback_index
+assert "r2_eee1b6d5-ca97-4fd1-be20-2eda2fe1b979.jpg" in fallback_index
+assert 'Eden::AppResourceFile("ui/box-art-fallback.tsv")' in native
+assert "load_rows(input, false);" in native and "load_rows(fallback, true);" in native
+assert "if (it->second[side].empty())" in native
 assert 'Eden::AppFile("ui/box-art-index.tsv")' not in native
 assert '"EDEN_CASE_INDEX status=%s entries=%zu path=%s' in native
 assert '"EDEN_CASE_FETCH status=unavailable' in native

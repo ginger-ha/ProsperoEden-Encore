@@ -744,8 +744,12 @@ const BoxIndex& RetailCaseIndex() {
             std::fprintf(stderr, "EDEN_CASE_INDEX status=missing path=%s\n",
                          catalog_path.c_str());
         }
+        // A tiny, source-verified fallback index is packaged independently
+        // from the optional multi-thousand-title LaunchBox build snapshot.
+        // The full snapshot always wins; fallback fills missing NS2 faces.
+        const auto load_rows = [&](std::istream& source, bool supplemental) {
         std::string row;
-        while (std::getline(input, row) && items.size() < 20000) {
+        while (std::getline(source, row) && (items.size() < 20000 || supplemental)) {
             if (row.empty() || row[0] == '#' || row.size() > 5000) continue;
             const auto a = row.find('\t');
             if (a == std::string::npos) continue;
@@ -798,10 +802,27 @@ const BoxIndex& RetailCaseIndex() {
                 scenes[i] = split_candidates(scene_columns[i]);
             // Invalid optional scene metadata must never invalidate valid
             // original front/back/spine entries from the same row.
-            items.emplace(title, std::array<std::vector<std::string>, 6>{
+            std::array<std::vector<std::string>, 6> faces{
                 std::move(fronts), std::move(backs), std::move(spines),
-                std::move(scenes[0]), std::move(scenes[1]), std::move(scenes[2])});
+                std::move(scenes[0]), std::move(scenes[1]), std::move(scenes[2])};
+            auto [it, inserted] = items.emplace(title, faces);
+            if (supplemental && !inserted) {
+                for (std::size_t side = 0; side < faces.size(); ++side) {
+                    if (it->second[side].empty())
+                        it->second[side] = std::move(faces[side]);
+                }
+            }
         }
+        };
+        load_rows(input, false);
+        const auto primary_count = items.size();
+        const std::string fallback_path = Eden::AppResourceFile("ui/box-art-fallback.tsv");
+        std::ifstream fallback(fallback_path);
+        if (fallback) load_rows(fallback, true);
+        std::fprintf(stderr,
+                     "EDEN_CASE_FALLBACK status=%s added=%zu path=%s\n",
+                     fallback ? "loaded" : "missing",
+                     items.size() - primary_count, fallback_path.c_str());
         std::fprintf(stderr, "EDEN_CASE_INDEX status=%s entries=%zu path=%s\n",
                      opened ? "loaded" : "missing", items.size(), catalog_path.c_str());
         return items;

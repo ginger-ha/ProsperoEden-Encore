@@ -1,0 +1,5 @@
+# Eden Encore — supplemental LaunchBox flat-box metadata, no scans bundled.
+# Verified public GamesDB refs: Mario Kart World 423668; Donkey Kong Bananza 424483.
+# A full build-host index takes precedence; this supplies missing NS2 faces.
+mario kart world	eu:r2_22b0967c-08e4-4988-9eeb-c5d7a1c34408.png;world:r2_2346357f-c9c7-4b8c-8732-e56682328653.png	-	-	-	-	-
+donkey kong bananza	eu:991fd827-5f47-47ee-a400-4c6f22266b4f.jpg	us:r2_02551e34-3f1e-4bf6-88d5-d083b700cf9f.jpg	us:r2_eee1b6d5-ca97-4fd1-be20-2eda2fe1b979.jpg	-	-	-
