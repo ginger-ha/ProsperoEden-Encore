@@ -423,6 +423,8 @@ assert "std::erase_if(pending_resolve_shadows" in tick_frame
 assert "scratch.unused_frames = 0;" in tick_frame
 assert "++scratch.unused_frames > MAX_UNUSED_SCRATCH_FRAMES" in tick_frame
 assert "scheduler.GetMasterSemaphore().KnownGpuTick()" in tick_frame
+assert "pending_retired_views" in tick_frame and "pending_retired_images" in tick_frame
+assert "gpu_retire_frame - pending.frame >= MIN_TEXTURE_RETIRE_FRAMES" in tick_frame
 assert "F07 snapshot native MSAA scratch and resolve cleanup GPU completion" in generator
 assert "F07 skip MSAA GPU probe when every scratch image is checked out" in generator
 
@@ -454,6 +456,12 @@ struct TextureCacheRuntime {
     Scheduler scheduler;
     std::vector<MsaaScratchImage> msaa_scratch_images;
     std::vector<std::pair<u64,int>> pending_resolve_shadows;
+#ifdef PS5_NATIVE
+    struct PendingRetiredOwner { u64 tick{}; u64 frame{}; };
+    u64 gpu_retire_frame{};
+    std::vector<PendingRetiredOwner> pending_retired_views;
+    std::vector<PendingRetiredOwner> pending_retired_images;
+#endif
     void TickFrame();
 };
 __ACTUAL_TICKFRAME__
@@ -499,6 +507,27 @@ int main() {
     r.TickFrame();
 #ifdef PS5_NATIVE
     assert(r.scheduler.master.probes == probes);
+    // P2.2: completion alone cannot override the prior eight-frame
+    // framebuffer lifetime; frame age alone cannot override GPU in-flight.
+    const auto stamp = r.gpu_retire_frame;
+    r.pending_retired_views.push_back({30, stamp});
+    r.pending_retired_images.push_back({30, stamp});
+    r.scheduler.master.completed = 30;
+    for (int i = 0; i < 7; ++i) r.TickFrame();
+    assert(r.pending_retired_views.size() == 1);
+    assert(r.pending_retired_images.size() == 1);
+    r.TickFrame(); // eight frames AND completed GPU tick
+    assert(r.pending_retired_views.empty());
+    assert(r.pending_retired_images.empty());
+    r.pending_retired_views.push_back({31, r.gpu_retire_frame});
+    r.pending_retired_images.push_back({31, r.gpu_retire_frame});
+    for (int i = 0; i < 10; ++i) r.TickFrame();
+    assert(r.pending_retired_views.size() == 1);
+    assert(r.pending_retired_images.size() == 1);
+    r.scheduler.master.completed = 31;
+    r.TickFrame();
+    assert(r.pending_retired_views.empty());
+    assert(r.pending_retired_images.empty());
 #else
     (void)probes;
 #endif
