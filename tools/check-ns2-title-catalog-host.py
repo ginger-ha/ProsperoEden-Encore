@@ -9,7 +9,9 @@ header=(root/"headless/ns2_title_catalog.h").read_text()
 services=(root/"headless/prosperoeden/eden_services.cpp").read_text()
 assert '#include "ns2_title_catalog.h"' in services
 assert 'Eden::Ns2Catalog::Find(game.title_id)' in services
-assert 'FetchKnownNs2Front(title_id, cancel)' in services
+assert 'return FetchKnownNs2Front(title_id, cancel)' not in services
+assert 'return 0u;' in services
+assert 'https://gamesdb-images.launchbox.gg' in services
 assert 'EDEN_NS2_TITLE_RESOLVED' in services
 assert 'if (game.cover.empty() && !game.box_front.empty()) game.cover = game.box_front;' in services
 assert 'base/exefs/icon.jpg' in services and 'exefs/icon.png' in services
