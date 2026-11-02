@@ -6385,3 +6385,18 @@ apply_reviewed_delta(
     "vulkan_rasterizer.cpp",
     "        fence_manager.SignalFence([pipeline = std::move(pipeline)] {});\n        return true;", "        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;",
     "NS2 Vulkan pipeline retained through successful compute dispatch")
+
+# P2.2 shared Vulkan image retirement: this is a generated cache owner,
+# not an overlay allowed to drift from the release source. Retain the
+# original desktop image/view ring and select native GPU+frame policy only
+# for the shared PS5 Vulkan TextureCacheRuntime.
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache.h',
+    "    for (const ImageViewId image_view_id : image_view_ids) {\n        sentenced_image_view.Push(std::move(slot_image_views[image_view_id]));\n        slot_image_views.erase(image_view_id);\n    }\n    image.image_view_ids.clear();",
+    "    for (const ImageViewId image_view_id : image_view_ids) {\n#ifdef PS5_NATIVE\n        if constexpr (std::is_same_v<Runtime, Vulkan::TextureCacheRuntime>) {\n            runtime.RetireGpuImageView(std::move(slot_image_views[image_view_id]));\n        } else\n#endif\n        {\n            sentenced_image_view.Push(std::move(slot_image_views[image_view_id]));\n        }\n        slot_image_views.erase(image_view_id);\n    }\n    image.image_view_ids.clear();",
+    'P2.2 shared Vulkan invalidate-scale view GPU retirement')
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache.h',
+    "    for (const ImageViewId image_view_id : image_view_ids) {\n        if (!immediate_delete) {\n            sentenced_image_view.Push(std::move(slot_image_views[image_view_id]));\n        }\n        slot_image_views.erase(image_view_id);\n    }\n    if (!immediate_delete) {\n        sentenced_images.Push(std::move(slot_images[image_id]));\n    }\n    slot_images.erase(image_id);",
+    "    for (const ImageViewId image_view_id : image_view_ids) {\n#ifdef PS5_NATIVE\n        if constexpr (std::is_same_v<Runtime, Vulkan::TextureCacheRuntime>) {\n            // Both ordinary GC and immediate eviction must respect GPU completion.\n            runtime.RetireGpuImageView(std::move(slot_image_views[image_view_id]));\n        } else\n#endif\n        if (!immediate_delete) {\n            sentenced_image_view.Push(std::move(slot_image_views[image_view_id]));\n        }\n        slot_image_views.erase(image_view_id);\n    }\n#ifdef PS5_NATIVE\n    if constexpr (std::is_same_v<Runtime, Vulkan::TextureCacheRuntime>) {\n        runtime.RetireGpuImage(std::move(slot_images[image_id]));\n    } else\n#endif\n    if (!immediate_delete) {\n        sentenced_images.Push(std::move(slot_images[image_id]));\n    }\n    slot_images.erase(image_id);",
+    'P2.2 shared Vulkan DeleteImage GPU retirement')
