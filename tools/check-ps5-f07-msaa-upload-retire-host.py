@@ -415,7 +415,9 @@ tick_begin = "void TextureCacheRuntime::TickFrame() {"
 tick_end = "\nImage::Image(TextureCacheRuntime&"
 assert source.count(tick_begin) == source.count(tick_end) == 1
 tick_frame = source[source.index(tick_begin):source.index(tick_end)]
-assert "msaa_scratch_images.empty() && pending_resolve_shadows.empty()" in tick_frame
+assert "msaa_scratch_images.empty() && pending_resolve_shadows.empty() &&" in tick_frame
+assert "pending_retired_views.empty() && pending_retired_images.empty()" in tick_frame
+assert "pending_resolve_shadows.empty() && pending_retired_views.empty() &&" in tick_frame
 assert "pending_resolve_shadows.empty() &&" in tick_frame
 assert "std::all_of(msaa_scratch_images.begin(), msaa_scratch_images.end()" in tick_frame
 assert "std::erase_if(msaa_scratch_images" in tick_frame
