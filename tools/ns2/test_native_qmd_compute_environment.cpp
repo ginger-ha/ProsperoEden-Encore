@@ -31,7 +31,7 @@ struct TextureMetadata final : Shader::Environment {
 };
 struct MockMappedGpu {
     u64 address{};
-    std::array<u32,4> words{0xabcdef01,0x11223344,0x55667788,0x99aabbcc};
+    std::array<u32,8> words{0xabcdef01,0x11223344,0x55667788,0x99aabbcc};
     unsigned reads{};
     bool mapped{true};
 };
@@ -39,7 +39,7 @@ static bool Read(void* context,u64 address,void* destination,std::size_t bytes) 
     auto& memory=*static_cast<MockMappedGpu*>(context);
     ++memory.reads;
     if (!memory.mapped || !destination || bytes!=sizeof(u32) ||
-        address < memory.address || address-memory.address > 12 ||
+        address < memory.address || address-memory.address > 28 ||
         (address-memory.address)%4)
         return false;
     std::memcpy(destination,
@@ -224,6 +224,45 @@ int main() {
     })); // A mapped QMD is not proof of mapped descriptor targets.
     // Never infer an SSBO size from a high packed tag: the upstream
     // BufferCache must resolve the real memory layout before submission.
+    // Two native SSBOs are distinct 16-byte QMD3 CBUF records.
+    auto array_launch = *decoded;
+    array_launch.constant_buffers[0].size = 32;
+    memory.words = {0x12345000U,0x10000U,0x40U,0U,
+                    0x22345000U,0x10000U,0x80U,0U};
+    NativeQmdComputeEnvironment array_env{
+        array_launch,Read,&memory,std::make_unique<TextureMetadata>()};
+    auto array_info = shader_info;
+    array_info.constant_buffer_used_sizes[0] = 32;
+    array_info.storage_buffers_descriptors.clear();
+    array_info.storage_buffers_descriptors.push_back({0,0,2,true});
+    const auto array_plan = array_env.BuildResourcePlan(array_info);
+    assert(array_plan && array_plan->HasResolvedBufferBindings());
+    assert(array_plan->storage_buffers.size() == 2);
+    assert(array_plan->storage_buffers[0].gpu_address == 0x1000012345000ULL);
+    assert(array_plan->storage_buffers[0].bytes == 0x40);
+    assert(array_plan->storage_buffers[1].gpu_address == 0x1000022345000ULL);
+    assert(array_plan->storage_buffers[1].bytes == 0x80);
+    unsigned array_binds{};
+    assert(array_plan->StageVulkanBufferBindings(
+        [](u64,u32){return true;},
+        [](u32,u32,u64,u32){return true;},
+        [&](u32 index,u64 address,u32 bytes,bool written) {
+            assert(index == array_binds && written);
+            assert(address == (index == 0 ? 0x1000012345000ULL
+                                          : 0x1000022345000ULL));
+            assert(bytes == (index == 0 ? 0x40U : 0x80U));
+            ++array_binds; return true;
+        },[]{}));
+    assert(array_binds == 2);
+    auto short_launch = array_launch;
+    short_launch.constant_buffers[0].size = 24;
+    NativeQmdComputeEnvironment short_env{
+        short_launch,Read,&memory,std::make_unique<TextureMetadata>()};
+    array_info.constant_buffer_used_sizes[0] = 16;
+    assert(!short_env.BuildResourcePlan(array_info));
+    array_info.storage_buffers_descriptors[0].count = 33;
+    assert(!array_env.BuildResourcePlan(array_info));
+    memory.words = {0x12345000U,0x10000U,0x40U,0U};
     memory.words[3]=1;
     const auto unresolved=env.BuildResourcePlan(shader_info);
     assert(unresolved && unresolved->requires_memory_layout &&
