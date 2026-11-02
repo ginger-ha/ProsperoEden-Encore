@@ -351,6 +351,7 @@ def main() -> int:
                 "QMD3 49-bit Compute metadata must reach authenticated SPIR-V compilation")
         # Native Vulkan must use the authenticated Ampere SPIR-V shader and
         # QMD buffer resources, never the legacy Maxwell launch descriptor.
+        native_vk_rasterizer = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
         native_vk_pipeline = (ROOT / "vendor/encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
         native_vk_pipeline_h = (ROOT / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_compute_pipeline.h").read_text()
         native_vk_cache = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
@@ -373,6 +374,18 @@ def main() -> int:
             "CaptureComputeTicket(kepler_compute)" in native_vk_cache and
             "CurrentComputePipeline() {" in native_vk_cache,
             "NS2 native Vulkan QMD3 module and buffer-only handoff must remain session-verified")
+        # U96: native buffer-only Compute inherits NS1's no-worker-wait
+        # inside cache-lock ordering. Keep native-only staging fail-closed.
+        require(
+            "guest_descriptor_queue.AcquireKnownEmpty(uses_descriptor_buffer);" in native_vk_pipeline and
+            "const auto preflight_guest = [&]" in native_vk_rasterizer and
+            "guest_descriptor_queue.PreflightExactGuestDraw(" in native_vk_rasterizer and
+            "descriptor_buffer_ring.PreflightFrameReuse(scheduler)" in native_vk_rasterizer and
+            "pipeline->PreflightDescriptorScratch();" in native_vk_rasterizer and
+            native_vk_rasterizer.index("const auto preflight_guest = [&]") <
+                native_vk_rasterizer.index("if (!pipeline->ConfigureNative(") and
+            "U96 native compute preflights GPU worker waits before BufferCache lock" in native_vk_port,
+            "NS2 Vulkan Compute preflight must occur before locked native descriptor binding")
         bridge_source = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
         stage_policy = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"
         require(stage_policy.is_file() and
