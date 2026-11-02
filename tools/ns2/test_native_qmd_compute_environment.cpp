@@ -733,6 +733,10 @@ int main() {
         pitch_tic.texture_type.Assign(TextureType::Texture2D);
         pitch_tic.pitch_high.Assign(0);
         assert(!Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
+        // u32 CalculateGuestSizeInBytes would wrap a huge pitch*height.
+        pitch_tic.pitch_high.Assign(0xffff);
+        pitch_tic.height_minus_1.Assign(0xffff);
+        assert(!Shader::Ampere::NativeQmdTicLayoutSupported(pitch_tic));
         TSCEntry tsc{};
         tsc.mag_filter.Assign(TextureFilter::Nearest);
         tsc.min_filter.Assign(TextureFilter::Linear);
