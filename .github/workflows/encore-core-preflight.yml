@@ -47,8 +47,9 @@ permissions:
 # Only real core source/test changes enter this workflow. New commits
 # supersede old checks; documentation and launcher-only pushes are excluded.
 concurrency:
-  group: encore-core-preflight-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  # Keep every checked SHA independently auditable, even during rapid P2 edits.
+  group: encore-core-preflight-${{ github.ref }}-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: false
 
 # Independent source witnesses share no build products or test output.
 # Run on separate host runners so 10+ minutes of graphics/JIT fixtures do

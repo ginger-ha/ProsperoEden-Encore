@@ -284,8 +284,10 @@ permissions:
   contents: read
 
 concurrency:
-  group: encore-fast-core-${{ github.ref }}
-  cancel-in-progress: true
+  # Validate each actual source revision to completion. Rapid successive pushes
+  # must not cancel the only Clang/GCC proof for an older SHA.
+  group: encore-fast-core-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   native-core-host-smoke:

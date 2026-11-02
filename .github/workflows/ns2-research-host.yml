@@ -19,8 +19,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ns2-research-${{ github.ref }}
-  cancel-in-progress: true
+  # Native ABI guards need a conclusive result for every submitted SHA.
+  group: ns2-research-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   dynarmic-a64-syntax:
