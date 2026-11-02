@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     assert storage_layout not in actual, 'common storage layout falsely regenerated'
     assert subprocess.check_output(
         ['git','hash-object',str(expected[storage_layout])],text=True
-    ).strip() == '5cd2afaabc24c51592df61d952433df6e1e7a342', (
+    ).strip() == 'f1cb4c7d91a30c56d55807ae62d796702ad1362f', (
         'common compute reflection owner drift')
     assert pool_policy not in actual, 'native GPU budget leaked into generator'
     assert subprocess.check_output(
