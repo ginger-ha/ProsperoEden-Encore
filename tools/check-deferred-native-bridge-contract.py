@@ -641,6 +641,16 @@ endif()
     # null-page-table crash guard. Reconstruct the exact historical source
     # by removing *only* that known addition, then compare all remaining bytes.
     # Guest bridge variants must remain byte-for-byte equivalent as before.
+    native_span_old = (
+        "        if (!size || !AddressSpaceContains(*current_page_table, addr, size)) return nullptr;"
+    )
+    native_span_guard = (
+        "        // AudioOut can request its initial guest buffer before the process\\n"
+        "        // page table is installed. Never dereference a missing table: the\\n"
+        "        // GuestMemory fallback performs a checked ReadBlockUnsafe instead.\\n"
+        "        if (!size || current_page_table == nullptr ||\\n"
+        "            !AddressSpaceContains(*current_page_table, addr, size)) return nullptr;"
+    )
     native_walk_old = "        if (!AddressSpaceContains(*current_page_table, addr, size)) {"
     native_walk_guard = (
         "        // An uninitialized process has no active guest page table.\n"
@@ -662,6 +672,11 @@ endif()
             assert maintained.count(native_walk_guard) == 1, (
                 "PS5 null-page-table crash guard missing or duplicated", owner)
             baseline = baseline.replace(native_walk_old, native_walk_guard)
+            assert baseline.count(native_span_old) == 1, (
+                "Historical native GetSpan owner moved", owner)
+            assert maintained.count(native_span_guard) == 1, (
+                "PS5 early audio GetSpan null-table guard missing or duplicated", owner)
+            baseline = baseline.replace(native_span_old, native_span_guard)
         assert maintained == baseline, (
             "G13 X05 M12 historical source parity drift", owner)
     print("ENCORE_FOUR_NATIVE_GUEST_MEMORY_VARIANTS_PARITY_PASS")
