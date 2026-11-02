@@ -35,6 +35,18 @@ class Launcher
     void update(float dt);
     void draw(gfx::DrawList &list);
 
+    // Host preview readiness probes are side-effect free. A focus sound
+    // on Home cannot certify that the async Library worker has completed.
+    // No filesystem, locks or GPU state change in either query.
+    [[nodiscard]] bool preview_home_ready() const noexcept {
+        return screen_ == Screen::home && home_loaded_;
+    }
+    [[nodiscard]] bool preview_library_ready(std::size_t required) const noexcept {
+        return screen_ == Screen::library && games_loaded_ &&
+               games_.size() >= required &&
+               library_.count == static_cast<int>(games_.size());
+    }
+
     // The sounds asked for since the last call.
     std::vector<audio::Cue> take_cues();
     // Launcher sound level (0-100) as set in Settings > Audio.

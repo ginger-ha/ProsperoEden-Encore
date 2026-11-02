@@ -229,37 +229,35 @@ void pictures(Stage &s)
     {
         s.restart(false);
         s.wait(2.0f);
-        s.press({Key::up, Key::cross});
-        s.wait(1.0f);
-        // R1 switches the main tab, not the Library page. Select the
-        // eleventh fixture with the same D-pad path as the retail-scan test;
-        // otherwise the fallback screenshots can capture another screen.
-        // The preview's simulated 60 Hz clock can outrun a real async
-        // filesystem worker on a busy CI runner. Only count a Right input
-        // once the Library itself reports a genuine focus-move cue. This
-        // waits for the FIRST selected ROM, not an arbitrary sleep or a
-        // fake ready flag. Remaining nine inputs preserve fixture index 10.
-        bool first_rom_selected = false;
-        for (int attempt = 0; attempt < 120 && !first_rom_selected; ++attempt) {
-            const std::size_t previous_cues = s.heard.size();
-            s.press({Key::right});
-            first_rom_selected = std::find(
-                s.heard.begin() + static_cast<std::ptrdiff_t>(previous_cues),
-                s.heard.end(), pe::audio::Cue::focus) != s.heard.end();
-            if (!first_rom_selected) {
+        // Simulated 60 Hz frames can outrun an actual async Home worker.
+        // Wait for the real state-machine owner, not a focus cue that could
+        // originate from another tab. Bounded: a stuck scan fails the test.
+        const auto await_ready = [&](auto ready) {
+            for (int attempt = 0; attempt < 160; ++attempt) {
+                if (ready()) return true;
                 s.render();
                 std::this_thread::sleep_for(std::chrono::milliseconds(25));
                 s.launcher->update(1.0f / 60.0f);
             }
-        }
-        if (!first_rom_selected) {
-            std::fprintf(stderr,
-                         "library-fallback-preview: first ROM never became navigable\\n");
+            return ready();
+        };
+        if (!await_ready([&] { return s.launcher->preview_home_ready(); })) {
+            std::fprintf(stderr, "library-fallback-preview: Home not ready\\n");
             s.ok = false;
             return;
         }
+        s.press({Key::up, Key::cross});
+        if (!await_ready([&] { return s.launcher->preview_library_ready(11); })) {
+            std::fprintf(stderr,
+                         "library-fallback-preview: Library not ready with 11 ROMs\\n");
+            s.ok = false;
+            return;
+        }
+        // The Library is now definitely open and has published its ROM
+        // list. Ten right movements reach the exact eleventh fixture.
+        // No cue substitution or alternate simulated renderer is involved.
         s.press({Key::right, Key::right, Key::right, Key::right, Key::right,
-                 Key::right, Key::right, Key::right, Key::right});
+                 Key::right, Key::right, Key::right, Key::right, Key::right});
         s.wait(0.4f);
         const auto sample = s.services.games();
         const auto case_scan = s.services.box_art(sample.at(10).title_id);
