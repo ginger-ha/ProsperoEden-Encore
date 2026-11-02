@@ -6362,3 +6362,10 @@ apply_reviewed_delta(
     "            if (!descriptors || !registry.IsComputeCurrent(kepler_compute, *ticket))\n                return false;\n            // The native process ticket alone is insufficient:",
     "            if (!descriptors || !registry.IsComputeCurrent(kepler_compute, *ticket))\n                return false;\n            // A captured array of raw u32s is not yet a cache descriptor.\n            // Decode the real TICEntry/TSCEntry ABI with no slot allocation.\n            // The second guest-table read below still authenticates these\n            // exact bytes under the current TextureCache channel lock.\n            const auto typed_descriptors = tables.DecodeAdmitted(\n                *resources, *descriptors);\n            if (!typed_descriptors ||\n                !registry.IsComputeCurrent(kepler_compute, *ticket))\n                return false;\n            // The native process ticket alone is insufficient:",
     "NS2 immutable typed TIC TSC handoff before future cache acquisition")
+
+# ChannelSetupCaches::BindToChannel mutates active owner pointers under
+# config_mutex, not texture_cache.mutex. Take both in this read-only proof.
+apply_reviewed_delta(
+    'vulkan-cache/video_core/texture_cache/texture_cache.h',
+    "    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&", "    // BindToChannel/EraseChannel mutate these pointers under config_mutex.\n    // The renderer holds texture_cache.mutex; take the configuration lock\n    // briefly as well so a concurrent channel switch cannot race this proof.\n    std::scoped_lock channel_lock{config_mutex};\n    return channel_state && gpu_memory &&\n           kepler_compute == &expected_compute &&",
+    'Native texture owner proof serialized with config channel switches')

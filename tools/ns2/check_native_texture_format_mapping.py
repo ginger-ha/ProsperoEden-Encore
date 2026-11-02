@@ -205,3 +205,8 @@ for path in (
     assert "return false; // no unbacked image/sampler descriptor publication" in bridge
 print("NS2_TYPED_TIC_TSC_DECODE_PASS real_cache_ABI=1"
       " retained_vk_objects=0 native_image_dispatch=closed")
+
+assert "std::scoped_lock channel_lock{config_mutex};" in impl
+assert impl.index("std::scoped_lock channel_lock{config_mutex};") < impl.index(
+    "&channel_state->kepler_compute == &expected_compute")
+print("NS2_CACHE_CHANNEL_RACE_PREVENTION_PASS config_mutex=acquired")
