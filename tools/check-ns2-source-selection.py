@@ -340,6 +340,30 @@ def main() -> int:
                 "CompileCapturedNs2ComputeSpirv(" in pipeline_source.read_text() and
                 (ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").is_file(),
                 "QMD3 49-bit Compute metadata must reach authenticated SPIR-V compilation")
+        # Native Vulkan must use the authenticated Ampere SPIR-V shader and
+        # QMD buffer resources, never the legacy Maxwell launch descriptor.
+        native_vk_pipeline = (ROOT / "vendor/encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp").read_text()
+        native_vk_pipeline_h = (ROOT / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_compute_pipeline.h").read_text()
+        native_vk_cache = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
+        native_vk_cache_h = (ROOT / "vendor/encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_pipeline_cache.h").read_text()
+        native_vk_port = (ROOT / "tools/prepare-vulkan-port.py").read_text()
+        require(
+            "bool ComputePipeline::ConfigureNative(" in native_vk_pipeline and
+            "resources.StageVulkanBufferBindings(" in native_vk_pipeline and
+            "resources.ValidateGpuMappings(mapped)" in native_vk_pipeline and
+            "buffer_cache.ObtainBuffer(" in native_vk_pipeline and
+            "WriteDescriptorBuffer(device, descriptor_buffer_layout," in native_vk_pipeline and
+            "bool ConfigureNative(" in native_vk_pipeline_h and
+            "CreateNativeComputePipeline(" in native_vk_cache_h and
+            "PipelineCache::CreateNativeComputePipeline(" in native_vk_cache and
+            "shader.ComputeMetadataReady()" in native_vk_cache and
+            "registry.IsComputeCurrent(kepler_compute, *ticket)" in native_vk_cache and
+            "vk::ShaderModule spv_module = BuildShader(device, shader.words)" in native_vk_cache and
+            "U92 native QMD3 direct ComputePipeline buffer binding" in native_vk_port and
+            "U93 authenticated native ComputePipeline SPIR-V to driver handoff" in native_vk_port and
+            "CaptureComputeTicket(kepler_compute)" in native_vk_cache and
+            "CurrentComputePipeline() {" in native_vk_cache,
+            "NS2 native Vulkan QMD3 module and buffer-only handoff must remain session-verified")
         bridge_source = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp"
         stage_policy = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"
         require(stage_policy.is_file() and
