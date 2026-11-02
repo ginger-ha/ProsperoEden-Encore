@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "intent": "Source ownership only: existence is not compile, runtime or console compatibility proof.",
+  "components": [
+    {
+      "name": "cpu-jit",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-core/src/core/arm/dynarmic/g11/arm_dynarmic_64_native_normal.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-a64/dynarmic/frontend/A64/decoder/a64.h",
+      "witness": "tools/ns2/check_guest_counter_policy.py",
+      "remaining": "NS1 JIT parity, NS2 six-core/JIT guest-PC proof"
+    },
+    {
+      "name": "loader-content",
+      "scope": "shared-with-generation-adapters",
+      "owner": "headless/ns2_title_catalog.h",
+      "ns2_adapter": "vendor/encore-active/ns2-experimental/src/core/loader/deconstructed_rom_directory.cpp",
+      "witness": "tools/check-ns2-extracted-inputs-host.py",
+      "remaining": "NPDM/NSO overlays, update/DLC and executable guest progress"
+    },
+    {
+      "name": "hos-ipc",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-core/src/core/hle/service/nvnflinger/nvnflinger.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-runtime/graphics_supervisor/core/hle/service/am/service/graphics_supervisor.cpp",
+      "witness": "tools/check-ns2-graphics-hle-host.py",
+      "remaining": "TIPC events, VI2/codec release-fence and native IPC validation"
+    },
+    {
+      "name": "gmmu-buffer",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-core/src/video_core/buffer_cache/buffer_cache.h",
+      "ns2_adapter": "vendor/encore-active/ns2-runtime/nvdrv_as/core/hle/service/nvdrv/devices/native_gpu_va_layout.h",
+      "witness": "tools/check-ns2-gmmu-va-layout-host.py",
+      "remaining": "49-bit VA residency, 4 KiB mappings and rollback fences"
+    },
+    {
+      "name": "shader-translation",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h",
+      "witness": "tools/check-ns2-ampere-host.py",
+      "remaining": "Ampere graphics shaders, texture metadata and proper negative cache"
+    },
+    {
+      "name": "vulkan-compute",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-vulkan/vk_compute_pipeline_cost.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h",
+      "witness": "tools/check-shared-compute-storage-descriptors-host.py",
+      "remaining": "TIC/TSC images, unknown-length SSBO, indirect CBUF and GPU fence"
+    },
+    {
+      "name": "texture-cache",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-vulkan/vk_texture_cache_cost.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-astc/include/video_core/texture_cache/ns2_astc_texture_cache_bridge.inc",
+      "witness": "tools/ns2/check_egl_astc_texture_cache.py",
+      "remaining": "Native TIC/TSC, blocklinear/GOB, sparse physical residency and image view lifetime"
+    },
+    {
+      "name": "frame-present",
+      "scope": "shared-with-generation-adapters",
+      "owner": "vendor/encore-active/eden-vulkan/vulkan_present_manager.cpp",
+      "ns2_adapter": "vendor/encore-active/ns2-runtime/graphics_supervisor/core/hle/service/am/service/graphics_supervisor.cpp",
+      "witness": "tools/check-ps5-vulkan-loading-stages-host.py",
+      "remaining": "True guest framebuffer via VI2 and independent vblank/fences"
+    },
+    {
+      "name": "launcher-library",
+      "scope": "shared-ui",
+      "owner": "headless/prosperoeden/pe/ui/library.cpp",
+      "witness": "tools/check-release-case-index-dedup-host.py",
+      "remaining": "NS2 art/back/3D case and atomic tab navigation PS5 verification"
+    }
+  ]
+}
