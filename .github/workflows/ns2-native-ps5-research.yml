@@ -11,6 +11,7 @@ on:
       # bounded SSBO arrays, buffer-only SPIR-V/Vulkan Compute and VI2 vblank.
       # TIC/TSC, images, full graphics stages and first guest frame remain
       # unqualified; no release or gameplay-compatibility assertion.
+      # Rebuild consolidated source with explicit VI2 51/104/105 compatibility.
       # Ordinary vendor/main pushes must not trigger repeated 4-hour PS5 jobs.
       - '.github/workflows/ns2-native-ps5-research.yml'
       # Workflow-only edits never cancel an already compiling native candidate.
