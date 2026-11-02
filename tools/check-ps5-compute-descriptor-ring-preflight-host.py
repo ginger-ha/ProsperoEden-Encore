@@ -39,14 +39,22 @@ def adapters(path):
     return result
 
 header_patches=adapters("src/video_core/renderer_vulkan/vk_compute_pipeline.h")
-assert len(header_patches)==1 and len(header_patches[0])==2
-old,new=header_patches[0]
+# The NS2 forward declaration is a separate, exact source adaptation.
+# Do not mistake it for the F07 descriptor preflight replacement.
+assert len(header_patches)==2 and all(len(entry)==2 for entry in header_patches)
+assert header_patches[0][0] == "namespace Vulkan {"
+assert "NativeQmdResourcePlan" in header_patches[0][1]
+old,new=header_patches[1]
 assert "bool IsBound() const noexcept" in old
 assert "DescriptorRingPreflightSize() const noexcept" in new
 assert "DescriptorEntryReservation() const noexcept" in new
 assert "return uses_descriptor_buffer ? descriptor_buffer_layout.size : 0;" in new
 assert "#ifdef PS5_NATIVE" in new
 getter=methods(compute_header,"[[nodiscard]] VkDeviceSize DescriptorRingPreflightSize() const noexcept")
+# The final native owner must retain the later F07 same-generation reuse
+# predicate, not just the older unconditional allocation in the base adapt.
+assert "last_descriptor_buffer_generation" in getter
+assert "last_descriptor_payload.size() != num_descriptor_entries" in getter
 reservation=methods(new,"[[nodiscard]] size_t DescriptorEntryReservation() const noexcept")
 assert "descriptor_buffer_ring.Allocate(scheduler, descriptor_buffer_layout.size)" in compute_pipeline
 assert "reuse_allocation" in compute_pipeline

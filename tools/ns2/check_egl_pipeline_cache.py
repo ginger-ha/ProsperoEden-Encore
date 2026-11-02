@@ -114,6 +114,32 @@ compute_anchor = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\n"
 assert reconstructed.count(compute_anchor + native_compute_guard) == 1, (
     'U91 Compute guard no longer precedes legacy Maxwell cache admission')
 reconstructed = reconstructed.replace(native_compute_guard, '', 1)
+# U92: separately reviewed native QMD3 Compute factory and opt-in include.
+# Strip only their exact authenticated fragments before comparing the NS1
+# driver-cache owner. Never relax the original full Git blob provenance.
+native_factory_include = (
+    '#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n'
+    '#include "shader_recompiler/frontend/ampere/renderer_spirv_bridge.h"\n'
+    '#endif\n'
+)
+assert reconstructed.count(native_factory_include) == 1, (
+    'U92 native Compute include changed outside reviewed gate')
+native_factory_start = (
+    '#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n'
+    '// Build a genuine VkComputePipeline'
+)
+assert reconstructed.count(native_factory_start) == 1, (
+    'U92 native Compute factory missing or duplicated')
+factory_begin = reconstructed.index(native_factory_start)
+factory_end = reconstructed.index('#endif\n', factory_begin) + len('#endif\n')
+native_factory = reconstructed[factory_begin:factory_end]
+assert n3m_hash(native_factory) == 'd659eec2b32bde1b', (
+    'U92 native Compute factory differs from authenticated owner')
+factory_boundary = native_factory + '\nComputePipeline* PipelineCache::CurrentComputePipeline() {'
+assert reconstructed.count(factory_boundary) == 1, (
+    'U92 native Compute factory moved outside reviewed boundary')
+reconstructed = reconstructed.replace(native_factory + '\n', '', 1)
+reconstructed = reconstructed.replace(native_factory_include, '', 1)
 data=reconstructed.encode()
 assert hashlib.sha1(b"blob "+str(len(data)).encode()+b"\0"+data).hexdigest()==("0d4c16e0afab6d18b44e51dc5cb9dda512f0557e"), "N56 native owner differs outside reviewed guard"
 assert 'EDEN_NS2_PIPELINE_CACHE_EXPERIMENTAL OR' in CMAKE
