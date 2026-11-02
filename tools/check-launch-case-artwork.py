@@ -542,7 +542,8 @@ assert "fitted.h = paper.w / source;" in lib_sleeve
 assert "if (source > target) {" in lib_sleeve
 assert "if (source < target) {" in lib_sleeve
 assert "fitted.y += (paper.h - fitted.h) * 0.5f;" in lib_sleeve
-assert "fitted.x += rear ? paper.w - fitted.w : (paper.w - fitted.w) * 0.5f;" in lib_sleeve
+assert "fitted.x += paper.w - fitted.w;" in lib_sleeve
+assert "c.list.image(artwork.texture, paper, uv," in lib_sleeve
 assert "const float side = shell.w * (7.0f / 454.0f);" in lib_sleeve
 # The 2D library's case geometry and reconstruction are independent of a
 # retail source's aspect ratio and use the 3D launcher's paper coordinates.
