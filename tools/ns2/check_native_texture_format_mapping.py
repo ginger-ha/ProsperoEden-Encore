@@ -93,3 +93,26 @@ assert "if (address >= (1ULL << 40))" in legacy
 
 print("NS2_NATIVE_TEXTURE_GMMU_SHARED_PASS mapping=49bit whole_span=1"
       " no_native_vulkan_publication=1 ns1_legacy_guard=unchanged")
+
+
+# P2.2 common cache owner: the indexed Maxwell path must delegate to
+# exactly the same typed TIC/TSC entry points available to Ampere.
+# Their slot IDs are NOT fence-held Vulkan objects; native publication
+# stays deliberately closed until scheduler/fence retention exists.
+cache_api = (vendor / "sources/eden/src/video_core/texture_cache/texture_cache_base.h").read_text()
+cache_impl = (vendor / "sources/eden/src/video_core/texture_cache/texture_cache.h").read_text()
+assert "ImageViewId AcquireImageView(const TICEntry& descriptor," in cache_api
+assert "SamplerId AcquireSampler(const TSCEntry& descriptor);" in cache_api
+assert "ImageViewId TextureCache<P>::AcquireImageView(" in cache_impl
+assert "SamplerId TextureCache<P>::AcquireSampler(" in cache_impl
+assert "const auto id = AcquireImageView(descriptor);" in cache_impl
+assert "const id = AcquireSampler(descriptor);" in cache_impl
+assert cache_impl.count("channel_state->image_views.try_emplace(descriptor)") == 1
+assert "channel_state->samplers.try_emplace(config)" in cache_impl
+assert "void TextureCache<P>::RemoveImageViewReferences(" in cache_impl
+assert "IsValidEntry(*gpu_memory, descriptor)" in cache_impl  # legacy <= 40-bit safety
+assert "FindSampler(const TSCEntry&" not in cache_api
+assert "return false; // no unbacked image/sampler descriptor publication" in (
+    vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
+print("NS1_NS2_TYPED_TEXTURE_CACHE_OWNER_PASS owner=single"
+      " maxwell_descriptor_route=unchanged native_publishing=closed")
