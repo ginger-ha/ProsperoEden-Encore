@@ -268,6 +268,9 @@ assert "const u64 tick = scheduler.CurrentTick();" in vk_runtime
 assert "scheduler.GetMasterSemaphore().KnownGpuTick()" in vk_runtime
 assert "std::erase_if(pending_retired_views" in vk_runtime
 assert "std::erase_if(pending_retired_images" in vk_runtime
+assert "MIN_TEXTURE_RETIRE_FRAMES = 8;" in vk_runtime
+assert "gpu_retire_frame - pending.frame >= MIN_TEXTURE_RETIRE_FRAMES" in vk_runtime
+assert "++gpu_retire_frame;" in vk_runtime
 assert vk_runtime.index("std::erase_if(pending_retired_views") < vk_runtime.index(
     "std::erase_if(pending_retired_images"), "destroy Vulkan image before view"
 assert "scheduler.Finish();" in vk_runtime.split(
