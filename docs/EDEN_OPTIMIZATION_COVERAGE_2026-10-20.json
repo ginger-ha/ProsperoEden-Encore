@@ -729,9 +729,9 @@
     {
       "path": "headless/prosperoeden/eden_services.cpp",
       "disposition": "new_source_issue_corrected",
-      "reviewed_source_git_blob": "df7d8af3f674d43f8c6596a62263a3234ca6dab8",
+      "reviewed_source_git_blob": "b8aeeafb7c8ce6d9993a34498e9701d851d7df12",
       "proof_ref": "tools/check-release-case-index-dedup-host.py",
-      "evidence": "LocaleCaseCandidates: linear-time stable regional dedup now replaces repeated vector search; actual release test. Exact selected source/O0/O2 host code parity; no PS5 FPS claim. PR #1: PS5-only owner-bound staged avatar, foreground-user lookup and readable-file check. LocaleCaseCandidates and its linear-time dedup remain byte-for-byte unchanged; no FPS claim. Source drift re-reviewed for flexible layout on 2026-10-31; see docs/FLEXIBLE_LAYOUT_INTEGRATION_SOURCE_REVIEW_2026-10-31.md. Historical optimization disposition is unchanged; hardware and FPS not claimed. Re-reviewed 2026-10-31 after extracted-game UI identity/size/cover and foreground avatar fixes. New review: docs/NS2_BLACK_SCREEN_FC27_AUDIO_REVIEW_2026-10-31.md. This revalidation is source-only: no NS2 gameplay or PS5 crash fix claim. 2026-11-01 exact delta: commit 7136f8a adds off-UI-thread decoding validation for staged/system PNG and DDS; prevents undecodable PNG from suppressing owner-matched DDS fallback. No gameplay, FPS or console avatar success proof. 2026-11-01 reviewed extracted NS1/NS2 sidecar NACP (16 language slots, UTF-8 validation, symlink-safe bounds), icon_<language>.dat JPEG/PNG, real allowlisted NS2 title/cover worker and late real tile cover refresh. Source witnesses: check-exefs-directory-host.py, check-ns2-title-catalog-host.py, check-release-case-index-dedup-host.py. See docs/NS2_LIBRARY_SIDECAR_SOURCE_REVIEW_2026-11-01.md. No PS5 FPS or NS2 frame proof.",
+      "evidence": "LocaleCaseCandidates: linear-time stable regional dedup now replaces repeated vector search; actual release test. Exact selected source/O0/O2 host code parity; no PS5 FPS claim. PR #1: PS5-only owner-bound staged avatar, foreground-user lookup and readable-file check. LocaleCaseCandidates and its linear-time dedup remain byte-for-byte unchanged; no FPS claim. Source drift re-reviewed for flexible layout on 2026-10-31; see docs/FLEXIBLE_LAYOUT_INTEGRATION_SOURCE_REVIEW_2026-10-31.md. Historical optimization disposition is unchanged; hardware and FPS not claimed. Re-reviewed 2026-10-31 after extracted-game UI identity/size/cover and foreground avatar fixes. New review: docs/NS2_BLACK_SCREEN_FC27_AUDIO_REVIEW_2026-10-31.md. This revalidation is source-only: no NS2 gameplay or PS5 crash fix claim. 2026-11-01 exact delta: commit 7136f8a adds off-UI-thread decoding validation for staged/system PNG and DDS; prevents undecodable PNG from suppressing owner-matched DDS fallback. No gameplay, FPS or console avatar success proof. 2026-11-01 reviewed extracted NS1/NS2 sidecar NACP (16 language slots, UTF-8 validation, symlink-safe bounds), icon_<language>.dat JPEG/PNG, real allowlisted NS2 title/cover worker and late real tile cover refresh. Source witnesses: check-exefs-directory-host.py, check-ns2-title-catalog-host.py, check-release-case-index-dedup-host.py. See docs/NS2_LIBRARY_SIDECAR_SOURCE_REVIEW_2026-11-01.md. No PS5 FPS or NS2 frame proof. 2026-11-02 P0.1 re-review: latest source replaces old storefront image URLs with genuine LaunchBox r2 CDN selection and rejects known merchant-origin cached fronts; obsolete storefront cover downloader removed. Existing case-index/source UX witnesses run in host CI. No remote-image console proof.",
       "review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
       "supplemental_review_document": "docs/NS2_LIBRARY_SIDECAR_SOURCE_REVIEW_2026-11-01.md"
     },
@@ -762,10 +762,10 @@
     {
       "path": "headless/prosperoeden/frontend.cpp",
       "disposition": "reviewed_without_new_code_edit",
-      "reviewed_source_git_blob": "6b0e980fb727b9dce86824994004e49964a41fe4",
+      "reviewed_source_git_blob": "ddb318401729da8b95c880ebee8746994ce0b789",
       "review_scope": "launcher-release-hotpath",
       "source_review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
-      "evidence": "RunApp input/render loop, language and capture entry; no further proven hotpath defect. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence."
+      "evidence": "RunApp input/render loop, language and capture entry; no further proven hotpath defect. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence. 2026-11-02 P0.1 re-review: bounded 4096x2160 one-shot launcher GL pixel capture, flipped RGBA rows, publish mailbox only after successful read, bad_alloc guard, and clear on new launcher; tools/check-ps5-vulkan-loading-stages-host.py covers ownership. No console frame proof."
     },
     {
       "path": "headless/prosperoeden/frontend.h",
@@ -1103,10 +1103,10 @@
     {
       "path": "headless/prosperoeden/pe/ui/launcher.cpp",
       "disposition": "reviewed_without_new_code_edit",
-      "reviewed_source_git_blob": "f7e26bfc81315730b16e26ee6580bafba273c6c6",
+      "reviewed_source_git_blob": "92d5fca55de36649db8d17bc26f0150e06e3f317",
       "review_scope": "launcher-release-hotpath",
       "source_review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
-      "evidence": "Launcher update, asynchronous avatar discovery and screen transitions. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence. PR #1: avatar filesystem fingerprint moved to async worker, five-second refresh; render loop only polls future and compares result, no synchronous stat/decode. No console proof."
+      "evidence": "Launcher update, asynchronous avatar discovery and screen transitions. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence. PR #1: avatar filesystem fingerprint moved to async worker, five-second refresh; render loop only polls future and compares result, no synchronous stat/decode. No console proof. 2026-11-02 P0.1 re-review: hold final jacket rather than fading to black, delay face compositing while authentic art decodes, opaque case paper and centered UV instead of white-edge sampling. Launcher host preview and case owner checks must stay green; PS5 visual proof pending."
     },
     {
       "path": "headless/prosperoeden/pe/ui/launcher.hpp",
@@ -4488,9 +4488,9 @@
       "contract_id": "U89",
       "prior_status": "SOURCE",
       "proof_ref": "tools/check-ns2-title-catalog-host.py",
-      "reviewed_source_git_blob": "96910dc19759cd989f7a6ecf5992f8dcbdadda14",
+      "reviewed_source_git_blob": "a3d339dda21870e7e1b730c56ada9e5a37e01957",
       "source_review_document": "docs/F07_BATCH_EXECUTION_REGISTER.md",
-      "evidence": "U89 bounded offline NS2 title IDs and image URL registry. A separately CI-invoked host test checks title uniqueness, metadata fallback and image source constraints. No FPS optimization or PS5 executable compatibility claimed."
+      "evidence": "U89 bounded offline NS2 title IDs and image URL registry. A separately CI-invoked host test checks title uniqueness, metadata fallback and image source constraints. No FPS optimization or PS5 executable compatibility claimed. 2026-11-02 P0.1 re-review: title-ID identity retained for NS2, storefront front_host/front_path removed; physical jacket art must be resolved independently from the LaunchBox index. Source-only; tests check curated-title/catalog owner."
     },
     {
       "path": "headless/firmware_zip_import.h",
