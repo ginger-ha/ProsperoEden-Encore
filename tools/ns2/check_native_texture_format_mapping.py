@@ -117,3 +117,17 @@ assert "return false; // no unbacked image/sampler descriptor publication" in (
     vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
 print("NS1_NS2_NATIVE_TEXTURE_CACHE_TYPED_OVERLAY_PASS owner=one"
       " upstream=immutable backports=immutable dispatch_images=closed")
+
+# Validate that every maintained Vulkan rasterizer refuses native TIC layer
+# offsets and layered image sizes that would narrow into u32 in the cache.
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    source = (vendor / path).read_text()
+    start = source.split("const u64 layer_offset =", 1)[1].split(
+        "return Shader::Ampere::NativeQmdContiguousGpuSpan(", 1)[0]
+    assert "layer_offset > u32_limit" in start, path
+    assert "u64{info.layer_stride} * info.resources.layers > u32_limit" in start, path
+    assert "if (!bytes) return false;" in start, path
+print("NS2_NATIVE_TIC_U32_LAYOUT_BOUNDS_PASS no_truncated_view_offset=1")
