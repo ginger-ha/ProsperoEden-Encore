@@ -1127,12 +1127,20 @@ void Launcher::enter_library()
     // initial scan; poll its completion here and let update() apply the result.
     // The normal periodic presence worker handles removals in the background.
     finish_scan(false);
-    start_scan();
+    // Tab navigation must not rescan ROM/update/DLC trees. Reopening the
+    // Library previously launched a fresh expensive flexible discovery on
+    // every visit and briefly exposed a misleading empty-state. The owner
+    // keeps its immutable last-good snapshot until an explicit refresh,
+    // initial load, preferences change, or confirmed media removal.
+    if (!games_loaded_ && !scan_.valid()) start_scan();
     library_.visible = 5;
     library_.pitch = 1.0f;
     library_back_focused_ = false;
     library_back_zoom_ = false;
-    library_.reset(static_cast<int>(games_.size()), 0);
+    if (library_.count != static_cast<int>(games_.size()))
+        library_.reset(static_cast<int>(games_.size()),
+                       std::clamp(library_.selected, 0,
+                                  std::max(0, static_cast<int>(games_.size()) - 1)));
     refresh_selected_game();
     detail_.snap(1.0f);
     mode_.snap(selected_docked_ ? 0.0f : 1.0f);
@@ -1391,7 +1399,13 @@ void Launcher::draw_library(Canvas &c)
     list.gradient_rect({rail_x, shelf_y, rail_w, 7.0f}, 3.0f,
                        theme::kPanelEdge.with_alpha(0.23f),
                        theme::kFocusCore.with_alpha(0.48f));
-    if (count == 0) {
+    if (!games_loaded_) {
+        // First-ever discovery is pending. A zero-length interim vector
+        // must never masquerade as an empty user ROM collection.
+        text(c, tr("Loading game library..."), 960.0f,
+             baseline(240.0f, 190.0f, theme::kText24), theme::kText24,
+             theme::kCopy, Align::center);
+    } else if (count == 0) {
         text(c, tr("No ROM files found."), 960.0f, baseline(240.0f, 190.0f, theme::kText24),
              theme::kText24, theme::kCopy, Align::center);
     } else {
