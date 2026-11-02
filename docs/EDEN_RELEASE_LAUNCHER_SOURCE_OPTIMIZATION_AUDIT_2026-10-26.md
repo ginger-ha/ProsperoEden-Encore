@@ -52,7 +52,7 @@ Tests source-extraits : `tools/check-release-case-index-dedup-host.py`, `tools/c
 | `headless/prosperoeden/pe/platform/display_egl.cpp` | `a31fb6db8799` | Revue statique | Display::swap/open/close EGL surface boundary; native GL batch owns drawing. |
 | `headless/prosperoeden/pe/platform/display_egl.hpp` | `7438f8f6fa10` | Revue statique | EGL display lifecycle surface and error signatures. |
 | `headless/prosperoeden/pe/ui/browse.cpp` | `96afbbbae783` | Revue statique | browse_to/press_files/draw_files path browser; disk navigation not guest GPU hotpath. |
-| `headless/prosperoeden/pe/ui/case_media_selection.hpp` | `3a3ddb591670` | Revue statique | FrontPaper/BackScenes ranked pointer selection; bounded to face inputs. |
+| `headless/prosperoeden/pe/ui/case_media_selection.hpp` | `34fd91455575` | Re-revue + témoin hôte | `FrontPaperAvailable` ne saute que les images confirmées absentes ; priorité des décodages en attente et références sans copie conservées. |
 | `headless/prosperoeden/pe/ui/dualsense_mask_asset.hpp` | `ba9a3d15e7cf` | Données/constantes | Immutable inline controller-mask artwork; no runtime decode/search. |
 | `headless/prosperoeden/pe/ui/hero_text_layout.hpp` | `9e76a77e987b` | Revue statique | wrap_description word-boundary layout, weak endings; bounded by hero text. |
 | `headless/prosperoeden/pe/ui/home.cpp` | `a40fd7f010aa` | Revue statique | refresh_home_hero/press_home and home draw, reused current game media. |
@@ -104,3 +104,9 @@ The new official repository is `niakw/ProsperoEden-Encore`. The single change to
 - **Défaut ciblé** : les appels `wait(2.0f)` simulent 120 frames sans attendre 2 secondes réelles ; un runner peut donc acheminer dix touches Right avant la publication de la liste de ROM.
 - **Correction de test** : le premier Right doit produire un `Cue::focus` réel, avec un plafond de 120 tentatives et 25 ms de délai de travail entre les tentatives. Les neuf Right restants atteignent toujours l'index 10. Échec explicite si la liste n'est pas navigable. La navigation console et les contrôles des pixels de la preview sont inchangés.
 - **Statut** : revue de source et empreinte F07 mise à jour ; qualification sur le nouveau SHA encore requise.
+
+## Re-revue du sélecteur de jaquettes après fallback média (2 novembre 2026)
+
+- **Source exacte :** `headless/prosperoeden/pe/ui/case_media_selection.hpp`, Git blob `34fd91455575949f539eeb0dd884c13add5992e4` (ancien `3a3ddb5916701487537e6670f4ebc56b4d4d9716`), introduit par `cfce4b32c9689c531f9d720f65881806684ef571`. La nouvelle fonction `FrontPaperAvailable` sélectionne par références des sources réellement déjà en cache : elle ne remplace le héros que lorsque son chargement est confirmé manquant. Les décodages encore en attente restent éligibles. Les chemins NS1 et NS2 partagent ce fallback ; pas de fetch réseau, copie de chaînes ni modification du parcours normal `FrontPaper` / `BackScenes`.
+- **Témoin réel :** `tools/check-encore-case-media-selection-host.py` exerce les cas héros absent, capture alternative, icône et héros encore disponible, avec les sources C++ sélectionnées ; le job `source-ux` **réussi** `125474453091` de la [prévalidation #41502592263](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41502592263) a produit `ENCORE_CASE_MEDIA_DEDUP_PASS` en `clang++`, `g++` et `c++`, `-O0/-O2` sur `90be0df2baa5824ec86740b9a6481fd122b51c90`. Le rendu OpenGL de prévisualisation est également vert sur ce SHA.
+- **Portée :** re-revue stricte de provenance après changement de code ; aucune optimisation F07 P0/P1, performance console, fraîcheur HUD ni validation FW13.60 revendiquée. Le garde `check-eden-optimization-coverage.py` conserve la comparaison du blob Git courant et les 518 propriétaires historiques.

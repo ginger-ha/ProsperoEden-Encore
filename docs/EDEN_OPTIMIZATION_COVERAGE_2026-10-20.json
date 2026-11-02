@@ -1071,10 +1071,10 @@
     {
       "path": "headless/prosperoeden/pe/ui/case_media_selection.hpp",
       "disposition": "reviewed_without_new_code_edit",
-      "reviewed_source_git_blob": "3a3ddb5916701487537e6670f4ebc56b4d4d9716",
+      "reviewed_source_git_blob": "34fd91455575949f539eeb0dd884c13add5992e4",
       "review_scope": "launcher-release-hotpath",
       "source_review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
-      "evidence": "FrontPaper/BackScenes ranked pointer selection; bounded to face inputs. Reviewed for shipping-path optimization relevance; no additional source edit justified by presently verified evidence."
+      "evidence": "Re-reviewed 2026-11-02 after cfce4b32: FrontPaperAvailable skips confirmed-missing cached media while retaining pending decode priority, without copying source strings; normal FrontPaper and BackScenes selection unchanged. tools/check-encore-case-media-selection-host.py passed clang++/g++/c++ O0/O2 in source-ux job 125474453091 on 90be0df; console not verified."
     },
     {
       "path": "headless/prosperoeden/pe/ui/dualsense_mask_asset.hpp",
