@@ -233,7 +233,10 @@ assert "flat_retail_sleeve(c, *game, art, true, 0.60f);" in library
 assert "flat_retail_sleeve(c, *game, enlarged, true, 0.92f," in library
 assert "library_back_scale_);" in library
 assert "std::max(paper.w, paper.h) * texture_scale" in library
-assert "fitted.x += rear ? paper.w - fitted.w : (paper.w - fitted.w) * 0.5f;" in library
+assert "fitted.x += paper.w - fitted.w;" in library
+assert "if (!rear) {" in library
+assert "uv.w = target / source;" in library
+assert "uv.h = source / target;" in library
 assert "c.list.image(artwork.texture, fitted, {0.0f, 0.0f, 1.0f, 1.0f}," in library
 assert "Rect fitted = paper;" in library and "if (source > target)" in library
 assert "paper_uv.x = (1.0f - paper_uv.w) * 0.5f;" in draw
