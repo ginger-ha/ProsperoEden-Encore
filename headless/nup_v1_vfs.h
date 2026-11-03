@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -15,7 +16,8 @@
 namespace Eden::NupV1 {
 
 // Source lifetime must exceed Archive lifetime. ReadAt must return exactly the
-// requested bytes or false; implementations must not permit the file to mutate.
+// requested bytes or false. Its bytes MUST remain immutable for the entire
+// Archive lifetime; verified-member memoization relies on this invariant.
 class Source {
 public:
     virtual ~Source() = default;
@@ -72,9 +74,10 @@ public:
         std::string_view relative_path = {}) const;
     std::optional<std::vector<DirEntry>> ListEffectiveDirectory(
         ContentView view, std::string_view relative_path = {}) const;
-    // Reads exactly dst.size() bytes, never past member bounds; checks the
-    // SHA-256 of the ENTIRE member before reporting success, including a
-    // zstd member decoded without retaining full output in memory.
+    // Reads exactly dst.size() bytes, never past member bounds. First access
+    // verifies the ENTIRE member SHA-256 with bounded memory; subsequent
+    // accesses reuse this verification only because Source is immutable.
+    // Zstd ranges still decompress from the beginning; no unbounded cache.
     // Callers MUST discard dst if false is returned.
     bool ReadMember(std::size_t file_index, std::uint64_t offset,
                     std::span<std::uint8_t> dst, std::string* error = nullptr) const;
@@ -106,6 +109,8 @@ private:
     };
 
     const Source& source_;
+    mutable std::mutex verified_mutex_;
+    mutable std::vector<std::uint8_t> member_verified_; // valid only for immutable Sources
     std::vector<Package> packages_;
     std::vector<Directory> dirs_;
     std::vector<File> files_;
