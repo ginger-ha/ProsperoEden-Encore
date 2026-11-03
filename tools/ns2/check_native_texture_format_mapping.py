@@ -413,6 +413,21 @@ for path in (
 assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
     "null QMD CBUF address must fail before any GPU mapping callback"
 )
+assert "kNativeQmdMaxContiguousBytes = 256ULL * 1024 * 1024" in native_env
+assert "NativeQmdWithinByteBudget(" in native_env
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    renderer = (vendor / path).read_text()
+    assert "VideoCommon::ImageType::Buffer" in renderer, path
+    assert "VideoCommon::ImageType::Linear" in renderer, path
+    assert "info.resources.layers > 1" in renderer, path
+    assert renderer.count("NativeQmdWithinByteBudget(") == 4, path
+    assert "const u64 layer_offset =" in renderer, path
+    assert renderer.index("NativeQmdWithinByteBudget(") < (
+        renderer.index("VideoCommon::CalculateGuestSizeInBytes(info)")), path
+    assert "if (!bytes || bytes < minimum_bytes) return false;" in renderer, path
 assert "HasResolvedGpuBufferBindings() const noexcept" in native_env, (
     "image shader CBUF/SSBO backing policy missing"
 )

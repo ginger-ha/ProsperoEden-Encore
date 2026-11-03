@@ -777,6 +777,7 @@ int main() {
         using namespace Tegra::Texture;
         using Shader::Ampere::NativeQmdContiguousGpuSpan;
         using Shader::Ampere::NativeQmdWithinTexelBudget;
+        using Shader::Ampere::NativeQmdWithinByteBudget;
         using Shader::Ampere::NativeQmdSamplerSupported;
         using Shader::Ampere::NativeQmdImageHandle;
         using Shader::Ampere::NativeQmdImageKind;
@@ -793,6 +794,24 @@ int main() {
             0x100000000ULL, 65536, 16384, 2048, 64ULL * 1024 * 1024));
         assert(!NativeQmdWithinTexelBudget(64, 64, 1, 1, 0));
         assert(!NativeQmdWithinTexelBudget(8192, 8192, 2, 1, 64ULL * 1024 * 1024));
+        // The legacy guest-size calculator multiplies u32 before
+        // checking 256 MiB. These byte-budget witnesses must reject
+        // wrapped image sizes BEFORE that arithmetic or any GMMU read.
+        constexpr u64 max_bytes = Shader::Ampere::kNativeQmdMaxContiguousBytes;
+        assert(NativeQmdWithinByteBudget(max_bytes, 1, 1, 1, 1));
+        assert(!NativeQmdWithinByteBudget(max_bytes + 1, 1, 1, 1, 1));
+        assert(NativeQmdWithinByteBudget(4096, 4096, 1, 1, 16));
+        assert(!NativeQmdWithinByteBudget(4096, 4096, 1, 1, 32));
+        assert(!NativeQmdWithinByteBudget(65536, 65536, 1, 1, 16));
+        assert(!NativeQmdWithinByteBudget(1, 1, 1, 1, 0));
+        assert(!NativeQmdWithinByteBudget(0, 1, 1, 1, 1));
+        // Layer stride * layer count would wrap a u32 here.
+        assert(NativeQmdWithinByteBudget(65536, 4096, 1, 1, 1));
+        assert(!NativeQmdWithinByteBudget(65536, 65537, 1, 1, 1));
+        // Linear row pitch * row count, and one-dimensional image-buffer
+        // width * BytesPerBlock, use the same overflow-safe admission.
+        assert(NativeQmdWithinByteBudget(4096, 32768, 1, 1, 2));
+        assert(!NativeQmdWithinByteBudget(4096, 32769, 1, 1, 2));
         TICEntry tic{};
         tic.header_version.Assign(TICHeaderVersion::BlockLinear);
         tic.texture_type.Assign(TextureType::Texture2D);
