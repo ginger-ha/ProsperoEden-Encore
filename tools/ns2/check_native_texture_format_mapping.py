@@ -535,7 +535,7 @@ assert "pending.resource->CanRetireNativeGpu()" in vk_runtime
 native_cache_header = (vendor / (
     "encore-active/ns2-astc/include/video_core/renderer_vulkan/vk_texture_cache.h"
 )).read_text()
-assert native_cache_header.count("bool CanRetireNativeGpu() const noexcept") == 2
+assert native_cache_header.count("bool CanRetireNativeGpu() const noexcept") == 3
 assert native_cache_header.count("std::shared_ptr<u8> PinNativeGpu()") == 3
 native_compute_header = (vendor / (
     "encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_compute_pipeline.h"
