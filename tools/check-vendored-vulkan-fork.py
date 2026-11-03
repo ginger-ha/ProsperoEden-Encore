@@ -213,7 +213,9 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         assert expected["vulkan_rasterizer.cpp"].read_text().count(shader_tic_reviewed) == 1, (
             "reviewed early TIC shader admission guard drift")
         raster = raster.replace(shader_tic_previous, shader_tic_reviewed)
-        raster_path.write_text(raster)
+    # Always commit the two independently reviewed indirect-draw null guards
+    # to the generated oracle, including the new fully generated QMD3 path.
+    raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.
     pipeline_src = actual['vk_graphics_pipeline_cost.cpp']
