@@ -54,22 +54,35 @@ int main(int argc, char** argv) {
     assert(Eden::FindNestedGamePackage(game) == "base/game.nsp");
     assert(Eden::IsSafeNestedGameFilePath(game.parent_path(), "Game/base/game.nsp"));
     assert(!Eden::IsSafeNestedGameFilePath(game.parent_path(), "Game/linked-base/game.nsp"));
-    const auto addon_roots = Eden::FindAddOnContentDirectories(game);
-    assert(addon_roots.size() == 1 && addon_roots.front() == game / "dlc");
+    bool complete = false;
+    const auto addon_roots = Eden::FindAddOnContentDirectories(game, &complete);
+    assert(complete && addon_roots.size() == 1 && addon_roots.front() == game / "dlc");
     // Traversing five wrapper levels is still allowed, and should discover
     // a nested DLC rather than treating it as a separate base game.
     const fs::path bounded = fs::path(argv[1]) / "Bounded";
     const auto allowed = bounded / "a" / "b" / "c" / "d" / "e" / "dlc";
     fs::create_directories(allowed);
-    const auto accepted = Eden::FindAddOnContentDirectories(bounded);
-    assert(accepted.size() == 1 && accepted.front() == allowed);
+    complete = false;
+    const auto accepted = Eden::FindAddOnContentDirectories(bounded, &complete);
+    assert(complete && accepted.size() == 1 && accepted.front() == allowed);
     // A deeper opaque branch cannot be treated as an empty add-on branch:
     // a partial inventory may hide updates, so fail the entire discovery.
     const fs::path deep = fs::path(argv[1]) / "Deep";
     fs::create_directories(deep / "dlc");
     std::ofstream(deep / "dlc" / "update.nsp").put('u');
     fs::create_directories(deep / "a" / "b" / "c" / "d" / "e" / "f");
-    assert(Eden::FindAddOnContentDirectories(deep).empty());
+    complete = true;
+    assert(Eden::FindAddOnContentDirectories(deep, &complete).empty());
+    assert(!complete);
+    // A valid but empty title remains distinct from an unreadable title.
+    const fs::path empty = fs::path(argv[1]) / "Empty";
+    fs::create_directories(empty);
+    complete = false;
+    assert(Eden::FindAddOnContentDirectories(empty, &complete).empty());
+    assert(complete);
+    complete = true;
+    assert(Eden::FindAddOnContentDirectories(empty / "missing", &complete).empty());
+    assert(!complete);
     return 0;
 }
 """
