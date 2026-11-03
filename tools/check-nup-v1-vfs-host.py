@@ -27,14 +27,18 @@ def expected(data: bytes) -> str:
     return f"size={len(data)} first={data[:width].hex()} last={data[-width:].hex()}"
 
 
-def layered_fixture(*, duplicate_version: bool = False) -> bytes:
-    """Base plus two full update snapshots in deliberately non-version order."""
+def layered_fixture(*, duplicate_version: bool = False, addon: bool = False,
+                    standalone: bool = False,
+                    broken_standalone: bool = False) -> bytes:
+    """Base/multi-update, standalone updates, and separate AoC package views."""
     bad = 0xFFFFFFFF
     title = 0x0100123400000000
     packages = (
-        (title, 1, 0, b"base-v1"),
+        (title, 1, 1 if standalone else 0, b"base-v1"),
         (title + 0x800, 3, 1, b"latest-v3"),
-        (title + 0x800, 3 if duplicate_version else 2, 1, b"older-v2"),
+        (title + (0x1000 if addon else 0x800),
+         0 if addon else (3 if duplicate_version else 2),
+         2 if addon else 1, b"addon-aoc" if addon else b"older-v2"),
     )
     toc = bytearray(0x2A0)
     names = b"romfsstate.bin"
@@ -47,6 +51,8 @@ def layered_fixture(*, duplicate_version: bool = False) -> bytes:
         p = 0x30 + 0x40 * i
         struct.pack_into("<QIIII", toc, p, title_id, 2 * i, bad, 2 * i + 1, version)
         toc[p + 0x18] = kind
+        if standalone and kind == 1 and not (broken_standalone and i == 1):
+            toc[p + 0x19] = 1
         signature.extend(struct.pack("<QIB", title_id, version, kind))
         d = 0xF0 + i * 2 * 0x18
         struct.pack_into("<IIIIQ", toc, d, 0, 0, 2 * i, 1, 0)
@@ -125,6 +131,14 @@ def main() -> None:
         execute(layered, "@update2/romfs/state.bin", b"older-v2")
         execute(layered, "@effective/romfs/state.bin", b"latest-v3")
         execute(layered_fixture(duplicate_version=True),
+                "@effective/romfs/state.bin", None)
+        execute(layered_fixture(addon=True),
+                "@addon/romfs/state.bin", b"addon-aoc")
+        execute(layered_fixture(addon=True),
+                "@effective/romfs/state.bin", b"latest-v3")
+        execute(layered_fixture(standalone=True),
+                "@effective/romfs/state.bin", b"latest-v3")
+        execute(layered_fixture(standalone=True, broken_standalone=True),
                 "@effective/romfs/state.bin", None)
         print(f"NUP C++ read-only VFS: {valid} valid / {rejected} malformed cases passed")
 
