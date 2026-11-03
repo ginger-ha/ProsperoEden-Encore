@@ -23,6 +23,7 @@ TEST = r"""
 #include <cstdint>
 #include <memory>
 #include <stop_token>
+#include <thread>
 #include <utility>
 #include "common/bounded_threadsafe_queue.h"
 
@@ -94,6 +95,30 @@ int main() {
             assert(observed == i);
         }
         assert(!queue.TryPop(observed));
+    }
+    // Exercise the actual single-producer / single-consumer publication order
+    // under concurrent wraparound, including move-only GPU-style payloads.
+    {
+        Common::SPSCQueue<std::unique_ptr<int>, 64> queue;
+        constexpr int Count = 30000;
+        std::thread producer([&] {
+            for (int i = 0; i < Count; ++i) {
+                auto item = std::make_unique<int>(i);
+                while (!queue.TryEmplace(std::move(item)))
+                    std::this_thread::yield();
+            }
+        });
+        std::thread consumer([&] {
+            std::unique_ptr<int> item;
+            for (int i = 0; i < Count; ++i) {
+                while (!queue.TryPop(item))
+                    std::this_thread::yield();
+                assert(item && *item == i);
+                item.reset();
+            }
+        });
+        producer.join();
+        consumer.join();
     }
     assert(Tracked::destroyed >= 6);
 }
