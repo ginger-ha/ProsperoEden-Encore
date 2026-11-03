@@ -414,6 +414,14 @@ int main() {
         // An absent CBUF is not a source of authentic global target VA
         // and size; shader IR must not read an undefined uniform pointer.
         assert(!env.BuildResourcePlan(unbound_bank));
+        // The native QMD reader addresses 16-byte records in bytes while
+        // global SPIR-V uses offset / 8 for the 64-bit base. A +4 byte
+        // record would otherwise read a different address from the one
+        // already authenticated in the QMD resource plan.
+        auto unaligned_record = global;
+        unaligned_record.storage_buffers_descriptors[0].cbuf_offset = 4;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            unaligned_record, *gp, 64));
         // Shader reflection can mark a global SSBO slot that has no
         // corresponding CBUF record. The native Vulkan binder only walks
         // the descriptor vector, so never acknowledge that missing slot.
