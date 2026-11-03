@@ -14,6 +14,8 @@ on:
       - headless/nup_v1_native_vfs.cpp
       - headless/nup_v1_native_content.h
       - headless/nup_v1_native_content.cpp
+      - headless/nup_v1_native_aoc.h
+      - headless/nup_v1_native_aoc.cpp
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - tools/nup-v1-native-host.cpp
@@ -36,6 +38,8 @@ on:
       - headless/nup_v1_native_vfs.cpp
       - headless/nup_v1_native_content.h
       - headless/nup_v1_native_content.cpp
+      - headless/nup_v1_native_aoc.h
+      - headless/nup_v1_native_aoc.cpp
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - tools/nup-v1-native-host.cpp
