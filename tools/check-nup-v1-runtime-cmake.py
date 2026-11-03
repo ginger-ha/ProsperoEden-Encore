@@ -16,6 +16,8 @@ add_library(core STATIC
     "@WORK_ROOT@/core/hle/service/aoc/addon_content_manager.cpp")
 add_library(libzstd_static INTERFACE)
 add_library(ZLIB::ZLIB INTERFACE IMPORTED)
+add_executable(eden-headless "@WORK_ROOT@/mock-headless.cpp")
+add_library(eden-metadata STATIC "@WORK_ROOT@/mock-metadata.cpp")
 include("@NUP_ROOT@/headless/nup_v1_runtime.cmake")
 get_target_property(source_list core SOURCES)
 if(EDEN_NUP_V1_RUNTIME)
@@ -68,6 +70,10 @@ def main() -> None:
             synthetic.parent.mkdir(parents=True, exist_ok=True)
             synthetic.write_text("int temporary_" + str(len(relative)) +
                                  "() { return 0; }\n", encoding="utf-8")
+        (root / "mock-headless.cpp").write_text(
+            "int main() { return 0; }\\n", encoding="utf-8")
+        (root / "mock-metadata.cpp").write_text(
+            "int metadata() { return 0; }\\n", encoding="utf-8")
         maintained = root / "vendor/encore-active/eden-core/src/core/file_sys"
         maintained.mkdir(parents=True)
         (maintained / "extracted_aoc.h").write_text("#pragma once\n", encoding="utf-8")
