@@ -38,6 +38,14 @@ assert "games_ = std::move(games);" in apply
 assert "if (!scan_cancel_.load(std::memory_order_acquire))" in finish
 assert "scan_.wait_for(std::chrono::seconds(0))" in finish
 assert "open(Screen::library, true);" in launcher
+# The renderer must not index games_[size_t(-1)] while selection is
+# invalid after a background scan or removal. No fallback fake game.
+draw_library = source.split("void Launcher::draw_library(Canvas &c)", 1)[1]
+assert "const bool selected_valid = library_.selected >= 0 && library_.selected < count;" in draw_library
+assert "list_position(selected_valid ? library_.selected + 1 : 0, count)" in draw_library
+assert "std::clamp(selected_valid ? library_.selected - slots / 2 : 0," in draw_library
+assert "const Game* game = selected_valid" in draw_library
+assert "count > 0 ? &games_[static_cast<std::size_t>(library_.selected)]" not in draw_library
 
 cpp = r"""
 #include <algorithm>
