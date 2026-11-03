@@ -130,6 +130,14 @@ def main() -> None:
         execute(layered, "@update1/romfs/state.bin", b"latest-v3")
         execute(layered, "@update2/romfs/state.bin", b"older-v2")
         execute(layered, "@effective/romfs/state.bin", b"latest-v3")
+        archive.write_bytes(layered)
+        listed = subprocess.run([str(binary), str(archive), "@list-effective/romfs/"],
+                                capture_output=True, text=True, check=True)
+        assert listed.stdout == "state.bin:F:1\\n", listed.stdout
+        listed_absent = subprocess.run(
+            [str(binary), str(archive), "@list-effective/romfs/not-present"],
+            capture_output=True, text=True, check=False)
+        assert listed_absent.returncode != 0
         execute(layered_fixture(duplicate_version=True),
                 "@effective/romfs/state.bin", None)
         execute(layered_fixture(addon=True),
