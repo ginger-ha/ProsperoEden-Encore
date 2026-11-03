@@ -1093,6 +1093,39 @@ int main() {
     assert(pressure_bool_threw && pressure_bool_rejected.Failed());
     assert(!pressure_bool_rejected.Reserve(0, 0xB200000, 8));
 
+    // The queue can recycle an emptied GPU snapshot without losing its
+    // capacity on every frame. If a producer enqueues DURING replay, its
+    // newer tail must remain intact; subsequent empty-burst drains still
+    // preserve sequence watermarks and exact callback counts.
+    Queue recycled;
+    unsigned recycled_callbacks = 0;
+    for (unsigned round = 0; round < 64; ++round) {
+        for (unsigned i = 0; i < 32; ++i)
+            assert(recycled.EnqueueTracked(i % Queue::Cores,
+                    0xC000000 + (std::uint64_t(round) * 32 + i) * 4096, 8));
+        unsigned seen = 0;
+        const auto before = recycled.CompletedSequence();
+        assert(recycled.Drain([&](unsigned, std::uint64_t, std::uint64_t size) {
+            assert(size == 8);
+            if (round == 0 && seen == 0)
+                assert(recycled.EnqueueTracked(1, 0xE000000, 8));
+            ++seen;
+            ++recycled_callbacks;
+        }) == 32);
+        assert(seen == 32);
+        assert(recycled.CompletedSequence() == before + 32);
+        if (round == 0) {
+            assert(recycled.Pending());
+            assert(recycled.Drain([&](unsigned core, std::uint64_t address,
+                                       std::uint64_t size) {
+                assert(core == 1 && address == 0xE000000 && size == 8);
+                ++recycled_callbacks;
+            }) == 1);
+        }
+        assert(!recycled.Pending());
+    }
+    assert(recycled_callbacks == 64 * 32 + 1);
+
     // Coalescing does not create an unbounded accepted-sequence backlog
     // disguised as one vector entry: throttle the outstanding watermark.
     Queue coalesced_budget;
