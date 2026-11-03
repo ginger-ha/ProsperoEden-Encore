@@ -277,6 +277,29 @@ int main() {
     assert(Eden::FindNestedGamePackage(moderately_crowded) == "base.xci");
     // If the hard entry cap is reached, refuse an incomplete candidate
     // list instead of hiding another possible base or update.
+    // An update/DLC provider must not lose a real add-on merely because
+    // the parent has more than the old 128 directory entries.
+    const auto crowded_addons = root / "Crowded DLC";
+    fs::create_directories(crowded_addons / "custom");
+    for (int i = 0; i < 150; ++i)
+        std::ofstream(crowded_addons /
+                      ("other_" + std::to_string(i) + ".bin")) << "asset";
+    std::ofstream(crowded_addons / "base.xci") << "base";
+    std::ofstream(crowded_addons / "custom" / "bonus.nsz") << "dlc";
+    assert(Eden::FindGameFolderInput(crowded_addons) == "base.xci");
+    const auto crowded_roots = Eden::FindAddOnContentDirectories(crowded_addons);
+    assert(crowded_roots.size() == 1 &&
+           crowded_roots[0] == crowded_addons / "custom");
+
+    // Never register an arbitrary subset of DLC directories when one
+    // oversized parent contains more entries than the safe scan budget.
+    const auto incomplete_addons = root / "Incomplete Addons";
+    fs::create_directories(incomplete_addons / "updates");
+    std::ofstream(incomplete_addons / "updates" / "patch.nsp") << "update";
+    for (int i = 0; i < 516; ++i)
+        std::ofstream(incomplete_addons /
+                      ("asset_" + std::to_string(i) + ".bin")) << "asset";
+    assert(Eden::FindAddOnContentDirectories(incomplete_addons).empty());
     const auto incomplete_packages = root / "Incomplete Packages";
     fs::create_directory(incomplete_packages);
     for (int i = 0; i < 516; ++i)
