@@ -28,6 +28,19 @@ assert HEADER.count("const auto* second = tail_bytes ?") == 1
 assert HEADER.count("auto* second = tail_bytes ?") == 2
 assert "if (!first || !second)" in HEADER
 
+# Large native GPU transfers retain their efficient contiguous memcpy, but
+# only when the ACTUAL device-memory continuity owner approves the full span.
+# A GPU big-page hint alone is not enough after physical remapping.
+block = OWNER.split("void MemoryManager::ReadBlockImpl(", 1)[1].split(
+    "void MemoryManager::WriteBlock(", 1
+)[0]
+assert block.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4
+assert block.count("memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount);") == 2
+assert block.count("memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount);") == 2
+assert "memory.GetPointer<u8>(dev_addr_base)" not in block
+assert block.count("IsBigPageContinuous(page_index)") == 2
+print("GPU_BLOCK_DEVICE_CONTINUITY_OWNER_PASS fast=4 fallback=4")
+
 TEST = r"""
 #include <array>
 #include <cassert>
