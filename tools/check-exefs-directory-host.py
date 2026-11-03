@@ -27,9 +27,9 @@ assert 'FindNestedGamePackage(entry.path())' in library
 assert 'FindGameFolderInput(entry.path())' in library
 assert 'IsNestedGameFileSelection(name)' in settings
 assert 'IsSafeNestedGameFilePath(selected_root, relative)' in main
-assert 'FindAddOnContentDirectories(title_root)' in main
+assert 'FindAddOnContentDirectories(' in main and 'title_root, &complete' in main
 assert 'Eden::IsAddOnContainerName' in main
-assert 'FindAddOnContentDirectories(path)' in (root / "headless/metadata_bridge.cpp").read_text()
+assert 'FindAddOnContentDirectories(path, &complete)' in (root / "headless/metadata_bridge.cpp").read_text()
 assert 'eden_scan_addons(const char* updates_dir, const char* keys_dir, const char* roms_dir)' in (root / "headless/metadata_bridge.cpp").read_text()
 assert 'FindGameFolderInput(entry.path())' in main
 assert 'if (!Eden::ValidRomFilename(file)) continue;' in library
