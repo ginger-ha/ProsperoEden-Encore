@@ -7,6 +7,7 @@ The marker strings in eboot.bin alone do not prove CMake conditionals are ON.
 from __future__ import annotations
 import sys
 import tempfile
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +24,7 @@ REQUIRED = {
     "EDEN_DEV_VULKAN:BOOL": "OFF",
     "EDEN_SHARED_JIT:BOOL": "OFF",
     "EDEN_JIT_COMPILE_BATCH:BOOL": "OFF",
+    "EDEN_NUP_V1_RUNTIME:BOOL": "OFF",
 }
 # Sparse fallback diagnostics may be linked from maintained JIT source even
 # when runtime sparse selection is OFF. Strings alone are not activation proof.
@@ -44,6 +46,12 @@ def verify(cache: str, eboot: bytes) -> None:
         f"{k}={config.get(k)!r} (expected {want!r})"
         for k, want in REQUIRED.items() if config.get(k) != want
     ]
+    # A new NS2 research switch must never evade release verification just
+    # because it was added after this script's fixed REQUIRED list.
+    for key, value in config.items():
+        if re.fullmatch(r"EDEN_NS2_.*_EXPERIMENTAL:BOOL", key):
+            if value not in ("OFF", "FALSE", "0"):
+                mismatches.append(f"{key}={value!r} (expected 'OFF')")
     if mismatches:
         raise ValueError("release compile profile mismatch: " + ", ".join(mismatches))
     missing = [value.decode() for value in MARKERS if value not in eboot]
@@ -62,6 +70,18 @@ def self_test() -> None:
             assert key in str(exc)
         else:
             raise AssertionError(f"unnoticed compiler flag mismatch: {key}")
+    for injected in (
+        "EDEN_NS2_FUTURE_UNREVIEWED_EXPERIMENTAL:BOOL=ON",
+        "EDEN_NS2_METADATA_EXPERIMENTAL:BOOL=ON",
+    ):
+        try:
+            verify(valid + "\n" + injected, eboot)
+        except ValueError as exc:
+            assert injected.split("=", 1)[0] in str(exc)
+        else:
+            raise AssertionError(f"unreviewed NS2 release selector accepted: {injected}")
+    # A non-NS2 flag must not accidentally match the catch-all checker.
+    verify(valid + "\nEDEN_UNRELATED_FEATURE:BOOL=ON", eboot)
     for marker in MARKERS:
         try:
             verify(valid, eboot.replace(marker, b""))
