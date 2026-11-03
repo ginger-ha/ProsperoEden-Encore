@@ -7,6 +7,8 @@ A successful check is NOT a substitute for full raw/zstd member SHA-256 verifica
 """
 from __future__ import annotations
 
+from collections import deque
+
 import argparse
 import hashlib
 import os
@@ -106,6 +108,26 @@ def check(path: Path) -> dict:
         require(child_names == sorted(set(child_names), key=lambda s: s.encode("utf-8")),
                 "unsorted or duplicate child names")
 
+    # A cyclic directory graph would recurse forever in a mounted VFS.
+    # Topological traversal handles very deep trees without Python recursion.
+    incoming = [0] * dirs_count
+    for _, first, number in dirs:
+        for node in slots[first:first + number]:
+            if node < dirs_count:
+                incoming[node] += 1
+    pending = deque(i for i, count in enumerate(incoming) if count == 0)
+    visited = 0
+    while pending:
+        index = pending.popleft()
+        visited += 1
+        _, first, number = dirs[index]
+        for node in slots[first:first + number]:
+            if node < dirs_count:
+                incoming[node] -= 1
+                if incoming[node] == 0:
+                    pending.append(node)
+    require(visited == dirs_count, "cyclic directory tree")
+
     for i in range(files_count):
         off = files_start + i * 0x50
         name_off, name_size, size, extent, stored = record(toc, off, "<IIQQQ")
@@ -183,7 +205,22 @@ def self_test() -> None:
                 pass
             else:
                 raise AssertionError(f"damaged fixture accepted at {offset}")
-    print("NUP v1 host preflight: valid fixture + 5 corruption cases passed")
+        # Self-referencing root with a consistent TOC hash: only graph validation
+        # should reject it (rather than magic, offsets or header validation).
+        cyclic_toc = bytearray(valid[0x80:])
+        struct.pack_into("<Q", cyclic_toc, 0x18, 0x8C)  # string pool starts after 1 slot
+        struct.pack_into("<I", cyclic_toc, 0x7C, 1)  # root child_count
+        struct.pack_into("<I", cyclic_toc, 0x88, 0)  # root -> root
+        cyclic_header = bytearray(valid[:0x80])
+        cyclic_header[0x18:0x38] = hashlib.sha256(cyclic_toc).digest()
+        path.write_bytes(cyclic_header + cyclic_toc)
+        try:
+            check(path)
+        except InvalidNup:
+            pass
+        else:
+            raise AssertionError("cyclic directory tree accepted")
+    print("NUP v1 host preflight: valid fixture + 6 corruption/cycle cases passed")
 
 
 def main() -> int:
