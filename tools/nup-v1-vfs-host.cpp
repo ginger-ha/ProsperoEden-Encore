@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <span>
+#include <string_view>
 #include <string>
 #include <vector>
 
@@ -52,7 +53,26 @@ int main(int argc, char** argv) {
             std::cerr << "NUP mount rejected: " << error << '\n';
             return 1;
         }
-        const auto file = archive->FindFile(0, argv[2]);
+        const std::string_view name(argv[2]);
+        std::optional<std::size_t> file;
+        constexpr std::string_view effective = "@effective/romfs/";
+        constexpr std::string_view base = "@base/romfs/";
+        constexpr std::string_view first_update = "@update1/romfs/";
+        constexpr std::string_view second_update = "@update2/romfs/";
+        if (name.starts_with(effective))
+            file = archive->FindEffectiveMember(Eden::NupV1::ContentView::RomFS,
+                                                name.substr(effective.size()));
+        else if (name.starts_with(base))
+            file = archive->FindPackageMember(0, Eden::NupV1::ContentView::RomFS,
+                                              name.substr(base.size()));
+        else if (name.starts_with(first_update))
+            file = archive->FindPackageMember(1, Eden::NupV1::ContentView::RomFS,
+                                              name.substr(first_update.size()));
+        else if (name.starts_with(second_update))
+            file = archive->FindPackageMember(2, Eden::NupV1::ContentView::RomFS,
+                                              name.substr(second_update.size()));
+        else
+            file = archive->FindFile(0, name);
         if (!file) {
             std::cerr << "Member not found in package 0\n";
             return 1;
