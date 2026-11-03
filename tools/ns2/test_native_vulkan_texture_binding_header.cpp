@@ -14,6 +14,9 @@
 // Parse the actual optional ASTC TextureCache method implementations too;
 // declarations alone cannot prove the combined native-owner ABI compiles.
 #include "video_core/texture_cache/texture_cache.h"
+#if !defined(EDEN_NS2_ASTC_TEXTURE_CACHE_OWNER_SELECTED)
+#error "ASTC-first ABI probe silently included wrong texture-cache owner"
+#endif
 #endif
 
 #if !defined(PS5_NATIVE) || !defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
