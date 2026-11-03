@@ -260,6 +260,18 @@ Cover Textures::cover(const std::string &path, float size)
 void Textures::invalidate(const std::string &path)
 {
     if (path.empty()) return;
+    // The Nlib atomic rename invalidates every size bucket of this path.
+    // Also purge its pending decode requests now: otherwise repeated media
+    // refreshes can leave hundreds of dead FIFO entries, and the bounded
+    // 24-lookups/frame decoder delays newly visible covers behind them.
+    // The '#' boundary prevents removing a different path with the same prefix.
+    const auto is_queued_variant = [&](const std::string& key) {
+        return key.size() > path.size() &&
+               key.compare(0, path.size(), path) == 0 &&
+               key[path.size()] == '#';
+    };
+    queue_.erase(std::remove_if(queue_.begin(), queue_.end(),
+                                is_queued_variant), queue_.end());
     for (auto it = covers_.begin(); it != covers_.end(); )
     {
         if (it->second.path == path) {
