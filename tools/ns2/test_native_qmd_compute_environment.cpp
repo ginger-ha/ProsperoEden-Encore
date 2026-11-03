@@ -990,6 +990,19 @@ int main() {
         assert(NativeQmdContiguousGpuSpan(texture_va + 123, 8192 - 123, mapper));
         assert(NativeQmdContiguousGpuSpan(texture_va + 4095, 2, mapper));
         assert(NativeQmdContiguousGpuSpan(texture_va + 4096, 4096, mapper));
+        // P2.5/P4.2: a sparse mapping may disappear while validating the
+        // second page. This must refuse an image span without throwing
+        // into the Vulkan worker, or creating a partial TextureCache view.
+        unsigned translation_attempts{};
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8192,
+            [&](u64 addr) -> std::optional<u64> {
+                if (++translation_attempts == 2)
+                    throw std::runtime_error{"sparse page invalidated"};
+                return mapper(addr);
+            }));
+        assert(translation_attempts == 2);
+        assert(!NativeQmdContiguousGpuSpan(texture_va, 8192,
+            [](u64) -> std::optional<u64> { throw std::bad_alloc{}; }));
         assert(!NativeQmdContiguousGpuSpan(texture_va + 123, 8192 - 122, mapper));
         assert(!NativeQmdContiguousGpuSpan(texture_va + 4095, 2,
             [&](u64 addr) -> std::optional<u64> {
