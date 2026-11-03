@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `47f2bab4476796c0a54e8e91f7a94faec57b868f` | Sélection et validation des neuf extensions et de l'ExeFS; sélection de titre, pas du frame GPU |
+| `headless/game_files.h` | `dd89d9f9c5c0cde824f41889918f665275c05bdc` | Sélection et validation des neuf extensions et de l'ExeFS; sélection de titre, pas du frame GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -88,3 +88,7 @@ or anonymous NSP-only mixtures still fail closed rather than guessing.
 ## Addendum 2026-11-01 — ExeFS-first identification
 
 The loader's reviewed source is now blob `7943b817dfa8118b150c4970d6513ec179262af0`. The exact source-owner gate reconstructs the maintained file from pinned Eden, plus existing NSZ/XCZ and NAX handling, and the explicitly reviewed first-choice `AppLoader_DeconstructedRomDirectory` for a file named `main` that actually belongs to a valid ExeFS directory. Standalone NSO files continue through the generic NSO detector. This avoids treating an extracted program with `main.npdm`, `rtld` and `sdk` as an isolated `main` NSO; no claim is made that Bananza gameplay boots or that Switch 2 emulation is complete.
+
+### Revue complémentaire du 3 novembre 2026 — ExeFS mixte
+
+Le nouvel objet `headless/game_files.h` (`dd89d9f9c5c0cde824f41889918f665275c05bdc`) ne modifie que trois sélections d'`exefs`/`base` : reconnaissance insensible à la casse des noms de répertoires exacts (`ExeFS`, `BASE`), sans accepter des préfixes ou les répertoires de mise à jour/DLC comme titres de base. Les contrôles des segments, erreurs de système de fichiers et liens symboliques restent inchangés; `tools/check-exefs-directory-host.py` est le témoin hôte. Cet inventaire reste distinct d'une preuve de lancement PS5.
