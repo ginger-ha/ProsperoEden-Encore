@@ -82,17 +82,25 @@ struct MockMappedGpu {
     u64 address{};
     std::array<u32,8> words{0xabcdef01,0x11223344,0x55667788,0x99aabbcc};
     unsigned reads{};
+    std::size_t last_read_bytes{};
     bool mapped{true};
 };
 static bool Read(void* context,u64 address,void* destination,std::size_t bytes) {
     auto& memory=*static_cast<MockMappedGpu*>(context);
     ++memory.reads;
-    if (!memory.mapped || !destination || bytes!=sizeof(u32) ||
-        address < memory.address || address-memory.address > 28 ||
+    memory.last_read_bytes = bytes;
+    // The native SSBO owner now requests all four 32-bit fields in one
+    // cache-coherent GMMU operation. A page-mapping failure denies the
+    // complete descriptor, not just the missing word.
+    if (!memory.mapped || !destination ||
+        (bytes!=sizeof(u32) && bytes!=4*sizeof(u32)) ||
+        address < memory.address ||
+        bytes > sizeof(memory.words) ||
+        address-memory.address > sizeof(memory.words)-bytes ||
         (address-memory.address)%4)
         return false;
     std::memcpy(destination,
-                &memory.words[(address-memory.address)/4],sizeof(u32));
+                &memory.words[(address-memory.address)/4],bytes);
     return true;
 }
 template <typename F>
@@ -355,8 +363,13 @@ int main() {
            plan->storage_buffers[0].is_written &&
            plan->storage_buffers[0].known_size &&
            !plan->requires_memory_layout && !plan->requires_tic_tsc &&
-           memory.reads==4);
+           memory.reads==1 && memory.last_read_bytes==16);
     assert(plan->HasResolvedBufferBindings());
+    // One complete native descriptor mapping failure must refuse the
+    // entire resource plan (including address and access permissions).
+    memory.mapped=false;
+    assert(!env.BuildResourcePlan(shader_info));
+    memory.mapped=true;
     // P2.2: reflected TIC/TSC handle words must be read from the native QMD
     // CBUF, in the shared cache descriptor order. This is NOT an image binding.
     {
