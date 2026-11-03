@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix="encore-firmware-auto-") as temp:
         info=z.getinfo(first_member)
     original=fixture.read_bytes()
     local=info.header_offset
-    assert original[local:local+4] == b"PK\\x03\\x04"
+    assert original[local:local+4] == b"PK\x03\\x04"
     name_offset=local+30
     wrong_name=bytearray(original)
     wrong_name[name_offset]=ord("x")
@@ -38,12 +38,12 @@ with tempfile.TemporaryDirectory(prefix="encore-firmware-auto-") as temp:
     wrong_crc[crc_offset] ^= 0x01
     local_crc=root/"bad-local-crc.zip"
     local_crc.write_bytes(wrong_crc)
-    directory=original.find(b"PK\\x01\\x02")
+    directory=original.find(b"PK\x01\\x02")
     assert directory>local
     central_entry=original.find(first_member.encode(),directory)
     assert central_entry>=directory+46
     central_header=central_entry-46
-    assert original[central_header:central_header+4] == b"PK\\x01\\x02"
+    assert original[central_header:central_header+4] == b"PK\x01\\x02"
     wrong_extent=bytearray(original)
     # ZIP32 central compressed-length field, little endian.
     wrong_extent[central_header+20:central_header+24]=(directory).to_bytes(4,"little")
