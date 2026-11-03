@@ -545,7 +545,7 @@ assert "std::span<const NativeComputeImageBinding> images" in native_compute_hea
 # Guard against a deceptively valid image path that rejects itself after
 # staging buffers: the total reflection count includes sampled/storage images.
 assert "resources.uniform_buffers.size() + resources.storage_buffers.size() +" in compute
-assert "images.size() != num_descriptor_entries" not in compute
+assert "if (!ready || staged.size() != num_descriptor_entries)" not in compute
 assert "staged.size() != num_descriptor_entries - images.size()" in compute
 assert "guest_descriptor_queue.AddSampledImage(item.view, item.sampler);" in compute
 assert "guest_descriptor_queue.AddImage(item.view);" in compute
