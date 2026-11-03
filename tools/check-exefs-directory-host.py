@@ -105,6 +105,9 @@ int main() {
     assert(!Eden::ValidRomFilename("My Game/../main"));
     assert(!Eden::ValidRomFilename("My Game/sub/main"));
     assert(Eden::ValidRomFilename("My Game/base/exefs/main"));
+    assert(Eden::ValidRomFilename("My Game/Base/ExeFS/main"));
+    assert(!Eden::ValidRomFilename("My Game/base/prefixExeFS/main"));
+    assert(!Eden::ValidRomFilename("My Game/Updates/458752/ExeFS/main"));
     assert(Eden::ValidRomFilename("My Game/base/game.XCI"));
     assert(Eden::ValidRomFilename("My Game/wrapper/second/title.nsp"));
     assert(!Eden::ValidRomFilename("My Game/updates/001/update.nsp"));
@@ -151,6 +154,17 @@ int main() {
     std::ofstream(nested / "updates" / "458752" / "exefs" / "main.npdm") << "patchmeta";
     assert(Eden::FindDeconstructedGameMain(nested) == "base/exefs/main");
     assert(Eden::IsSafeDeconstructedGamePath(root, "Nested Game/base/exefs/main"));
+    // Extractions may preserve mixed-case Base/ExeFS names; prefer that
+    // actual program over an arbitrary wrapper without accepting DLC/updates.
+    const fs::path mixed = root / "Mixed Case";
+    fs::create_directories(mixed / "Base" / "ExeFS");
+    fs::create_directories(mixed / "wrapper" / "exefs");
+    std::ofstream(mixed / "Base" / "ExeFS" / "main") << "code";
+    std::ofstream(mixed / "Base" / "ExeFS" / "main.npdm") << "metadata";
+    std::ofstream(mixed / "wrapper" / "exefs" / "main") << "decoy";
+    std::ofstream(mixed / "wrapper" / "exefs" / "main.npdm") << "metadata";
+    assert(Eden::FindDeconstructedGameMain(mixed) == "Base/ExeFS/main");
+    assert(Eden::IsSafeDeconstructedGamePath(root, "Mixed Case/Base/ExeFS/main"));
     // Top-level content stores cannot surface as independent library games.
     const fs::path external_updates = root / "updates" / "458752" / "exefs";
     fs::create_directories(external_updates);
