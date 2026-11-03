@@ -101,6 +101,23 @@ int main() {
     assert(role_pick[0] == &role_noise[1] && !role_pick[1]);
     assert(role_pick[2] == &role_noise[3]);
     assert(decode_checks == 3);
+    // Hot path: hundreds of Nlib screenshots plus a late official scene.
+    // A full-second scan of all candidates on every draw is unnecessary:
+    // retain only the first three distinct usable fallbacks, while a late
+    // indexed category must still take its canonical slot.
+    std::vector<std::string> large_scene_set{
+        "nlib/first.tga", "nlib/first.tga", "nlib/second.tga",
+        "nlib/third.tga"};
+    for (int n = 0; n < 1024; ++n)
+        large_scene_set.push_back("nlib/unused-" + std::to_string(n) + ".tga");
+    large_scene_set.push_back("/cache/box-scene-2-LATE.tga");
+    unsigned large_checks = 0;
+    const auto large_pick = BackScenes(hero, icon, large_scene_set,
+        [&](const std::string&) { ++large_checks; return true; });
+    assert(large_pick[0] == &large_scene_set[0]);
+    assert(large_pick[1] == &large_scene_set.back());
+    assert(large_pick[2] == &large_scene_set[2]);
+    assert(large_checks <= 6); // one front + three fallbacks + one indexed
     const std::vector<std::string> missing_fanart{
         "/cache/box-scene-2-ABCD.tga", "/cache/box-scene-3-ABCD.tga"};
     const auto role_stable = BackScenes(hero, icon, missing_fanart);
