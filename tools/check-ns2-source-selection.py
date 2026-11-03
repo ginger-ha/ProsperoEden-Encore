@@ -216,6 +216,9 @@ def main() -> int:
                 'Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;' in native_graphics_cache and
                 'NativeGraphicsStageMaskSupported(configured_stages)' in native_graphics_cache and
                 'NativeGraphicsStageMaskSupported(keyed_stages)' in native_graphics_cache and
+                'catch (const std::exception& exception) {' in native_graphics_cache and
+                'if (!Shader::Ampere::NativeSpirvCbufBoundsActive())' in native_graphics_cache and
+                'LOG_WARNING(Render_Vulkan, "NS2 native graphics shader rejected:' in native_graphics_cache and
                 'NativeSpirvCbufBoundsActive(), "native CBUF mode not enabled"' in ir_native_fixture and
                 'ctx.OpAccessChain(uniform_type, cbuf, ctx.u32_zero_value,' in native_direct_cbuf and
                 'if (offset.IsImmediate() || !ctx.profile.has_broken_robust)' in pristine_direct_cbuf and
@@ -398,6 +401,11 @@ def main() -> int:
                 "channel_generation" in engine_registry,
                 "Native 3D rendering requires per-channel authenticated class identity")
         native_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text()
+        require("if (!memory->IsFullyMappedRange(address, size))" in native_capture and
+                "memory->ReadBlock(address, dest, size);" in native_capture and
+                "catch (const std::exception&)" in native_capture and
+                "return false;" in native_capture,
+                "NS2 GMMU native shader capture must fail closed on changed mappings")
         require("AcquireGraphicsTranslationCache(" in engine_registry and
                 "std::shared_ptr<Shader::Ampere::NativeTranslationCache>" in engine_registry and
                 "translation_cache{}" in engine_registry and
