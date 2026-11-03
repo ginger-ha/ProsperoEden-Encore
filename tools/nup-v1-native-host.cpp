@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 8);
+    assert(argc == 9);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -178,6 +178,14 @@ int main(int argc, char** argv) {
     assert(metadata->title == "Demo / Game");
     assert(metadata->publisher == "Example Publisher");
     assert(metadata->display_version == "3.0.0");
+    assert(metadata->TitleFor("fr-FR") == "Démo / Jeu");
+    assert(metadata->TitleFor("en-US") == "Demo Game (US)");
+    assert(metadata->TitleFor("de-DE") == "Demo / Game");
+    const auto* fr_icon = metadata->IconFor("fr-FR");
+    assert(fr_icon && fr_icon->size() > 8);
+    assert((*fr_icon)[0] == 0x89 && (*fr_icon)[1] == 0x50);
+    const auto* fallback_icon = metadata->IconFor("de-DE");
+    assert(fallback_icon && (*fallback_icon)[0] == 0xff);
     assert(metadata->default_icon.size() >= 3);
     assert(metadata->default_icon[0] == 0xff);
     assert(metadata->default_icon[1] == 0xd8);
@@ -321,5 +329,9 @@ int main(int argc, char** argv) {
     auto invalid_meta = Eden::NupV1::Native::Mount::Open(
         std::make_shared<MemoryFile>(Load(argv[7])), &error);
     assert(!invalid_meta && error == "invalid NUP UTF-8 metadata");
+    error.clear();
+    auto duplicate_locale = Eden::NupV1::Native::Mount::Open(
+        std::make_shared<MemoryFile>(Load(argv[8])), &error);
+    assert(!duplicate_locale && error == "duplicate or excessive NUP localized entries");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
