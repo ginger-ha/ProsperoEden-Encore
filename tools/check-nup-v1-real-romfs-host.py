@@ -17,6 +17,7 @@ SOURCES = (
     "core/file_sys/fsmitm_romfsbuild.cpp",
     "core/file_sys/fsmitm_romfsbuild.h",
     "common/alignment.h",
+    "common/common_types.h",
 )
 
 
