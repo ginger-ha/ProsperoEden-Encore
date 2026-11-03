@@ -216,26 +216,24 @@ assert not post_f07_nup_vfs_owners & (
     post_f07_native_vulkan_owners | post_f07_shared_compute_owners |
     post_f07_launcher_handoff_owners | post_f07_ns2_typed_cache_owners
 )
-assert 'nup_v1_vfs.cpp' not in release_cmake
-assert 'nup_v1_native_vfs.cpp' not in release_cmake
-assert 'nup_v1_native_content.cpp' not in release_cmake
-assert 'nup_v1_native_loader.cpp' not in release_cmake
-assert 'nup_v1_native_loader.h' not in release_cmake
-assert 'nup_v1_native_aoc.cpp' not in release_cmake
-assert 'nup_v1_loader_route.cpp' not in release_cmake
-# The separate host/qualification route must never silently become a default
-# final-release source. Verify *selection* as well as the staged file count.
-nup_select = (ROOT / "headless/CMakeLists.txt").read_text()
-assert 'option(EDEN_NUP_V1_RUNTIME' in nup_select
-assert 'route verified NUP containers to shared loader" OFF)' in nup_select
-assert 'if(EDEN_NUP_V1_RUNTIME)' in nup_select
-assert 'if(EDEN_FINAL_RELEASE_PROFILE)' in nup_select
+# The native router is prepared but must remain *conditional*, never a
+# default shipping source. The old "not in CMake at all" rule became stale
+# when the explicit P5 gate was introduced.
+assert release_cmake.count("option(EDEN_NUP_V1_RUNTIME") == 1
+assert 'route verified NUP containers to shared loader" OFF)' in release_cmake
+assert release_cmake.count("if(EDEN_NUP_V1_RUNTIME)") == 1
+nup_gate = release_cmake.split("if(EDEN_NUP_V1_RUNTIME)", 1)[1].split("\nendif()", 1)[0]
+assert 'if(EDEN_FINAL_RELEASE_PROFILE)' in nup_gate
+assert "NUP v1 P5 qualification is not yet allowed in a final release" in nup_gate
+assert "target_sources(core PRIVATE" in nup_gate
 for selected in (
     "nup_v1_vfs.cpp", "nup_v1_native_vfs.cpp",
     "nup_v1_native_content.cpp", "nup_v1_native_aoc.cpp",
     "nup_v1_native_loader.cpp", "nup_v1_loader_route.cpp",
 ):
-    assert '"${EDEN_PORT_DIR}/' + selected + '"' in nup_select
+    source_ref = '"${EDEN_PORT_DIR}/' + selected + '"'
+    assert nup_gate.count(source_ref) == 1
+    assert release_cmake.count(source_ref) == 1
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
 assert "Not wired into the PS5 loader or game catalogue." in nup_core
