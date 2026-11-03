@@ -556,8 +556,9 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
         Check(index < files_.size(), "unknown member");
         const auto& f = files_[index];
         Check(offset <= f.size && dst.size() <= f.size - offset, "member read outside bounds");
+        const bool allow_cache = source_.AllowsVerifiedMemberCache();
         bool already_verified = false;
-        {
+        if (allow_cache) {
             std::lock_guard guard(verified_mutex_);
             already_verified = member_verified_[index] != 0;
         }
@@ -631,8 +632,10 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
             Check(produced == f.size, "member decoded size mismatch");
             const auto actual = digest.End();
             Check(std::equal(actual.begin(), actual.end(), f.digest), "member SHA-256 mismatch");
-            std::lock_guard guard(verified_mutex_);
-            member_verified_[index] = 1;
+            if (allow_cache) {
+                std::lock_guard guard(verified_mutex_);
+                member_verified_[index] = 1;
+            }
         } else {
             Check(produced >= offset + dst.size(), "short decoded member range");
         }
