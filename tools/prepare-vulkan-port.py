@@ -6514,3 +6514,12 @@ apply_reviewed_delta(
     "                    if (!bytes) return false;\n                    return Shader::Ampere::NativeQmdContiguousGpuSpan(",
     "                    if (!bytes || bytes < minimum_bytes) return false;\n                    return Shader::Ampere::NativeQmdContiguousGpuSpan(",
     "NS2 image guest-size lower bound may not be truncated")
+
+# P2.2b: a typed native GPU owner pins real shared-cache Vulkan images/views
+# across a concurrent guest eviction. The pinned cache runtime still retires
+# asynchronously after both the GPU timeline AND last native owner release.
+apply_reviewed_delta(
+    "vk_texture_cache_cost.cpp",
+    "    const auto ready = [this, is_free](const auto& pending) {\n        return is_free(pending.tick) &&\n               gpu_retire_frame - pending.frame >= MIN_TEXTURE_RETIRE_FRAMES;\n    };",
+    "    const auto ready = [this, is_free](const auto& pending) {\n        const bool gpu_completed = is_free(pending.tick) &&\n            gpu_retire_frame - pending.frame >= MIN_TEXTURE_RETIRE_FRAMES;\n#if defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n        // A guest remap/eviction can race a freshly acquired native image\n        // before that dispatch flushes its timeline. Do not destroy the REAL\n        // VkImage or VkImageView until its final fence-held pin is released.\n        return gpu_completed && pending.resource->CanRetireNativeGpu();\n#else\n        return gpu_completed;\n#endif\n    };",
+    "P2.2b native image/view cache pin retirement")
