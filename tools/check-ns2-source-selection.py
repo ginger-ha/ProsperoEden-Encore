@@ -204,6 +204,9 @@ def main() -> int:
                 'NormalizeNativeQmdIndirectCbufIR(ir, qmd_enabled_cbuf_mask)' in qmd_bridge and
                 'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
                 'info.constant_buffer_mask = enabled_mask;' in qmd_indirect and
+                'NativeQmdStaticCbufReadExtent(offset.U32())' in qmd_indirect and
+                'all_offsets_static' in qmd_indirect and
+                'info.uses_global_memory || info.stores_global_memory' in qmd_indirect and
                 'bank_indices[bank_count] = bank;' in qmd_spirv and
                 'const Id cbuf{cbufs[bank_indices[i]].*member_ptr};' in qmd_spirv and
                 'enabled_cbuf_mask |= u32{1} << bank;' in qmd_launch_capture and

@@ -253,6 +253,14 @@ int main() {
             assert(scheduler.waited == 2 && destroyed == 1);
         }
     }
+    // P2.3 static-offset admission: a vector UBO alias may load the entire
+    // 16-byte record, so never undercount the authenticated guest range.
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(0) == 16);
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(15) == 16);
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(16) == 32);
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(0x1c) == 32);
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(0xffff) == 0x10000);
+    static_assert(Shader::Ampere::NativeQmdStaticCbufReadExtent(0x10000) == 0);
     {
         // P2.3: native QMD3 may expose only eight real banks, even though
         // Maxwell's generic indirect LDC collector lists fourteen.
