@@ -5,6 +5,11 @@
 namespace Loader {
 class AppLoader_DeconstructedRomDirectory final : public AppLoader {
 public:
+    explicit AppLoader_DeconstructedRomDirectory(FileSys::VirtualFile main,
+                                                 bool override_update = false)
+      : AppLoader(std::move(main)),
+        directory_(file ? file->GetContainingDirectory() : nullptr),
+        override_update_(override_update) {}
     explicit AppLoader_DeconstructedRomDirectory(FileSys::VirtualDir directory,
                                                  bool override_update = false)
       : AppLoader(directory ? directory->GetFile("main") : nullptr),
