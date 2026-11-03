@@ -91,6 +91,16 @@ on:
       - 'tools/verify/hle/check-native-hle-ipc-receive-index-host.py'
       - 'tools/audit-eden-progress-state.py'
       - 'tools/check-eden-optimization-coverage.py'
+      # P0.1/P4.1: queue-source or host-witness edits invalidate the same-SHA core proof.
+      - 'tools/check-ps5-gpu-producer-wake.py'
+      - 'tools/check-ps5-native-load-replay.py'
+      - 'tools/check-vendored-gpu-thread.py'
+      - 'tools/check-native-gpu-queue-slot-lifetime-host.py'
+      - 'tools/check-native-gpu-queue-stop-fastpath-host.py'
+      - 'tools/check-shared-gpu-queue-lifetime-host.py'
+      # P1.1/P3.4: persisted selections share an audit path with the ROM scanner.
+      - 'headless/game_files.h'
+      - 'tools/check-exefs-directory-host.py'
       - 'tools/check-vendored-deps.py'
       - 'tools/check-vendor-archive-pin-contract-host.py'
       - 'tools/deps.json'
