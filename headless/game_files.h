@@ -445,11 +445,11 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
             std::error_code entry_error;
             const auto status = fs::symlink_status(path, entry_error);
             if (entry_error) {
-                if (entry_error != std::errc::no_such_file_or_directory &&
-                    entry_error != std::errc::not_a_directory)
-                    incomplete = true;
-                if (incomplete) return;
-                continue;
+                // Even ENOENT can mean an update/DLC disappeared between
+                // iterator discovery and symlink_status. Skipping the entry
+                // would publish a partial catalogue from a moving library.
+                incomplete = true;
+                return;
             }
             if (fs::is_symlink(status)) continue;
             if (fs::is_directory(status)) {
