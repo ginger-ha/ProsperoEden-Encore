@@ -281,48 +281,49 @@ int main(int argc, char** argv) {
     error.clear();
     auto cross_title = Eden::NupV1::Native::Mount::Open(cross_title_input, &error);
     assert(!cross_title && error == "unrelated base/update title ID");
-    // A correctly checksummed NUP can still carry an NPDM for another
-    // program. Never report that ID nor attempt a guest process launch.
+    // Invalid identity must fail at Open(), before constructing the real
+    // extracted-loader (which eagerly parses NPDM in its constructor).
     auto forged_input = std::make_shared<MemoryFile>(Load(argv[5]));
     error.clear();
     auto forged = Eden::NupV1::Native::NupAppLoader::Open(forged_input, &error);
-    assert(forged && error.empty()); // mount checks layout, not identity
-    u64 exposed_program_id = 0x123456ULL;
-    assert(forged->ReadProgramId(exposed_program_id) ==
+    assert(!forged && error == "NUP invalid NPDM program identity");
+    auto sibling_input = std::make_shared<MemoryFile>(Load(argv[6]));
+    error.clear();
+    auto sibling = Eden::NupV1::Native::NupAppLoader::Open(sibling_input, &error);
+    assert(!sibling && error == "NUP invalid NPDM program identity");
+
+    // Source immutability is NOT promised even by a read-only VfsFile.
+    // Revalidate NPDM before every post-open loader API exposure.
+    auto mutable_app_input = std::make_shared<MemoryFile>(Load(argv[3]));
+    error.clear();
+    auto mutable_app = Eden::NupV1::Native::NupAppLoader::Open(
+        mutable_app_input, &error);
+    assert(mutable_app && error.empty());
+    mutable_app_input->Corrupt("latest-npdm");
+    u64 preserved_program_id = 0x123456ULL;
+    assert(mutable_app->ReadProgramId(preserved_program_id) ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(exposed_program_id == 0x123456ULL);
+    assert(preserved_program_id == 0x123456ULL);
+    FileSys::VirtualFile denied_romfs;
+    assert(mutable_app->ReadRomFS(denied_romfs) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(!denied_romfs);
+    std::string denied_title = "preserve";
+    assert(mutable_app->ReadTitle(denied_title) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(denied_title == "preserve");
+    std::vector<u8> denied_icon{1, 2, 3};
+    assert(mutable_app->ReadIcon(denied_icon) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(denied_icon == std::vector<u8>({1, 2, 3}));
+    Loader::AppLoader::Modules denied_modules;
+    assert(mutable_app->ReadNSOModules(denied_modules) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(denied_modules.empty());
     Kernel::KProcess blocked_process;
     Core::System blocked_system;
-    assert(forged->Load(blocked_process, blocked_system).first ==
+    assert(mutable_app->Load(blocked_process, blocked_system).first ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
-    FileSys::VirtualFile forbidden_romfs;
-    assert(forged->ReadRomFS(forbidden_romfs) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(!forbidden_romfs);
-    std::string forbidden_title = "unchanged";
-    assert(forged->ReadTitle(forbidden_title) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(forbidden_title == "unchanged");
-    std::vector<u8> forbidden_icon{1, 2, 3};
-    assert(forged->ReadIcon(forbidden_icon) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(forbidden_icon == std::vector<u8>({1, 2, 3}));
-    Loader::AppLoader::Modules forbidden_modules;
-    assert(forged->ReadNSOModules(forbidden_modules) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(forbidden_modules.empty());
-    auto sibling_input = std::make_shared<MemoryFile>(Load(argv[6]));
-    auto sibling = Eden::NupV1::Native::NupAppLoader::Open(sibling_input, &error);
-    assert(sibling);
-    std::uint64_t sibling_id = 0xABCDEFULL;
-    assert(sibling->ReadProgramId(sibling_id) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(sibling_id == 0xABCDEFULL);
-    assert(sibling->Load(blocked_process, blocked_system).first ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(sibling->ReadRomFS(forbidden_romfs) ==
-           Loader::ResultStatus::ErrorBadNPDMHeader);
-    assert(!forbidden_romfs);
     // A checksummed archive with an invalid UTF-8 metadata TLV is rejected
     // before exposing any title, icon or VFS view to an application.
     error.clear();
