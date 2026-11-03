@@ -3,8 +3,10 @@
 // GetLoader, FileType, CMake, ROM scanning, the frontend, or AoC.
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,6 +14,7 @@
 #include "core/loader/loader.h"
 
 namespace Eden::NupV1::Native {
+class AddOnIndex;
 
 // Reuse the existing deconstructed ExeFS/NSO loader, while providing the
 // effective NUP RomFS explicitly. No title-ID special cases or new CPU/GPU path.
@@ -37,12 +40,15 @@ public:
     // Exposes verified package directory handles for a future AoC provider.
     // Does NOT register titles with aoc:u or make DLC visible to the guest.
     const std::vector<AddOnDirectory>& SelectedAddOns() const;
+    // A future aoc:u service can request this verified per-caller snapshot.
+    std::unique_ptr<AddOnIndex> MakeAddOnIndex() const;
 
 private:
     // Use the actual common NPDM parser before exposing a program ID or boot.
     Loader::ResultStatus ValidateProgramIdentity(u64& program_id) const;
     explicit NupAppLoader(FileSys::VirtualFile source);
     std::shared_ptr<Mount> mount_;
+    std::optional<std::uint64_t> nacp_aoc_base_id_;
     std::unique_ptr<ContentSet> content_;
     std::unique_ptr<Loader::AppLoader> extracted_loader_;
     mutable std::mutex romfs_mutex_;
