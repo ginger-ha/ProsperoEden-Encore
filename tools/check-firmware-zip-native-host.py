@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix="encore-firmware-auto-") as temp:
     commented=root/"comment-with-eocd-marker.zip"
     commented.write_bytes(original)
     with zipfile.ZipFile(commented,"a") as z:
-        z.comment=b"Firmware notes PK\\x05\\x06" + b"padding-"*8
+        z.comment=b"Firmware notes PK\x05\x06" + b"padding-"*8
     with zipfile.ZipFile(commented) as z:
         assert z.testzip() is None
     local=info.header_offset
