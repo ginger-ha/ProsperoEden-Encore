@@ -436,6 +436,11 @@ def main() -> int:
                     ROOT / "tools/ns2/test_ampere_lower_bridge.cpp").read_text() and
                 "MakeNativeIndirectBranchPlans" in native_branch_tables and
                 "compiled_brx.Ready()" in native_capture_fixture and
+                "changed_shader.status==NativeCaptureStatus::TranslationFailed" in native_capture_fixture and
+                "changed_header.status==NativeCaptureStatus::TranslationFailed" in native_capture_fixture and
+                "current->words != native[native_index].words" in native_capture_core and
+                "if (live_header != header)" in native_capture_core and
+                "cbuf->stage_index != required_bank" in native_capture and
                 "stable_cbuf.mutate_between_reads" in native_capture_fixture and
                 "CaptureNativeGraphicsShaderChecked" in native_capture_core and
                 "ReadNs2GraphicsCbuf" in native_capture and

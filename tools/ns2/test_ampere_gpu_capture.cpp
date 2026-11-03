@@ -39,6 +39,21 @@ static bool Read(void* opaque, u64 address, void* destination, std::size_t size)
     std::memcpy(destination, mem.data.data() + offset, size);
     return true;
 }
+struct MutatingGpuRead {
+    MappedMemory* memory{};
+    u64 watch_address{};
+    std::size_t watch_size{};
+    u32 watch_hits{};
+};
+static bool ReadMutatingGpu(void* context, u64 address, void* destination,
+                            std::size_t size) {
+    auto& fixture=*static_cast<MutatingGpuRead*>(context);
+    if (!Read(fixture.memory,address,destination,size)) return false;
+    if (address==fixture.watch_address && size==fixture.watch_size &&
+        ++fixture.watch_hits>=2)
+        static_cast<u8*>(destination)[0]^=1U;
+    return true;
+}
 static void Require(bool condition, const char* why) {
     if (!condition) {
         std::fprintf(stderr, "NS2 shader memory capture FAIL: %s\n", why);
@@ -457,6 +472,25 @@ int main() {
     Require(!throwing_brx.Ready() && throwing_brx.image.code.empty(),
             "throwing CBUF callback cannot escape GPU capture or expose partial image");
     stable_cbuf.throw_reader=false;
+    // A shader rewrite after its initial read but before pipeline
+    // publication must fail even if the checked CBUF table is unchanged.
+    MutatingGpuRead modified_code{&brx_memory,brx_memory.base+0x80U,16U};
+    const auto changed_shader=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,ReadMutatingGpu,&modified_code,
+        ReadCheckedCbuf,&stable_cbuf);
+    Require(changed_shader.status==NativeCaptureStatus::TranslationFailed &&
+            changed_shader.first_error_offset==0x80U &&
+            changed_shader.image.code.empty() &&
+            modified_code.watch_hits>=2,
+            "BRX rechecks all native source words after CBUF resolution");
+    MutatingGpuRead modified_header{&brx_memory,brx_memory.base,0x80U};
+    const auto changed_header=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,ReadMutatingGpu,&modified_header,
+        ReadCheckedCbuf,&stable_cbuf);
+    Require(changed_header.status==NativeCaptureStatus::TranslationFailed &&
+            changed_header.image.code.empty() &&
+            modified_header.watch_hits>=2,
+            "BRX rechecks graphics SPH bytes before image publication");
 
     mem.data.resize(0x80);
     Push(mem.data,pred_true|0xfff);
