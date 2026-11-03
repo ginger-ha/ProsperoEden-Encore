@@ -143,10 +143,13 @@ jobs:
         run: |
           # Regression: the real ASTC owner must expose the same native cache
           # acquisition and GPU pin ABI, even when its headers shadow Vulkan.
+          # Parse the full ASTC scratch + layer + cache combination selected
+          # by the actual PS5 research profile, but never build a PS5 binary.
           set -euo pipefail
           for cxx in clang++ g++; do
             "$cxx" -std=c++20 -fsyntax-only -Wno-unused-parameter \
-              -DPS5_NATIVE=1 -DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1 -DEDEN_NS2_ASTC_CACHE_BRIDGE=1 \
+              -DPS5_NATIVE=1 -DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1 \
+              -DEDEN_NS2_ASTC_SCRATCH_TRIM=1 -DEDEN_NS2_ASTC_LAYER_DECODE=1 -DEDEN_NS2_ASTC_CACHE_BRIDGE=1 \
               -Ibuild-ns2-a64/fmt/include \
               -Ibuild-ns2-a64/vulkan-headers/include \
               -Ibuild-ns2-a64/vma/include \
