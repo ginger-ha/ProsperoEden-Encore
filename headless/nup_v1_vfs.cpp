@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
+#include <set>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -329,9 +330,14 @@ void Archive::Parse() {
         packages_.push_back(p);
     }
     Check(base_count <= 1, "multiple base packages");
-    for (const auto& p : packages_)
-        if (p.kind == 1) Check(p.standalone_update == (base_count == 0),
-                               "inconsistent standalone-update flag");
+    std::set<std::uint32_t> update_versions;
+    for (const auto& p : packages_) {
+        if (p.kind != 1) continue;
+        Check(p.standalone_update == (base_count == 0),
+              "inconsistent standalone-update flag");
+        Check(update_versions.insert(p.version).second,
+              "duplicate update version");
+    }
     const auto uuid = uuid_hash.End();
     Check(std::equal(uuid.begin(), uuid.begin() + 16, head.begin() + 0x50),
           "NUP content UUID mismatch");
@@ -355,8 +361,13 @@ void Archive::Parse() {
 }
 
 std::optional<std::size_t> Archive::FindFile(std::size_t pkg, std::string_view path) const {
-    if (pkg >= packages_.size() || path.empty()) return std::nullopt;
-    auto dir = packages_[pkg].root_dir;
+    if (pkg >= packages_.size()) return std::nullopt;
+    return FindFromDir(packages_[pkg].root_dir, path);
+}
+
+std::optional<std::size_t> Archive::FindFromDir(std::uint32_t dir,
+                                               std::string_view path) const {
+    if (dir == NoDirectory || dir >= dirs_.size() || path.empty()) return std::nullopt;
     while (true) {
         const auto end = path.find('/');
         const auto part = path.substr(0, end);
@@ -380,6 +391,33 @@ std::optional<std::size_t> Archive::FindFile(std::size_t pkg, std::string_view p
         if (!matched || end == std::string_view::npos) return std::nullopt;
         path.remove_prefix(end + 1);
     }
+}
+
+std::optional<std::size_t> Archive::FindPackageMember(
+    std::size_t pkg, ContentView view, std::string_view path) const {
+    if (pkg >= packages_.size()) return std::nullopt;
+    const auto& package = packages_[pkg];
+    const auto dir = view == ContentView::ExeFS ? package.exefs_dir : package.romfs_dir;
+    return FindFromDir(dir, path);
+}
+
+std::optional<std::size_t> Archive::FindEffectiveMember(
+    ContentView view, std::string_view path) const {
+    std::optional<std::size_t> base;
+    std::optional<std::size_t> newest_update;
+    for (std::size_t i = 0; i < packages_.size(); ++i) {
+        const auto& package = packages_[i];
+        if (package.kind == 0) base = i;
+        if (package.kind == 1 &&
+            (!newest_update || package.version > packages_[*newest_update].version))
+            newest_update = i;
+    }
+    if (newest_update) {
+        if (const auto member = FindPackageMember(*newest_update, view, path))
+            return member;
+    }
+    if (base) return FindPackageMember(*base, view, path);
+    return std::nullopt;
 }
 
 std::uint64_t Archive::MemberSize(std::size_t index) const {
