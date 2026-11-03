@@ -141,6 +141,7 @@ def verify(path: Path) -> dict:
         _, dirs_count, files_count, _pool_start = struct.unpack_from("<IQQQ", toc, 4)
         files_start = 0x30 + 0x40 * len(info["packages"]) + 0x18 * dirs_count
         extents = {}
+        verified_extents = {}
         ranges = []
         zstd = None
         for i in range(files_count):
@@ -157,7 +158,9 @@ def verify(path: Path) -> dict:
                 require(key not in extents or extents[key] == identity,
                         "shared extent has incompatible digest/shape")
                 extents[key] = identity
-                if codec == 0:
+                if key in verified_extents:
+                    digest = verified_extents[key]
+                elif codec == 0:
                     stream.seek(extent)
                     digestor = hashlib.sha256()
                     remaining = stored
@@ -171,6 +174,7 @@ def verify(path: Path) -> dict:
                     if zstd is None:
                         zstd = Zstd()
                     digest = zstd.hash_extent(stream, extent, stored, size)
+                verified_extents[key] = digest
                 ranges.append((extent, extent + stored))
             require(digest == expected, f"member {i}: SHA-256 mismatch")
         unique_ranges = sorted(set(ranges))
@@ -227,6 +231,32 @@ def fixture(codec: int, contents: bytes, *, tamper_digest=False, extra=b"") -> b
     return bytes(header + toc + stored)
 
 
+def dual_file_fixture(contents: bytes, *, overlap: bool = False) -> bytes:
+    """Two sorted files, either sharing exactly one extent or partially overlapping."""
+    require(len(contents) > 16, "fixture too small")
+    toc = bytearray(0x140)
+    names = b"a.binb.bin"
+    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\\x01", 1, 1, 2, 0x130, len(names), 0)
+    struct.pack_into("<QIIII", toc, 0x30, 0x1234000000000000, 0, BAD, 0, 1)
+    struct.pack_into("<IIIIQ", toc, 0x70, 0, 0, 0, 2, 0)
+    for index in (0, 1):
+        sub = contents[16:] if overlap and index == 1 else contents
+        off = 0x88 + 0x50 * index
+        extent = 0x1C0 + (16 if overlap and index == 1 else 0)
+        struct.pack_into("<IIQQQ", toc, off, index * 5, 5, len(sub), extent, len(sub))
+        toc[off + 0x20:off + 0x40] = hashlib.sha256(sub).digest()
+    struct.pack_into("<II", toc, 0x128, 1, 2)
+    toc[0x130:0x13A] = names
+    header = bytearray(0x80)
+    header[:4] = b"NUP\\x01"
+    struct.pack_into("<HHQQ", header, 4, 0x80, 1, 0x80, len(toc))
+    header[0x18:0x38] = hashlib.sha256(toc).digest()
+    struct.pack_into("<QQII", header, 0x38, 0x1C0, 0x1C0 + len(contents), 1, 0)
+    header[0x50:0x60] = hashlib.sha256(
+        struct.pack("<QIB", 0x1234000000000000, 1, 0)).digest()[:16]
+    return bytes(header + toc + contents)
+
+
 def self_test() -> None:
     data = (b"NUP integrity streamed!" * 200_000) + b"end"
     with tempfile.TemporaryDirectory() as tmp:
@@ -255,7 +285,16 @@ def self_test() -> None:
                 raise AssertionError("accepted trailing zstd data/second frame")
         path.write_bytes(fixture(0, b""))
         require(verify(path)["member_hashes_verified"], "empty file rejected")
-    print("NUP v1 payload host: raw/zstd/empty valid + 6 corruptions rejected")
+        path.write_bytes(dual_file_fixture(data))
+        require(verify(path)["files"] == 2, "shared extent rejected")
+        path.write_bytes(dual_file_fixture(data, overlap=True))
+        try:
+            verify(path)
+        except InvalidPayload:
+            pass
+        else:
+            raise AssertionError("accepted partially overlapping extents")
+    print("NUP v1 payload host: raw/zstd/empty/dedup valid + 7 corruptions rejected")
 
 
 def main() -> int:
