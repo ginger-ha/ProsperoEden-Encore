@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `34335ce9b32f19a6a84f35cc9ab35b2197b3ec05` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
+| `headless/game_files.h` | `a478384917d04ffe6ed62f5cd7e14dbf5f803d20` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -108,3 +108,7 @@ Nouvel objet `headless/game_files.h` : `fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e
 ### Révision du 3 novembre 2026 — scan des packages complet et borné
 
 Nouvel objet Git `headless/game_files.h` : `34335ce9b32f19a6a84f35cc9ab35b2197b3ec05`. `FindNestedGamePackage` refuse un résultat si le parcours a été interrompu par erreur ou après **512 entrées** examinées dans un répertoire ; le compteur global de 128 répertoires et celui de 64 packages sont également fail-closed. Le précédent arrêt après 128 entrées pouvait retenir une liste **partielle** et masquer un deuxième candidat selon l'ordre des fichiers. Les nouveaux tests hôte vérifient la découverte d'un `base.xci` parmi 140 ressources et le refus de sélection parmi 516 ressources lorsque le parcours ne peut être exhaustif. Le chemin ExeFS, les protections de symlinks, la séparation updates/DLC, le moteur NS1 et le garde NUP P5 restent inchangés.
+
+### Re-revue P3.4 du 3 novembre — fail-closed en profondeur et permissions
+
+Source actuelle : `headless/game_files.h` blob Git `a478384917d04ffe6ed62f5cd7e14dbf5f803d20`, correction `3f76cc9`. La découverte `FindAddOnContentDirectories` renvoyait un sous-ensemble de DLC si une branche dépassait la profondeur cinq ou si `skip_permission_denied` masquait un dossier. Le scan signale désormais `incomplete` à la première branche inaccessible ou hors profondeur et refuse toute liste partielle. Le cas profond et la limite autorisée sont exercés dans `tools/check-nup-v1-game-discovery.py` (`d92dbc8`), en mode NUP OFF et ON (ON réservé P5). Les limites de profondeur et de volume restent appliquées ; aucune extension opportuniste, aucun traitement de jeu individuel. **Source relue, exécution de la suite C++ complète encore à confirmer ; ni release ni rendu PS5.**
