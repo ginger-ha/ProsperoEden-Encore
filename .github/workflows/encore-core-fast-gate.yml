@@ -153,6 +153,10 @@ on:
       - 'headless/prosperoeden/pe/gfx/gl_batch.cpp'
       - 'tools/check-launcher-release-hotpaths-host.py'
       - 'tools/check-release-case-index-dedup-host.py'
+      # P3.2/P4.1: the case-media selector and its real C++ host witness
+      # must invalidate Core even when only a test expectation changes.
+      - 'headless/prosperoeden/pe/ui/case_media_selection.hpp'
+      - 'tools/check-encore-case-media-selection-host.py'
       - 'tools/check-launcher-atomic-scan-host.py'
       - 'tools/check-native-vulkan-retire-allocation-host.py'
       - 'tools/check-release-font-fit-alloc-host.py'
