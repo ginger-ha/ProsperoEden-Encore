@@ -32,7 +32,7 @@ assert "std::vector<std::string> scan_paths;" in ui
 # traversal reports whether it was complete. A missing optional global root
 # is okay; an existing provider root that fails to open must refuse publish.
 scan = ui.split("void eden_scan_addons(", 1)[1].split(
-    "\\n// Native launch-time display-art version:", 1)[0]
+    "// Native launch-time display-art version:", 1)[0]
 assert "std::filesystem::directory_options::none" in scan
 assert "if (++scanned_titles > 2048)" in scan
 assert "exceeded_limit = true;" in scan
