@@ -454,7 +454,23 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
             return false;
         };
         if (!append_root(updates_dir)) return;
-        if (roms_dir && Eden::IsSafeExtractedDirectory(roms_dir)) {
+        // A missing ROM library is optional, but a present, inaccessible or
+        // symlinked library cannot be silently omitted from a complete
+        // update/DLC snapshot.
+        bool scan_rom_library = false;
+        if (roms_dir) {
+            std::error_code root_error;
+            const auto root_status = std::filesystem::symlink_status(roms_dir, root_error);
+            if (root_error && root_error != std::errc::no_such_file_or_directory)
+                return;
+            if (!root_error && root_status.type() != std::filesystem::file_type::not_found) {
+                if (!std::filesystem::is_directory(root_status) ||
+                    !Eden::IsSafeExtractedDirectory(roms_dir))
+                    return;
+                scan_rom_library = true;
+            }
+        }
+        if (scan_rom_library) {
             // Enumerate immediate game roots; scan each for named add-on
             // containers with a bounded traversal. Never recursively open
             // a game's extracted base RomFS just to find update packages.
@@ -472,7 +488,13 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
                     break;
                 }
                 const auto path = it->path();
-                if (!Eden::IsSafeExtractedDirectory(path)) continue;
+                // Only files and symbolic links are intentionally skipped.
+                // An unreadable real game directory may contain DLC; fail
+                // closed rather than publishing an incomplete catalogue.
+                const auto entry_status = it->symlink_status(error);
+                if (error) return;
+                if (!std::filesystem::is_directory(entry_status)) continue;
+                if (!Eden::IsSafeExtractedDirectory(path)) return;
                 if (Eden::IsAddOnContainerName(path.filename().string())) {
                     if (!append_root(path)) return; // /roms/updates or /roms/dlc
                     continue;
