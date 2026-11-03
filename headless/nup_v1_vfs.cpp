@@ -377,7 +377,14 @@ void Archive::Parse() {
                 const auto kind = ReadLe<std::uint16_t>(meta, pos);
                 const auto payload = std::span<const std::uint8_t>(
                     meta.data() + pos + 8, length);
-                if (kind == 0x0003 && package_meta.default_icon.empty()) {
+                if (kind == 0x0002 && package_meta.control_nacp.empty()) {
+                    // NACP is opaque to the platform-independent core.
+                    // The pinned native vendor defines RawNACP as 0x4000;
+                    // reject oversized control metadata, skip unknown sizes.
+                    Check(length <= 64U * 1024U, "NUP NACP metadata too large");
+                    if (length == 0x4000)
+                        package_meta.control_nacp.assign(payload.begin(), payload.end());
+                } else if (kind == 0x0003 && package_meta.default_icon.empty()) {
                     // Icons can be large but the UI never needs an unbounded
                     // blob. Ignore unknown encodings instead of mislabeling.
                     Check(length <= 4 * 1024 * 1024, "NUP icon metadata too large");
