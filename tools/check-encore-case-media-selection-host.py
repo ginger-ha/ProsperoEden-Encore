@@ -170,7 +170,17 @@ int main() {
     const auto filtered_indexed = BackScenes(
         empty, icon, indexed_failed,
         [](const std::string& path) { return path.find("-BAD.") == std::string::npos; });
-    assert(!filtered_indexed[0] && filtered_indexed[1] == &indexed_failed[1]);
+    // With no hero, the valid indexed title capture becomes the ACTUAL
+    // front after the fanart decode fails. It must not be duplicated on
+    // the back, even though its original indexed role was category 2.
+    assert(!filtered_indexed[0] && !filtered_indexed[1] && !filtered_indexed[2]);
+    // With a valid hero front, that same title capture remains eligible
+    // for its reserved rear category: genuine source roles are retained.
+    const auto indexed_with_hero = BackScenes(
+        hero, icon, indexed_failed,
+        [](const std::string& path) { return path.find("-BAD.") == std::string::npos; });
+    assert(!indexed_with_hero[0] && indexed_with_hero[1] == &indexed_failed[1]);
+    assert(!indexed_with_hero[2]);
     assert(FrontAlternate(hero, empty, {"hero.tga"}) == nullptr);
 
     // When a game only has a front icon/poster, the back stays plain ink.
