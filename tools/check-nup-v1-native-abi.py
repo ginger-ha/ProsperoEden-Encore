@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile inactive NUP adapter against exact pinned vendor VFS headers (host only).
 
-Only five textual headers are fetched at the repository's recorded gitlink SHA.
+Only the native file, RomFS and loader API headers are fetched at the gitlink SHA.
 This is a C++ ABI/source-signature preflight, NOT a full vendor/core/PS5 build.
 """
 from __future__ import annotations
@@ -21,6 +21,12 @@ FILES = (
     "core/file_sys/romfs.h",
     "core/file_sys/vfs/vfs.h",
     "core/file_sys/vfs/vfs_types.h",
+    "common/bit_field.h",
+    "common/swap.h",
+    "core/file_sys/control_metadata.h",
+    "core/file_sys/program_metadata.h",
+    "core/loader/loader.h",
+    "core/loader/deconstructed_rom_directory.h",
 )
 
 def main() -> None:
@@ -48,6 +54,7 @@ def main() -> None:
             "-I", str(ROOT / "headless"),
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
             str(ROOT / "headless/nup_v1_native_content.cpp"),
+            str(ROOT / "headless/nup_v1_native_loader.cpp"),
         ], check=True)
     print(f"NUP native adapter compiles against pinned vendor VFS headers {pinned[:12]}")
 
