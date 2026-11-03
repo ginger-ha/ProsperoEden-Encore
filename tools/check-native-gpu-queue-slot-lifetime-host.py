@@ -29,7 +29,7 @@ assert original.count(construct) == 1
 assert original.count("std::destroy_at(std::addressof(m_data[pos]));") == 0
 assert canonical.count(construct) == 0
 assert canonical.count(live_construct) == 2
-assert canonical.count(live_destroy) == 2
+assert canonical.count(live_destroy) == 1  # Pop; drain uses cursor-indexed slot
 assert "union Slot {" in canonical
 assert "std::array<Slot, Capacity> m_data;" in canonical
 assert "t = std::move(m_data[pos].value);\n        // Destroy moved-from commands before the producer can reuse the slot.\n        " + live_destroy in canonical
