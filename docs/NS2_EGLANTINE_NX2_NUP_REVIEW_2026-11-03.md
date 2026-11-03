@@ -65,4 +65,13 @@ Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin
 6. CI host, tests NS1/NS2, comparaison du contenu exposé avec un dump extrait équivalent; ensuite autorisation séparée d'un build PS5 pour qualification console.
 7. Réutiliser le design GPL-compatible d'Eglantine seulement après audit des différences et de la licence; ne pas importer le code de `a55uka/nup` sans confirmation de licence (aucun LICENSE visible dans son arborescence).
 
+## Adaptateur natif — contrats vérifiés, non activés
+
+- Le moteur maintenu expose `FileSys::VfsFile::Read(u8*, size_t, size_t)`, `GetSize()` et `GetName()` dans `vendor/sources/eden/src/core/file_sys/vfs/vfs.h`, et les dossiers en lecture seule via `ReadOnlyVfsDirectory` / `VectorVfsDirectory`. Le futur adaptateur devra conserver la durée de vie du `NupV1::Source` et le propriétaire du fichier; ne pas exposer de pointeur vers un conteneur détruit.
+- L'API hôte expose désormais `FindPackageMember`, `FindEffectiveMember`, `ListPackageDirectory` et `ListEffectiveDirectory`. Les deux chemins utilisent l'ordre des versions NCM, sans liste de jeux ni contournement par TitleID; les packages addon restent accessibles individuellement et ne sont pas injectés à tort dans la RomFS principale.
+- Les deux fichiers `vendor/encore-active/eden-core/src/core/loader/loader.cpp` et `vendor/encore-active/ns2-experimental/src/core/loader/loader.cpp` ont des sélecteurs qui diffèrent sur le chemin ExeFS, et `vendor/sources/eden/src/core/loader/loader.h` ne déclare pas encore `FileType::NUP`. Le branchement devra pointer sur **un seul** VFS/chargeur NUP commun sans échanger ces sélecteurs en bloc.
+- L'adaptateur devra vérifier la disponibilité et la liaison des bibliothèques crypto/zstd dans le profil PS5 avant tout ajout aux cibles CMake. Rien n'a été ajouté au sélecteur `IsGameFile` ni au frontend.
+- **Performance restante** : le VFS hôte revalide actuellement le SHA-256 complet à chaque `ReadMember`, ce qui est correct mais coûteux pour des accès aléatoires répétés, surtout en zstd. Avant le runtime, ajouter une validation unique sûre par membre sur source immuable et un cache/stream de lecture borné, avec invalidation explicite.
+- CI hôte des vues et des listes de répertoires : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41560322257 (réussie, C++ compilé et exécuté). **Aucun titre NUP lancé ni test PS5 effectué.**
+
 **Limite actuelle : NUP n'est PAS lancé par Encore.** Les contrôles ajoutés sont un prérequis sûr, pas un port complet. P2.2/Vulkan continue indépendamment. Ne fermer aucun jalon GPU ou loader sur une simple réussite du préflight.
