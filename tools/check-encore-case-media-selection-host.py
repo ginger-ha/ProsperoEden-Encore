@@ -90,6 +90,17 @@ int main() {
     assert(categorized[0] && *categorized[0] == indexed[3]);
     assert(categorized[1] && *categorized[1] == indexed[2]);
     assert(categorized[2] && *categorized[2] == indexed[1]);
+    // Bad marker roles stay excluded from the Nlib fallback; only real
+    // numbered LaunchBox categories may claim a reserved rear slot.
+    const std::vector<std::string> role_noise{
+        "/cache/box-scene-9-BAD.tga", "/cache/box-scene-1-OK.tga",
+        "/cache/box-scene-1-OTHER.tga", "/cache/box-scene-3-YES.tga"};
+    unsigned decode_checks = 0;
+    const auto role_pick = BackScenes(hero, icon, role_noise,
+        [&](const std::string&) { ++decode_checks; return true; });
+    assert(role_pick[0] == &role_noise[1] && !role_pick[1]);
+    assert(role_pick[2] == &role_noise[3]);
+    assert(decode_checks == 3);
     const std::vector<std::string> missing_fanart{
         "/cache/box-scene-2-ABCD.tga", "/cache/box-scene-3-ABCD.tga"};
     const auto role_stable = BackScenes(hero, icon, missing_fanart);

@@ -83,13 +83,23 @@ inline std::array<const std::string*, 3> BackScenes(
     // [0] fanart full-paper backdrop, [1] title capture, [2] gameplay.
     constexpr std::array<std::string_view, 3> kSceneMarkers{
         "/box-scene-1-", "/box-scene-2-", "/box-scene-3-"};
-    for (std::size_t category = 0; category < kSceneMarkers.size(); ++category) {
-        for (const auto& image : screenshots) {
-            if (image.find(kSceneMarkers[category]) == std::string::npos ||
-                image == cover || is_front(image) || !usable(image)) continue;
-            selected[category] = &image;
-            break;
-        }
+    // One pass rather than three full screenshot traversals per rendered
+    // back. The canonical marker's numeric role is parsed without temporary
+    // strings, and decoding is queried only once per eligible category.
+    for (const auto& image : screenshots) {
+        const auto marker = image.find("/box-scene-");
+        if (marker == std::string::npos) continue;
+        const auto role_at = marker + sizeof("/box-scene-") - 1;
+        if (role_at >= image.size()) continue;
+        const auto role = image[role_at];
+        if (role < '1' || role > '3') continue;
+        const auto category = static_cast<std::size_t>(role - '1');
+        if (selected[category] ||
+            image.compare(marker, kSceneMarkers[category].size(),
+                          kSceneMarkers[category]) != 0 ||
+            image == cover || is_front(image) || !usable(image))
+            continue;
+        selected[category] = &image;
     }
     // Existing Nlib captures can fill missing roles, but an indexed game-title
     // screenshot must never masquerade as fanart merely because fanart failed.
