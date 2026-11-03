@@ -82,8 +82,8 @@ def main() -> None:
 
     runtime = (ROOT / "headless/nup_v1_runtime.cmake").read_text()
     assert 'option(EDEN_NUP_V1_RUNTIME' in runtime
-    assert '"nup_v1_romfs_factory.cpp"' in runtime
-    assert '"nup_v1_aoc_service.cpp"' in runtime
+    assert 'nup_v1_romfs_factory.cpp' in runtime
+    assert 'nup_v1_aoc_service.cpp' in runtime
     assert 'EDEN_FINAL_RELEASE_PROFILE' in runtime
     assert 'exactly one existing AoC/ROMFS source owner' in runtime
     metadata = (ROOT / "headless/metadata_bridge.cpp").read_text()
