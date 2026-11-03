@@ -17,6 +17,7 @@ FILES = (
     "common/common_funcs.h",
     "common/common_types.h",
     "core/file_sys/fs_filesystem.h",
+    "core/file_sys/romfs.h",
     "core/file_sys/vfs/vfs.h",
     "core/file_sys/vfs/vfs_types.h",
 )
@@ -45,6 +46,7 @@ def main() -> None:
             "-I", str(includes),
             "-I", str(ROOT / "headless"),
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
+            str(ROOT / "headless/nup_v1_native_content.cpp"),
         ], check=True)
     print(f"NUP native adapter compiles against pinned vendor VFS headers {pinned[:12]}")
 
