@@ -534,6 +534,11 @@ def main() -> int:
                 "BuildResourcePlan(" in qmd_environment.read_text() and
                 "shader_info.storage_buffers_descriptors" in qmd_environment.read_text() and
                 "ReadStorageDescriptor(" in qmd_environment.read_text() and
+                "offset > 0x10000U - sizeof(u32)" in qmd_environment.read_text() and
+                "offset > 0x10000U - 4U * sizeof(u32)" in qmd_environment.read_text() and
+                "desc.cbuf_offset > 0x10000U - 16U * desc.count" in qmd_environment.read_text() and
+                "oversized_env.ReadStorageDescriptor(0,0x10000U)" in (
+                    ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").read_text() and
                 "std::array<u32, 4> descriptor{};" in qmd_environment.read_text() and
                 "descriptor.data(), sizeof(descriptor)" in qmd_environment.read_text() and
                 "const auto record = ReadStorageDescriptor(desc.cbuf_index, offset);" in qmd_environment.read_text() and

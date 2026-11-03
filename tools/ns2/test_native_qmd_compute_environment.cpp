@@ -421,6 +421,39 @@ int main() {
     assert(Reject([&]{(void)env.ReadCbufValue(1,0);}));
     assert(Reject([&]{(void)env.ReadCbufValue(8,0);}));
     assert(memory.reads==2); // Invalid ranges never touch guest memory.
+    // QMD can reserve a backing CBUF larger than the hardware-visible
+    // 64 KiB. Shader reads, SSBO descriptors and texture handle words must
+    // NEVER address the spillover (even if a synthetic GMMU reader says yes).
+    auto oversized_launch=*decoded;
+    oversized_launch.constant_buffers[0].size=0x20000U;
+    NativeQmdComputeEnvironment oversized_env{
+        oversized_launch,Read,&memory,std::make_unique<TextureMetadata>()};
+    const auto reads_before_oversize=memory.reads;
+    assert(Reject([&]{(void)oversized_env.ReadCbufValue(0,0x10000U);}));
+    assert(Reject([&]{(void)oversized_env.ReadStorageDescriptor(0,0xfff4U);}));
+    assert(Reject([&]{(void)oversized_env.ReadStorageDescriptor(0,0x10000U);}));
+    assert(memory.reads==reads_before_oversize);
+    Shader::Info large_cbuf_info{};
+    large_cbuf_info.constant_buffer_mask=1;
+    large_cbuf_info.constant_buffer_used_sizes[0]=16;
+    large_cbuf_info.constant_buffer_descriptors.push_back({0,1});
+    const auto bounded_cbuf_plan=oversized_env.BuildResourcePlan(large_cbuf_info);
+    assert(bounded_cbuf_plan && bounded_cbuf_plan->uniform_buffers.size()==1 &&
+           bounded_cbuf_plan->uniform_buffers[0].bytes==0x10000U);
+    large_cbuf_info.constant_buffer_used_sizes[0]=0x10001U;
+    assert(!oversized_env.BuildResourcePlan(large_cbuf_info));
+    large_cbuf_info.constant_buffer_used_sizes[0]=16;
+    large_cbuf_info.storage_buffers_descriptors.push_back({0,0x10000U,1,true});
+    assert(!oversized_env.BuildResourcePlan(large_cbuf_info));
+    large_cbuf_info.storage_buffers_descriptors.clear();
+    Shader::TextureDescriptor beyond_cbuf{};
+    beyond_cbuf.cbuf_index=0;
+    beyond_cbuf.cbuf_offset=0x10000U;
+    beyond_cbuf.count=1;
+    large_cbuf_info.texture_descriptors.push_back(beyond_cbuf);
+    assert(!oversized_env.BuildResourcePlan(large_cbuf_info));
+    assert(memory.reads==reads_before_oversize);
+
     memory.mapped=false;
     assert(Reject([&]{(void)env.ReadCbufValue(0,0);}));
     assert(Reject([&]{(void)env.ReadInstruction(0);}));
