@@ -54,25 +54,33 @@ inline bool IsGameFile(std::string_view name) {
     return IsPackageFile(name) || IsCardImageFile(name) ||
            IsDirectLoaderFile(name) || IsNupFile(name);
 }
+// Folder classification runs for every ROM scan entry. Match the fixed ASCII
+// tokens directly rather than allocating and lowercasing a temporary string.
+inline bool StartsWithNoCase(std::string_view name, std::string_view lowercase_prefix) {
+    if (name.size() < lowercase_prefix.size()) return false;
+    for (std::size_t i = 0; i < lowercase_prefix.size(); ++i)
+        if (std::tolower(static_cast<unsigned char>(name[i])) != lowercase_prefix[i])
+            return false;
+    return true;
+}
+inline bool EqualsNoCase(std::string_view name, std::string_view lowercase) {
+    return name.size() == lowercase.size() && StartsWithNoCase(name, lowercase);
+}
 inline bool IsAddOnContainerName(std::string_view name) {
-    std::string lower{name};
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return lower == "updates" || lower == "update" || lower == "patches" ||
-           lower == "patch" || lower == "dlc" || lower == "aoc" ||
-           lower == "addon" || lower == "addons" || lower == "add-on" ||
-           lower == "add-ons" || lower == "add_on";
+    return EqualsNoCase(name, "updates") || EqualsNoCase(name, "update") ||
+           EqualsNoCase(name, "patches") || EqualsNoCase(name, "patch") ||
+           EqualsNoCase(name, "dlc") || EqualsNoCase(name, "aoc") ||
+           EqualsNoCase(name, "addon") || EqualsNoCase(name, "addons") ||
+           EqualsNoCase(name, "add-on") || EqualsNoCase(name, "add-ons") ||
+           EqualsNoCase(name, "add_on");
 }
 // Apply the same update/DLC safeguard to newly discovered packages and
 // previously saved selections. A stale persisted path is not proof of a base.
 inline bool IsReservedAddOnPackageStem(std::string_view name) {
-    std::string lower{name};
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (IsAddOnContainerName(lower)) return true;
+    if (IsAddOnContainerName(name)) return true;
     for (const char* prefix : {"update_", "update-", "patch_", "patch-",
                                "dlc_", "dlc-", "aoc_", "aoc-", "addon_", "addon-"}) {
-        if (lower.starts_with(prefix)) return true;
+        if (StartsWithNoCase(name, prefix)) return true;
     }
     return false;
 }
@@ -88,10 +96,7 @@ inline bool LooksLikeExtractedAocTitleId(std::string_view name) {
            (id & 0x1fffU) >= 0x1000U && (id & 0x1fffU) <= 0x17ffU;
 }
 inline bool IsExtractedAssetFolderName(std::string_view name) {
-    std::string lower{name};
-    std::transform(lower.begin(), lower.end(), lower.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return lower == "romfs" || lower == "exefs";
+    return EqualsNoCase(name, "romfs") || EqualsNoCase(name, "exefs");
 }
 
 // A saved extracted title is either <title>/main (legacy), or
