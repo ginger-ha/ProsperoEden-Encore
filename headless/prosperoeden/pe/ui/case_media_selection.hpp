@@ -69,43 +69,53 @@ inline std::array<const std::string*, 3> BackScenes(
     const auto is_front = [&](const std::string& image) {
         return front && *front == image;
     };
-    const auto accept = [&](const std::string& image) {
-        if (image.empty() || image == cover || is_front(image) || !usable(image)) return;
-        for (const auto* existing : selected)
-            if (existing && *existing == image) return;
-        for (auto& entry : selected)
-            if (!entry) { entry = &image; return; }
-    };
-    // These canonical local filenames are built by EnsureRetailCase; unlike
-    // arbitrary Nlib screenshots they identify three actual media categories.
-    // Category matching must not allocate three temporary strings per draw.
-    // Keep indexed media in its OWN slot even when other categories are absent:
-    // [0] fanart full-paper backdrop, [1] title capture, [2] gameplay.
+    // Collect at most three independent Nlib fallbacks during the same scan.
+    // Indexed scene roles always take precedence, even when encountered later.
+    // No second screenshot traversal or per-frame dynamic allocation.
+    std::array<const std::string*, 3> fallback{nullptr, nullptr, nullptr};
     constexpr std::array<std::string_view, 3> kSceneMarkers{
         "/box-scene-1-", "/box-scene-2-", "/box-scene-3-"};
-    // One pass rather than three full screenshot traversals per rendered
-    // back. The canonical marker's numeric role is parsed without temporary
-    // strings, and decoding is queried only once per eligible category.
     for (const auto& image : screenshots) {
         const auto marker = image.find("/box-scene-");
-        if (marker == std::string::npos) continue;
-        const auto role_at = marker + sizeof("/box-scene-") - 1;
-        if (role_at >= image.size()) continue;
-        const auto role = image[role_at];
-        if (role < '1' || role > '3') continue;
-        const auto category = static_cast<std::size_t>(role - '1');
-        if (selected[category] ||
-            image.compare(marker, kSceneMarkers[category].size(),
-                          kSceneMarkers[category]) != 0 ||
-            image == cover || is_front(image) || !usable(image))
+        if (marker != std::string::npos) {
+            // Malformed indexed names must not silently become gameplay art.
+            const auto role_at = marker + sizeof("/box-scene-") - 1;
+            if (role_at >= image.size()) continue;
+            const auto role = image[role_at];
+            if (role < '1' || role > '3') continue;
+            const auto category = static_cast<std::size_t>(role - '1');
+            if (selected[category] ||
+                image.compare(marker, kSceneMarkers[category].size(),
+                              kSceneMarkers[category]) != 0 ||
+                image == cover || is_front(image) || !usable(image))
+                continue;
+            selected[category] = &image;
             continue;
-        selected[category] = &image;
+        }
+        if (image.empty() || image == cover || is_front(image)) continue;
+        bool duplicate = false;
+        for (const auto* existing : fallback) {
+            if (existing && *existing == image) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate) continue;
+        for (auto& slot : fallback) {
+            if (!slot) {
+                if (usable(image)) slot = &image;
+                break;
+            }
+        }
     }
-    // Existing Nlib captures can fill missing roles, but an indexed game-title
-    // screenshot must never masquerade as fanart merely because fanart failed.
-    for (const auto& image : screenshots) {
-        if (image.find("/box-scene-") != std::string::npos) continue;
-        accept(image);
+    // Preserve reserved fanart/title/gameplay slots, then fill gaps with
+    // independent captures in their original order.
+    std::size_t next_slot = 0;
+    for (const auto* candidate : fallback) {
+        if (!candidate) break;
+        while (next_slot < selected.size() && selected[next_slot]) ++next_slot;
+        if (next_slot == selected.size()) break;
+        selected[next_slot++] = candidate;
     }
     return selected;
 }
