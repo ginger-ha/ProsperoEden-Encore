@@ -605,6 +605,27 @@ int main() {
                (addr==0x1000012345000ULL && bytes==0x40);
     }));
     assert(mapped_spans==2);
+    // Mapping probes may throw when a sparse GPU page disappears between
+    // CBUF and SSBO admission. Refuse the whole plan without exposing an
+    // exception to the GPU pusher; no Vulkan descriptor may be published.
+    unsigned fault_probes{};
+    assert(!plan->ValidateGpuBufferMappings([&](u64, u32) -> bool {
+        ++fault_probes;
+        throw std::runtime_error{"guest GPU mapping disappeared"};
+    }));
+    assert(fault_probes==1);
+    fault_probes=0;
+    assert(!plan->ValidateGpuBufferMappings([&](u64, u32) -> bool {
+        if (++fault_probes==2)
+            throw std::runtime_error{"guest SSBO mapping disappeared"};
+        return true;
+    }));
+    assert(fault_probes==2);
+    // Non-throwing, fully backed inputs remain admitted.
+    assert(plan->ValidateGpuBufferMappings([&](u64 addr, u32 bytes) {
+        return (addr==memory.address && bytes==16) ||
+               (addr==0x1000012345000ULL && bytes==0x40);
+    }));
     // Mutable native CBUF descriptors can change during shader compilation
     // without making either GPU address unmapped. Compare every binding,
     // including write rights and known-size admission, before Vulkan use.
