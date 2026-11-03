@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 using u8 = std::uint8_t;
+using u64 = std::uint64_t;
 namespace FileSys {
 class VfsFile;
 class VfsDirectory;
