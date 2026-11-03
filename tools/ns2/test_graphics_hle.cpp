@@ -112,6 +112,15 @@ int main(){
     require(!P::IsSyncpointWaitSatisfied(1,0x100000001ULL,true),
             "wide syncpoint checks full threshold");
     require(P::DecodeBufferSlot(0x1234)==0x34,"packed buffer slot");
+    // Guest VI2 timing, not a title-specific performance override.
+    require(P::DecodePresentSwapInterval(0)==1,"zero-timing legacy 60 Hz default");
+    require(P::DecodePresentSwapInterval(60)==1,"single-vblank 60 Hz default");
+    require(P::DecodePresentSwapInterval((1U<<16)|60)==1,"guest one vblank");
+    require(P::DecodePresentSwapInterval((2U<<16)|60)==2,"guest two vblanks at 30 FPS");
+    require(P::DecodePresentSwapInterval((3U<<16)|120)==3,"guest three vblanks");
+    require(P::DecodePresentSwapInterval((4U<<16)|60)==4,"guest four vblanks");
+    require(P::DecodePresentSwapInterval((5U<<16)|60)==4,"unsupported interval bounded");
+    require(P::DecodePresentSwapInterval(0xffffffff)==4,"malformed interval bounded");
 
     std::array<u32,16> preferences{};
     preferences[0]=0;preferences[1]=1;preferences[2]=(63<<16)|127; // 128x64

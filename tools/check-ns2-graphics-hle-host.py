@@ -76,6 +76,10 @@ def main()->int:
     assert 'void AcknowledgeDisplayPoll(HLERequestContext& ctx)' in text
     assert 'rb.Push(ResultSuccess.raw);' in text
     assert 'rb.Push(Kernel::ResultNotImplemented.raw)' in text
+    # The guest's VI2 swap interval is forwarded to the real compositor.
+    # A fixed 1-vblank default here can double 30 FPS game/audio pacing.
+    assert 'DecodePresentSwapInterval(p[12])' in text
+    assert 'input.swap_interval=1;' not in text
     # VI2 must connect real process-owned 429 image window aliases to the
     # existing display compositor, not return synthetic present success.
     for command, method in ((301,"InitializeDisplayContext"),
