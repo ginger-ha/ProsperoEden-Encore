@@ -69,12 +69,41 @@ def main()->int:
     assert 'rb.PushCopyObjects(ctx, *readable);' in gpu_notify
     assert 'AddMoveObject' not in gpu_notify
     assert 'readable->Open(kernel)' not in gpu_notify
-    # NX2 VI2 display polling uses explicit, known empty acknowledgements.
-    # Do not blanket-ack unknown service commands or fake guest frames.
-    for number in (51, 104, 105):
-        assert '{'+str(number)+',&IVi2Session::AcknowledgeDisplayPoll' in text
-    assert 'void AcknowledgeDisplayPoll(HLERequestContext& ctx)' in text
-    assert 'rb.Push(ResultSuccess.raw);' in text
+    # NX2 VI2 has an empty request-group acknowledgement only for 51.
+    # Queries 103/104/105 must fill their full SDK payload, not return
+    # success with stale input buffer words (HDR 104 can black out graphics).
+    for number, method in (
+        (51, "AcknowledgeDisplayPoll"),
+        (103, "QueryRefreshRate"),
+        (104, "QueryHdrStatus"),
+        (105, "QueryPaperWhite"),
+    ):
+        assert '{'+str(number)+',&IVi2Session::'+method in text
+    for evidence in (
+        'void AcknowledgeDisplayPoll(HLERequestContext& ctx)',
+        'void QueryRefreshRate(HLERequestContext& ctx)',
+        'void QueryHdrStatus(HLERequestContext& ctx)',
+        'void QueryPaperWhite(HLERequestContext& ctx)',
+        'ValidateDisplayStatus(ctx, 103)',
+        'ValidateDisplayStatus(ctx, 104)',
+        'ValidateDisplayStatus(ctx, 105)',
+        'GraphicsSupervisorProtocol::Vi2NominalRefreshRateHz',
+        'GraphicsSupervisorProtocol::Vi2SdrOutputFormat',
+        'GraphicsSupervisorProtocol::Vi2SdrPeakNits',
+        'GraphicsSupervisorProtocol::Vi2SdrPaperWhiteNits',
+        'GraphicsSupervisorProtocol::Vi2MaxResolutionMode(',
+        'Settings::IsDockedMode()',
+        'GetDisplayResolution(&width, &height, *m_display)',
+        'return Kernel::ResultInvalidCombination;',
+        'return m_display && m_vi ? ResultSuccess : Kernel::ResultInvalidState;',
+    ):
+        assert evidence in text, "Missing fail-closed VI2 payload owner: " + evidence
+    assert 'width==1280&&height==720' not in text
+    hdr=text.split('void QueryHdrStatus(HLERequestContext& ctx) {',1)[1].split(
+        'void QueryPaperWhite(HLERequestContext& ctx) {',1)[0]
+    assert 'IPC::ResponseBuilder rb{ctx, 5};' in hdr
+    assert 'rb.Push<u64>(result.IsSuccess()' in hdr
+    assert 'rb.Push<u32>(result.IsSuccess()' in hdr
     assert 'rb.Push(Kernel::ResultNotImplemented.raw)' in text
     # The guest's VI2 swap interval is forwarded to the real compositor.
     # A fixed 1-vblank default here can double 30 FPS game/audio pacing.

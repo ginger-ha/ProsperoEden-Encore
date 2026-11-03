@@ -25,6 +25,31 @@ int main(){
     using namespace Service::AM;
     namespace P=Service::AM::GraphicsSupervisorProtocol;
     namespace N=Service::Nvidia::Devices;
+    // VI2 103-106 are device capability queries, not TitleID exceptions:
+    // enforce packet words and the real default display name before reply.
+    constexpr u64 default_display = 0x00746c7561666564ULL;
+    for (u32 command : {103U, 104U, 105U, 106U}) {
+        require(P::IsDefaultVi2DisplayQuery(command + 16, 2,
+                                            default_display, command),
+                "VI2 default display capability request admitted");
+        require(!P::IsDefaultVi2DisplayQuery(command + 16, 1,
+                                             default_display, command) &&
+                !P::IsDefaultVi2DisplayQuery(command + 16, 2,
+                                             default_display ^ 1ULL, command) &&
+                !P::IsDefaultVi2DisplayQuery(command + 17, 2,
+                                             default_display, command),
+                "VI2 wrong arity, name or header rejected");
+    }
+    require(!P::IsDefaultVi2DisplayQuery(0x77, 2, default_display, 102) &&
+            !P::IsDefaultVi2DisplayQuery(0x7b, 2, default_display, 107),
+            "VI2 unknown request IDs stay closed");
+    require(P::Vi2MaxResolutionMode(true) == 4 &&
+            P::Vi2MaxResolutionMode(false) == 2 &&
+            P::Vi2NominalRefreshRateHz == 60 &&
+            P::Vi2SdrOutputFormat == 1 &&
+            P::Vi2SdrPeakNits == 400 &&
+            P::Vi2SdrPaperWhiteNits == 203,
+            "VI2 true SDR payload and docked/handheld resolution contract");
     const std::array<u32,8> reg{0x75,6,0x1000,0,0x2fff,0,0xaabbcc05,0xff000006};
     const auto r=DecodeGpuMemoryRegistration(reg);
     require(r && r->begin==0x1000 && r->end==0x2fff,"GPU registration bounds");
