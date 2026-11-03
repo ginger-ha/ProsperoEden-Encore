@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `f65c78ff3f666ce920763dcd9e8676058184e07d` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
+| `headless/game_files.h` | `9729ca93a48713c39aadd80e41398cb977ec261b` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -116,3 +116,7 @@ Source actuelle : `headless/game_files.h` blob Git `a478384917d04ffe6ed62f5cd7e1
 ### Re-revue P3.4 du 3 novembre — état explicite du scanner DLC
 
 Blob actuel `headless/game_files.h` : `f65c78ff3f666ce920763dcd9e8676058184e07d` (source `a2a80ce`). L'API `FindAddOnContentDirectories(title_root, bool* scan_complete = nullptr)` reste compatible avec les appels historiques, et publie désormais un état explicite séparant **vide valide** et **arborescence incomplète**. Le booléen est réinitialisé à `false` dès l'entrée ; il devient `true` uniquement après un parcours complet, trié et dédupliqué. Il reste `false` sur un titre invalide, une profondeur dépassée, une erreur du filesystem ou un quota atteint. Il n'y a aucune suppression de découverte pour les appels existants ; la distinction est exploitée dans `metadata_bridge.cpp` et `main.cpp`. La fixture `tools/check-nup-v1-game-discovery.py` couvre un titre normal, un titre vide valide, une racine absente et une profondeur trop grande en configurations NUP OFF/ON. Ces changements n'activent pas le lecteur NUP en production, ne touchent pas les formats NS1 et ne démontrent pas le runtime console. Exécution hôte complète sur le nouveau couple SHA encore à qualifier.
+
+### Re-revue P3.4 du 3 novembre — retrait d'une entrée pendant le scan
+
+Source `headless/game_files.h` blob `9729ca93a48713c39aadd80e41398cb977ec261b` (commit `5457de8`). Le parcours de conteneurs updates/DLC ne traite plus `ENOENT` ou `ENOTDIR` sur une entrée déjà fournie par `directory_iterator` comme un retrait sûr : ce cas indique que la bibliothèque change pendant l'inventaire. Tout échec de `symlink_status` marque maintenant le scan `incomplete` et interdit au caller de publier une liste tronquée. Les fichiers/symlinks correctement catégorisés restent ignorés comme avant ; aucune nouvelle extension ni activation NUP de production. `tools/check-nup-v1-game-discovery.py` enregistre cette exigence en plus des scénarios C++ NUP OFF/ON. Tests hôte complets toujours à qualifier au couple SHA courant.
