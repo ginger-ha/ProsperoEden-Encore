@@ -236,7 +236,7 @@ def dual_file_fixture(contents: bytes, *, overlap: bool = False) -> bytes:
     require(len(contents) > 16, "fixture too small")
     toc = bytearray(0x140)
     names = b"a.binb.bin"
-    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\\x01", 1, 1, 2, 0x130, len(names), 0)
+    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\x01", 1, 1, 2, 0x130, len(names), 0)
     struct.pack_into("<QIIII", toc, 0x30, 0x1234000000000000, 0, BAD, 0, 1)
     struct.pack_into("<IIIIQ", toc, 0x70, 0, 0, 0, 2, 0)
     for index in (0, 1):
@@ -248,7 +248,7 @@ def dual_file_fixture(contents: bytes, *, overlap: bool = False) -> bytes:
     struct.pack_into("<II", toc, 0x128, 1, 2)
     toc[0x130:0x13A] = names
     header = bytearray(0x80)
-    header[:4] = b"NUP\\x01"
+    header[:4] = b"NUP\x01"
     struct.pack_into("<HHQQ", header, 4, 0x80, 1, 0x80, len(toc))
     header[0x18:0x38] = hashlib.sha256(toc).digest()
     struct.pack_into("<QQII", header, 0x38, 0x1C0, 0x1C0 + len(contents), 1, 0)
