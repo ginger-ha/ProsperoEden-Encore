@@ -1561,9 +1561,29 @@ if gpu_actual != gpu_expected:
         return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
     assert git_blob_id(gpu_expected) == "f30099dfb5df01d9cd787d199e3e61f28205669a", (
         "pre-NS2 GPU source baseline drift")
-    assert git_blob_id(gpu_actual) == "c7923dbbef27a9088dbfcb33c162e3c7069679c1", (
-        "unreviewed changed-PTE GPU source drift")
+    # The N51 GPU batching owner has one later, independently reviewed P1.2
+    # revision. P1.2 adds checked cross-page scalars and a physical-backing
+    # fallback. Match the *entire* canonical blob; do not accept a general
+    # source variant or declare the historical five-hunk oracle identical.
+    owner_sha = git_blob_id(gpu_actual)
+    n51_sha = "c7923dbbef27a9088dbfcb33c162e3c7069679c1"
+    p12_sha = "7dba34b3e300515cd5b0a8579fe893072cb70b24"
+    assert owner_sha in (n51_sha, p12_sha), (
+        "unreviewed changed-PTE/P1.2 GPU source drift", owner_sha)
     assert "#ifdef EDEN_NS2_GPU_RANGE_BATCH" in gpu_actual
+    if owner_sha == p12_sha:
+        assert '#include "native_paged_scalar.h"' in gpu_actual
+        assert "Eden::GpuScalar::Read(addr, value" in gpu_actual
+        assert "Eden::GpuScalar::Write(addr, data" in gpu_actual
+        assert gpu_actual.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4
+        assert "memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount)" in gpu_actual
+        assert "memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount)" in gpu_actual
+    # N51's independent source-normalisation witness must also pin both
+    # complete blobs and recheck all batching operands after removing N51.
+    n51_guard = (root / "tools/ns2/check_egl_gpu_range_batch.py").read_text()
+    assert f'n51_original = "{n51_sha}"' in n51_guard
+    assert f'p12_protected = "{p12_sha}"' in n51_guard
+    assert 't.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4' in n51_guard
 
 assert 'list(APPEND video_sources "${EDEN_NATIVE_GPU_MEMORY_MANAGER}")' in c
 assert c.count('list(REMOVE_ITEM video_sources "memory_manager.cpp")') == 1
