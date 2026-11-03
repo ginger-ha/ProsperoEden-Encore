@@ -167,6 +167,10 @@ const std::vector<Eden::NupV1::Package>& Mount::Packages() const {
     return state_->archive->Packages();
 }
 
+const Eden::NupV1::PackageMetadata* Mount::ApplicationMetadata() const {
+    return state_->archive->ApplicationMetadata();
+}
+
 FileSys::VirtualDir Mount::Effective(ContentView view) const {
     if (!state_->archive->ListEffectiveDirectory(view)) return {};
     return std::make_shared<NativeDirectory>(
