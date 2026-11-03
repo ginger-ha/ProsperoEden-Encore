@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <limits>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -136,7 +137,7 @@ public:
 
     std::vector<FileSys::VirtualFile> GetFiles() const override {
         std::vector<FileSys::VirtualFile> result;
-        const auto entries = Entries();
+        const auto& entries = Entries();
         if (!entries) return result;
         const auto self = std::const_pointer_cast<NativeDirectory>(shared_from_this());
         for (const auto& entry : *entries) {
@@ -151,7 +152,7 @@ public:
 
     std::vector<FileSys::VirtualDir> GetSubdirectories() const override {
         std::vector<FileSys::VirtualDir> result;
-        const auto entries = Entries();
+        const auto& entries = Entries();
         if (!entries) return result;
         const auto self = std::const_pointer_cast<NativeDirectory>(shared_from_this());
         for (const auto& entry : *entries) {
@@ -167,11 +168,21 @@ public:
     FileSys::VirtualDir GetParentDirectory() const override { return parent_; }
 
 private:
-    std::optional<std::vector<DirEntry>> Entries() const {
-        if (package_) return state_->archive->ListPackageDirectory(*package_, view_, path_);
-        return state_->archive->ListEffectiveDirectory(view_, path_);
+    const std::optional<std::vector<DirEntry>>& Entries() const {
+        // The mounted NUP TOC and effective overlay are immutable. Cache only
+        // directory metadata; NativeFile::Read still verifies the live source.
+        // Both VFS GetFiles/GetSubdirectories may be called by different
+        // services, so initialize exactly once and never copy the entry vector.
+        std::call_once(entries_once_, [this] {
+            entries_ = package_
+                ? state_->archive->ListPackageDirectory(*package_, view_, path_)
+                : state_->archive->ListEffectiveDirectory(view_, path_);
+        });
+        return entries_;
     }
 
+    mutable std::once_flag entries_once_;
+    mutable std::optional<std::vector<DirEntry>> entries_;
     std::shared_ptr<Detail::State> state_;
     std::optional<std::size_t> package_;
     ContentView view_;
