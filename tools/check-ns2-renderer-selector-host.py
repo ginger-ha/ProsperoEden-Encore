@@ -42,14 +42,25 @@ def main():
     dollar = chr(36)
     with tempfile.TemporaryDirectory(prefix="ns2-cmake-") as tmp:
         path = Path(tmp)
+        # The extracted selector starts after the production shader target is
+        # declared. Mirror its original emitter sources for OFF as well as
+        # the ON source replacement, without compiling the PS5 application.
+        original_emitters = path / "backend/spirv"
+        original_emitters.mkdir(parents=True)
+        for name in ("spirv_emit_context.cpp", "emit_spirv_context_get_set.cpp"):
+            (original_emitters / name).write_text("// selector fixture\n")
         cmake = (
             "cmake_minimum_required(VERSION 3.22)\n"
             "project(NS2ShaderSelector LANGUAGES CXX)\n"
             f'file(WRITE "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp" "int n() {{return 1;}}\\n")\n'
             f'add_library(video_core STATIC "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp")\n'
             f'add_library(core STATIC "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp")\n'
+            f'add_library(shader_recompiler STATIC "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/stub.cpp")\n'
+            'target_sources(shader_recompiler PRIVATE backend/spirv/spirv_emit_context.cpp '\
+            'backend/spirv/emit_spirv_context_get_set.cpp)\n'
             f'set(PORT_BUILD_DIR "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}")\n'
             f'set(PORT_ROOT "{ROOT.as_posix()}")\n'
+            f'set(EDEN_NS2_AMPERE_ROOT "{ROOT.as_posix()}/vendor/encore-active/ns2-runtime/ampere")\n'
         )
         for name in ("NATIVE","VULKAN","AMPERE","METADATA","GPU_SESSION","NVDRV"):
             key = {"NATIVE":"PS5_NATIVE","VULKAN":"EDEN_PS5_VULKAN",
@@ -60,14 +71,24 @@ def main():
             cmake += f"set({key} {dollar}{{NS2_TEST_{name}}})\n"
         cmake += selector
         cmake += f'get_target_property(owner video_core SOURCES)\nfile(WRITE "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/owner.txt" "{dollar}{{owner}}")\n'
+        cmake += f'get_target_property(compiler_owner shader_recompiler SOURCES)\nfile(WRITE "{dollar}{{CMAKE_CURRENT_BINARY_DIR}}/compiler-owner.txt" "{dollar}{{compiler_owner}}")\n'
         (path/"CMakeLists.txt").write_text(cmake)
         baseline = {f"NS2_TEST_{n}":True for n in ("NATIVE","VULKAN","AMPERE","METADATA","GPU_SESSION","NVDRV")}
         off = test(path,"off",baseline,True)
         assert "renderer_spirv_bridge" not in off,off
+        original = {"backend/spirv/spirv_emit_context.cpp",
+                    "backend/spirv/emit_spirv_context_get_set.cpp"}
+        off_compiler = set((path/"off"/"compiler-owner.txt").read_text().split(";"))
+        assert original <= off_compiler,off_compiler
         enabled = {**baseline,"EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL":True}
         on = test(path,"on",enabled,True)
         assert str(target) in on,on
         assert "ns2_shader_spirv_compile.cpp" in on,on
+        on_compiler = set((path/"on"/"compiler-owner.txt").read_text().split(";"))
+        ampere = ROOT/"vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv"
+        reviewed = {str(ampere/name) for name in
+                    ("spirv_emit_context.cpp", "emit_spirv_context_get_set.cpp")}
+        assert reviewed <= on_compiler and not (original & on_compiler),on_compiler
         for name in baseline:
             test(path,"missing-"+name,{**enabled,name:False},False)
     print("NS2 renderer selector: PASS (OFF, ON, six missing prerequisite cases)")
