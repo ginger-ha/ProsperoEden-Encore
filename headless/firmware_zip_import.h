@@ -92,6 +92,32 @@ inline bool Index(std::ifstream& stream, std::vector<Entry>* out) {
         std::string name(name_size, '\0');
         if (!Read(stream, cursor+46, name.data(), name.size()) ||
             !SafeName(name)) return false;
+        // Validate the local header and its exact filename before accepting
+        // an entry. ZIP metadata is duplicated; trusting only the central
+        // directory allows a forged local name or an extent that overlaps
+        // the central directory to be extracted as firmware payload.
+        const std::uint64_t local_offset = U32(h+42);
+        std::array<unsigned char,30> local{};
+        if (local_offset > cd || cd - local_offset < local.size() ||
+            !Read(stream, local_offset, local.data(), local.size()) ||
+            U32(local.data()) != 0x04034b50u ||
+            U16(local.data()+6) != flags ||
+            U16(local.data()+8) != method ||
+            U16(local.data()+26) != name_size) return false;
+        const std::uint64_t data_start = local_offset + 30ull +
+            name_size + U16(local.data()+28);
+        if (data_start > cd || compressed > cd - data_start ||
+            (method == 0 && compressed != expanded)) return false;
+        std::string local_name(name_size, '\0');
+        if (!Read(stream, local_offset + 30ull,
+                  local_name.data(), local_name.size()) ||
+            local_name != name) return false;
+        // With bit 3 clear the local sizes and CRC must match the central
+        // record. Bit 3 permits a trailing data descriptor instead.
+        if (!(flags & 0x0008u) &&
+            (U32(local.data()+14) != U32(h+16) ||
+             U32(local.data()+18) != compressed ||
+             U32(local.data()+22) != expanded)) return false;
         total += expanded;
         if (name.back() != '/' && name.rfind("__MACOSX/",0) != 0 &&
             name.find("/._") == std::string::npos && name != ".DS_Store" &&
@@ -110,6 +136,13 @@ inline bool ExtractEntry(std::ifstream& zip, const Entry& file, const fs::path& 
         (U16(local.data()+6)&1u)) return false;
     const std::uint64_t content=file.local_offset + 30ull +
         U16(local.data()+26)+U16(local.data()+28);
+    // An index validated against one file must not be used against a
+    // different local member if the archive changed before extraction.
+    if (U16(local.data()+26) != file.name.size()) return false;
+    std::string local_name(file.name.size(), '\0');
+    if (!Read(zip, file.local_offset + 30ull,
+              local_name.data(), local_name.size()) ||
+        local_name != file.name) return false;
     std::error_code ec;
     fs::create_directories(output.parent_path(),ec);
     if (ec || fs::exists(output,ec)) return false;
