@@ -1071,10 +1071,10 @@
     {
       "path": "headless/prosperoeden/pe/ui/case_media_selection.hpp",
       "disposition": "reviewed_without_new_code_edit",
-      "reviewed_source_git_blob": "34fd91455575949f539eeb0dd884c13add5992e4",
+      "reviewed_source_git_blob": "74695dfc2d3ce8ceade5cbe21486f0e4abd47a97",
       "review_scope": "launcher-release-hotpath",
       "source_review_document": "docs/EDEN_RELEASE_LAUNCHER_SOURCE_OPTIMIZATION_AUDIT_2026-10-26.md",
-      "evidence": "Re-reviewed 2026-11-02 after cfce4b32: FrontPaperAvailable skips confirmed-missing cached media while retaining pending decode priority, without copying source strings; normal FrontPaper and BackScenes selection unchanged. tools/check-encore-case-media-selection-host.py passed clang++/g++/c++ O0/O2 in source-ux job 125474453091 on 90be0df; console not verified."
+      "evidence": "Re-reviewed 2026-11-03 against reviewed blob 34fd91455575949f539eeb0dd884c13add5992e4 (exact C++ source diff): the only behavioral change is BackScenes accepting a read-only confirmed-usable predicate, excluding the already-selected FrontPaper (including a fallback screenshot when Hero is missing), and retaining the original 3-argument noexcept overload. Fixed three slots, borrowed string pointers and no new allocation, I/O, network fetch, blocking or GPU resource ownership; category priority and pending-decoder policy preserved. tools/check-encore-case-media-selection-host.py covers missing Hero, failed decoded Hero, indexed role stability, distinct rear scenes and pending front readiness using Clang/GCC O0/O2; current-head CI not yet proven and PS5 coverage remains P5."
     },
     {
       "path": "headless/prosperoeden/pe/ui/dualsense_mask_asset.hpp",
