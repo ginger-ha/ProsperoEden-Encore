@@ -191,7 +191,7 @@ assert "python3 -B tools/ns2/check_paged_gpu_scalar_host.py" in (
     ROOT / ".github/workflows/encore-core-preflight.yml").read_text()
 print("NS1_NS2_SHARED_GPU_SCALAR_F07_ISOLATION_PASS",
       f"post_snapshot_reviewed={len(post_f07_shared_gpu_scalar_owners)}")
-# The four NUP v1 parser/adapter files were introduced after the frozen
+# The NUP v1 parser/adapter/loader files were introduced after the frozen
 # 518-path F07 optimization audit. They are testable, read-only VFS sources,
 # but are NOT selected by the PS5 shipping target and have no native-runtime
 # performance review. Keep the historic ledger immutable and this debt
@@ -203,6 +203,8 @@ post_f07_nup_vfs_owners = {
     "headless/nup_v1_native_vfs.cpp",
     "headless/nup_v1_native_content.h",
     "headless/nup_v1_native_content.cpp",
+    "headless/nup_v1_native_loader.h",
+    "headless/nup_v1_native_loader.cpp",
 }
 assert post_f07_nup_vfs_owners <= all_owners, sorted(
     post_f07_nup_vfs_owners - all_owners)
@@ -215,6 +217,8 @@ assert not post_f07_nup_vfs_owners & (
 assert 'nup_v1_vfs.cpp' not in release_cmake
 assert 'nup_v1_native_vfs.cpp' not in release_cmake
 assert 'nup_v1_native_content.cpp' not in release_cmake
+assert 'nup_v1_native_loader.cpp' not in release_cmake
+assert 'nup_v1_native_loader.h' not in release_cmake
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
 assert "Not wired into the PS5 loader or game catalogue." in nup_core
@@ -223,6 +227,10 @@ assert "AllowsVerifiedMemberCache() const override { return false; }" in (
     ROOT / "headless/nup_v1_native_vfs.cpp").read_text()
 assert "Inactive native NUP content bridge" in (
     ROOT / "headless/nup_v1_native_content.h").read_text()
+assert "INACTIVE NUP v1 application-loader adapter." in (
+    ROOT / "headless/nup_v1_native_loader.h").read_text()
+assert "NupAppLoader::Open(" in (
+    ROOT / "headless/nup_v1_native_loader.cpp").read_text()
 print("NUP_V1_POST_F07_OWNER_ISOLATION_PASS",
       f"not_retroactive_F07={len(post_f07_nup_vfs_owners)}",
       "shipping_selection=absent")
