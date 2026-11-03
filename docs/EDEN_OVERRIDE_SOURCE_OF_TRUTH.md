@@ -61,6 +61,7 @@ de compilation native. Cette preuve couvre les frontières de build
 | `headless/guest_write_deferred_bridge.cmake` | Sélection de six variantes expérimentales maintenues | Sélecteur conforme ; M12 retiré |
 | `headless/inject.cmake` | Orchestration ou toolchain | Sélecteur / configuration |
 | `headless/jit-alias.cmake` | Sélection/copie de l'en-tête Xbyak et de ConstantPool complets | Sélecteur conforme ; X09 retiré |
+| `headless/nup_v1_runtime.cmake` | Sélection des sources NUP v1 et des propriétaires AoC/RomFS existants | P5 uniquement, OFF par défaut, interdit en release finale ; aucune génération C++ |
 | `headless/ps5.cmake` | Orchestration ou toolchain | Sélecteur / configuration |
 | `headless/scalar-memory.cmake` | Sélection des émetteurs vectoriel et data processing maintenus | Sélecteur conforme ; X08 retiré |
 | `headless/vulkan.cmake` | Sélection/copie de sources Encore maintenues | Sélecteur / configuration |
