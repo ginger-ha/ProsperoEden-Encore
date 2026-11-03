@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <vector>
 #include "shader_recompiler/frontend/ampere/lower_bridge.h"
+#include "shader_recompiler/frontend/ampere/lower_to_maxwell.h"
+#include "shader_recompiler/frontend/ampere/maxwell_image.h"
 
 using namespace Shader::Ampere;
 static void check(bool value, const char* why) {
@@ -87,6 +89,75 @@ int main() {
           no_exit.maxwell_instructions.empty() &&
           !no_exit.reason.empty(),
           "recognizable NOP is not a full executable without an EXIT");
+
+    // A recognized native BRX table must lower to real, relocated Maxwell
+    // conditional branches, not a Maxwell BRX with unconverted guest PCs.
+    // The direct lowerer test does not authenticate CBUF residency; that is
+    // the responsibility of the owning shader-capture front end.
+    std::vector<Instruction> computed_program{
+        Instruction{{PredTrue|0x949U|(6U<<24),0xfffffff0U,0x0383ffffU,0}},
+        Instruction{{PredTrue|0x94dU,0,ExitCondTrue,0}},
+        Instruction{{PredTrue|0x918U,0,0,0}},
+        Instruction{{PredTrue|0x94dU,0,ExitCondTrue,0}},
+    };
+    NativeIndirectBranchPlan plan{
+        .branch_instruction_index=0,
+        .targets={{0x80U,1U},{0xb0U,3U}},
+    };
+    const auto expanded=LowerToMaxwell(
+        computed_program,{},false,std::span<const NativeIndirectBranchPlan>{&plan,1});
+    check(expanded && expanded.source_size==4*16 &&
+          expanded.source_instruction_offsets.size()==4 &&
+          expanded.instructions.size()>10,
+          "native BRX emits branch-to-restoration stubs and consumes complete source");
+    bool found_integer_equal=false, found_predicated_branch=false;
+    bool found_predicate_save=false, found_predicate_restore=false;
+    for (const u64 word : expanded.instructions) {
+        found_integer_equal |= (word & 0xfff0000000000000ULL)==
+                               0x5b60000000000000ULL &&
+                               ((word>>49)&7U)==2U;
+        found_predicated_branch |= (word & 0xfff000000007000fULL)==
+                                   (0xe24000000006000fULL & 0xfff000000007000fULL);
+        found_predicate_save |= (word & 0xfff8000000000000ULL)==0x38e8000000000000ULL;
+        found_predicate_restore |= (word & 0xfff8000000000000ULL)==0x38f0000000000000ULL;
+    }
+    check(found_integer_equal && found_predicated_branch &&
+          found_predicate_save && found_predicate_restore,
+          "BRX dispatch compares actual native CBUF words and preserves P6");
+    const std::array<u8,0x50> synthetic_header{};
+    std::vector<u8> computed_bytes;
+    for (const auto& instruction : computed_program)
+        for (u32 word : instruction.words)
+            for (u32 i=0;i<4;++i)
+                computed_bytes.push_back(static_cast<u8>(word>>(i*8)));
+    const auto resolved_image=BuildMaxwellShaderImage(
+        synthetic_header,computed_bytes,4,
+        std::span<const NativeIndirectBranchPlan>{&plan,1});
+    const auto unresolved_image=BuildMaxwellShaderImage(
+        synthetic_header,computed_bytes,4);
+    check(resolved_image.ValidForCompiler() &&
+          resolved_image.consumed_native_bytes==computed_bytes.size() &&
+          resolved_image.TranslateNativeAddress(0).has_value() &&
+          resolved_image.TranslateNativeAddress(48).has_value() &&
+          resolved_image.diagnostic_cache_key!=unresolved_image.diagnostic_cache_key,
+          "resolved BRX produces bounded CFG image with distinct branch-table key");
+    plan.targets[1].native_instruction_index=123;
+    check(!LowerToMaxwell(
+              computed_program,{},false,
+              std::span<const NativeIndirectBranchPlan>{&plan,1}),
+          "BRX targets outside captured shader must be rejected");
+    plan.targets[1].native_instruction_index=3;
+    plan.targets[1].native_value=plan.targets[0].native_value;
+    check(!LowerToMaxwell(
+              computed_program,{},false,
+              std::span<const NativeIndirectBranchPlan>{&plan,1}),
+          "one native BRX raw value cannot map to contradictory blocks");
+    plan.targets[1].native_value=0xb0U;
+    plan.branch_instruction_index=2;
+    check(!LowerToMaxwell(
+              computed_program,{},false,
+              std::span<const NativeIndirectBranchPlan>{&plan,1}),
+          "native BRX dispatch plan cannot be attached to a non-branch opcode");
 
     // An unknown NOP field is rejected before the lowerer sees it.
     code.clear();
