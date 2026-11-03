@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -12,6 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace Eden::NupV1 {
@@ -136,6 +138,14 @@ private:
     const Source& source_;
     mutable std::mutex verified_mutex_;
     mutable std::vector<std::uint8_t> member_verified_; // valid only for immutable Sources
+    // Mutable raw members: a full member SHA-256 is verified first, then
+    // immutable per-block digests are retained. Subsequent reads rehash only
+    // the touched blocks, so edited source bytes cannot be returned. Bounded
+    // to 16 MiB of hashes per archive (1 MiB source blocks).
+    mutable std::unordered_map<std::size_t,
+        std::shared_ptr<const std::vector<std::array<std::uint8_t, 32>>>>
+        raw_block_digests_;
+    mutable std::size_t raw_digest_cache_bytes_{};
     std::vector<Package> packages_;
     std::vector<PackageMetadata> package_metadata_;
     std::vector<Directory> dirs_;
