@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Exercise native adapter WITHOUT linking a PS5 renderer/loader.
 #include "nup_v1_native_vfs.h"
+#include "nup_v1_native_content.h"
+#include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs.h"
 
 #include <algorithm>
@@ -43,6 +45,25 @@ private:
     std::vector<u8> bytes_;
 };
 
+// Host-only stub: checks that the bridge forwards the correct VFS tree.
+// This is intentionally NOT the real RomFS serializer. Native-header syntax
+// compilation checks the actual CreateRomFS API separately.
+namespace FileSys {
+VirtualFile CreateRomFS(VirtualDir directory, VirtualDir extension) {
+    if (!directory || extension) return {};
+    std::string serialized;
+    for (const auto& f : directory->GetFiles()) {
+        std::string data(f->GetSize(), '\\0');
+        if (!data.empty() &&
+            f->Read(reinterpret_cast<u8*>(data.data()), data.size(), 0) != data.size())
+            return {};
+        serialized += f->GetName() + "=" + data + "\\n";
+    }
+    return std::make_shared<MemoryFile>(
+        std::vector<u8>(serialized.begin(), serialized.end()));
+}
+} // namespace FileSys
+
 std::vector<u8> Load(const char* path) {
     std::ifstream input(path, std::ios::binary);
     assert(input);
@@ -64,6 +85,16 @@ int main(int argc, char** argv) {
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
     assert(mount && error.empty());
     assert(mount->Packages().size() == 3);
+    // ContentSet is a common NS1/NS2 handoff, not an installed loader.
+    Eden::NupV1::Native::ContentSet content{mount};
+    assert(!content.HasExecutableMain()); // synthetic fixture lacks ExeFS
+    assert(!content.ExeFS());
+    assert(content.AddOns().size() == 1);
+    assert(content.AddOns().front().package_index == 2);
+    assert(content.AddOns().front().romfs);
+    assert(content.AddOns().front().romfs->GetFile("state.bin"));
+    // Test serializer is a sentinel: verifies selected VFS contents only.
+    assert(Read(content.CreateRomFS()) == "state.bin=latest-v3\\n");
     using Eden::NupV1::ContentView;
     assert(!mount->Effective(ContentView::ExeFS));
     assert(!mount->PackageView(100, ContentView::RomFS));
