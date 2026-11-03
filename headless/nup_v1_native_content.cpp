@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_content.h"
 
+#include <limits>
 #include <map>
 #include <optional>
 #include <utility>
@@ -12,7 +13,8 @@
 namespace Eden::NupV1::Native {
 
 ContentSet::ContentSet(std::shared_ptr<Mount> mount,
-                       std::optional<std::uint64_t> caller_program_id)
+                       std::optional<std::uint64_t> caller_program_id,
+                       std::optional<std::uint64_t> nacp_aoc_base_id)
     : mount_(std::move(mount)) {
     if (!mount_) return;
     const auto& packages = mount_->Packages();
@@ -43,18 +45,23 @@ ContentSet::ContentSet(std::shared_ptr<Mount> mount,
     // Add-on-only archives carry no owning executable title: callers must
     // supply the program identity instead of seeing cross-title content.
     if (!active_base) return;
+    // A non-default NACP-declared AoC family is only meaningful when bound to
+    // a known caller. Do not grant blanket visibility from an unscoped mount.
+    if (nacp_aoc_base_id && !caller_program_id) return;
+    if (*active_base > std::numeric_limits<std::uint64_t>::max() - FileSys::AOC_TITLE_ID_OFFSET) return;
+    const auto aoc_base = nacp_aoc_base_id.value_or(
+        *active_base + FileSys::AOC_TITLE_ID_OFFSET);
 
-    // AOC title IDs are base + 0x1000 + an 11-bit index. Two revisions of
-    // one DLC must not be registered twice: use the highest NCM version.
+    // Select DLC from the declared AoC base, never by blindly treating every
+    // title with a similar high prefix as belonging to the application.
+    // Custom bases are inputs from trusted NACP metadata, not per-game hacks.
+    // Two revisions of one DLC use the highest NCM version.
     std::map<std::uint64_t, std::size_t> selected;
     for (std::size_t i = 0; i < packages.size(); ++i) {
         const auto& package = packages[i];
         if (package.kind != 2) continue;
-        const auto base = FileSys::GetBaseTitleID(package.title_id);
-        if (active_base && base != *active_base) continue;
-        const auto offset = package.title_id - base;
-        if (offset < FileSys::AOC_TITLE_ID_OFFSET ||
-            offset > FileSys::AOC_TITLE_ID_OFFSET + FileSys::AOC_TITLE_ID_MASK)
+        if (package.title_id < aoc_base ||
+            package.title_id - aoc_base > FileSys::AOC_TITLE_ID_MASK)
             continue;
         const auto it = selected.find(package.title_id);
         if (it == selected.end() ||
