@@ -27,7 +27,7 @@ required_puller = (
     "engine_id == static_cast<EngineID>(0xc797)",
     "CallNative3D(dma_pusher,method_call.method,",
     "CallNative3D(dma_pusher,method,",
-    "native_3d->Execute(",
+    "native_3d->ExecuteStaged(",
     "native_macro_method=method",
     "engine.draw_manager.DrawDeferred(engine)",
     "if (!native_3d) native_3d = std::make_unique<Tegra::NativeAmpereMacroState>()",
