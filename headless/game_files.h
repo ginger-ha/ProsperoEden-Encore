@@ -403,16 +403,31 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
     const auto base_relative = FindGameFolderInput(title_root);
     const fs::path base_package = base_relative.empty() ? fs::path{} :
                                   title_root / fs::path(base_relative);
+    // A partial directory walk must not publish only whichever DLC happened
+    // to be enumerated first. Preserve a bounded scan but invalidate the
+    // entire discovery result if a directory exceeds that bound.
+    constexpr std::size_t MaxVisited = 256;
+    constexpr std::size_t MaxEntriesPerDirectory = 512;
+    constexpr std::size_t MaxRoots = 128;
     std::size_t visited = 0;
+    bool incomplete = false;
     const auto scan = [&](const auto& self, const fs::path& dir, unsigned depth) -> void {
-        if (depth > 5 || ++visited > 128 || found.size() >= 32) return;
+        if (incomplete || depth > 5) return;
+        if (++visited > MaxVisited || found.size() > MaxRoots) {
+            incomplete = true;
+            return;
+        }
         std::error_code error;
         std::vector<fs::path> subdirs;
         bool loose_add_on = false;
         std::size_t examined = 0;
         for (fs::directory_iterator it{dir, fs::directory_options::skip_permission_denied, error},
                                     end;
-             !error && it != end && examined++ < 128; it.increment(error)) {
+             !error && it != end; it.increment(error)) {
+            if (++examined > MaxEntriesPerDirectory) {
+                incomplete = true;
+                return;
+            }
             const auto path = it->path();
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.') continue;
@@ -420,7 +435,14 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
             // for each ordinary file in a wrapper or DLC directory.
             std::error_code entry_error;
             const auto status = fs::symlink_status(path, entry_error);
-            if (entry_error || fs::is_symlink(status)) continue;
+            if (entry_error) {
+                if (entry_error != std::errc::no_such_file_or_directory &&
+                    entry_error != std::errc::not_a_directory)
+                    incomplete = true;
+                if (incomplete) return;
+                continue;
+            }
+            if (fs::is_symlink(status)) continue;
             if (fs::is_directory(status)) {
                 // Do not descend into extracted payloads or into a detected
                 // add-on container: the native package provider handles the
@@ -444,6 +466,10 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
                 path != base_package)
                 loose_add_on = true;
         }
+        if (error || found.size() > MaxRoots) {
+            incomplete = true;
+            return;
+        }
         if (loose_add_on) {
             // Provider takes directories, not individual packages. This root
             // includes all local packages and their nested add-on wrappers.
@@ -453,11 +479,12 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
         }
         std::sort(subdirs.begin(), subdirs.end());
         for (const auto& child : subdirs) {
-            if (visited >= 128 || found.size() >= 32) break;
+            if (incomplete) return;
             self(self, child, depth + 1);
         }
     };
     scan(scan, title_root, 0);
+    if (incomplete || found.size() > MaxRoots) return {};
     std::sort(found.begin(), found.end());
     found.erase(std::unique(found.begin(), found.end()), found.end());
     // Keep only minimal roots; a provider scans their descendants. Build a
