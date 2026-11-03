@@ -812,6 +812,37 @@ int main() {
         // width * BytesPerBlock, use the same overflow-safe admission.
         assert(NativeQmdWithinByteBudget(4096, 32768, 1, 1, 2));
         assert(!NativeQmdWithinByteBudget(4096, 32769, 1, 1, 2));
+        // P2.2: include ALL guest mip levels before the common u32
+        // ImageInfo cache computes offsets. This is the lower bound,
+        // not a substitute for the block-linear GOB allocation check.
+        u64 mip_min{};
+        using Shader::Ampere::NativeQmdMipChainMinimumBytes;
+        assert(NativeQmdMipChainMinimumBytes(
+            1024, 1024, 1, 1, 11, 1, 1, 4, mip_min));
+        assert(mip_min == 5592404);
+        assert(NativeQmdMipChainMinimumBytes(
+            64, 1, 1, 1, 7, 1, 1, 4, mip_min) && mip_min == 508);
+        assert(NativeQmdMipChainMinimumBytes(
+            16, 8, 4, 1, 5, 1, 1, 16, mip_min) && mip_min == 9392);
+        assert(NativeQmdMipChainMinimumBytes(
+            32, 32, 1, 4, 6, 1, 1, 4, mip_min) && mip_min == 21840);
+        // ASTC/BC block width is rounded up independently per level.
+        assert(NativeQmdMipChainMinimumBytes(
+            9, 9, 1, 1, 4, 4, 4, 16, mip_min) && mip_min == 192);
+        assert(NativeQmdMipChainMinimumBytes(
+            8192, 8192, 1, 1, 1, 1, 1, 4, mip_min) &&
+            mip_min == max_bytes);
+        // Level zero fits exactly; the second mip exceeds 256 MiB.
+        assert(!NativeQmdMipChainMinimumBytes(
+            8192, 8192, 1, 1, 2, 1, 1, 4, mip_min));
+        assert(!NativeQmdMipChainMinimumBytes(
+            65536, 65536, 1, 1, 1, 1, 1, 16, mip_min));
+        assert(!NativeQmdMipChainMinimumBytes(
+            64, 64, 1, 1, 33, 1, 1, 4, mip_min));
+        assert(!NativeQmdMipChainMinimumBytes(
+            0, 64, 1, 1, 1, 1, 1, 4, mip_min));
+        assert(!NativeQmdMipChainMinimumBytes(
+            64, 64, 1, 1, 1, 0, 1, 4, mip_min));
         TICEntry tic{};
         tic.header_version.Assign(TICHeaderVersion::BlockLinear);
         tic.texture_type.Assign(TextureType::Texture2D);
