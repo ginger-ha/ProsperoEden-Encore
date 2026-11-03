@@ -84,6 +84,23 @@ std::string Read(const FileSys::VirtualFile& file) {
 int main(int argc, char** argv) {
     assert(argc == 19);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
+    // File recognition must be based on the superblock, not .nup extension.
+    // This cheap probe does not replace the full archive validation.
+    assert(Eden::NupV1::Native::HasNupV1Header(input));
+    assert(!Eden::NupV1::Native::HasNupV1Header(
+        std::make_shared<MemoryFile>(std::vector<u8>(0x80, 0))));
+    auto bad_magic = Load(argv[1]);
+    bad_magic[0] = 'X';
+    assert(!Eden::NupV1::Native::HasNupV1Header(
+        std::make_shared<MemoryFile>(std::move(bad_magic))));
+    auto bad_size = Load(argv[1]);
+    bad_size[0x40] ^= 1;
+    assert(!Eden::NupV1::Native::HasNupV1Header(
+        std::make_shared<MemoryFile>(std::move(bad_size))));
+    // A valid superblock with packages from incompatible applications
+    // passes this probe, but its full Mount::Open will reject it.
+    assert(Eden::NupV1::Native::HasNupV1Header(
+        std::make_shared<MemoryFile>(Load(argv[4]))));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
     assert(mount && error.empty());
