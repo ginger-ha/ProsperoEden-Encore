@@ -293,6 +293,16 @@ public:
         {
             std::lock_guard lock(mutex_);
             completed_ = work.back().last_sequence;
+            // A complete drain traditionally swapped the entire FIFO into
+            // `work`, leaving queue_ with zero capacity. Repeated short
+            // bursts then reallocated the FIFO on almost every GPU boundary.
+            // Recycle the emptied snapshot's backing storage only when no
+            // producer enqueued a new tail while replay ran. Never disturb
+            // a newer unpublished reservation or its sequence ordering.
+            if (queue_.empty()) {
+                work.clear();
+                queue_.swap(work);
+            }
         }
         completed_cv_.notify_all();
         return replayed;
