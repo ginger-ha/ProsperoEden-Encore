@@ -148,16 +148,26 @@ int main() {
         same.games_loaded_ = true;
         same.library_.selected = 0;
         same.library_.count = 1;
+        same.library_back_focused_ = true;
+        same.library_back_zoom_ = true;
         Game updated = old;
         updated.mods_enabled = true;
         same.apply_games({updated});
         assert(same.mods_switch_.snaps == 1 && same.mods_switch_.last == 1.0f);
         assert(same.library_.resets == 0 && same.refreshed == 0);
+        assert(same.library_back_focused_ && same.library_back_zoom_);
         same.apply_games({updated});
         assert(same.mods_switch_.snaps == 1 && same.library_.resets == 0);
         updated.mods_enabled = false;
         same.apply_games({updated});
         assert(same.mods_switch_.snaps == 2 && same.mods_switch_.last == 0.0f);
+        assert(same.library_back_focused_ && same.library_back_zoom_);
+        // Replacing a ROM in place with a different TitleID cannot inherit
+        // either its UI identity or an open rear-cover zoom.
+        updated.title_id = 0x222;
+        same.apply_games({updated});
+        assert(!same.library_back_focused_ && !same.library_back_zoom_);
+        assert(same.library_.resets == 1 && same.refreshed == 1);
     }
     // A HOME-origin enrichment must also reach every installed physical
     // copy of a TitleID. This uses the actual asynchronous owner method.
@@ -354,8 +364,9 @@ int main() {
     v.library_back_zoom_ = true;
     v.apply_games({{"A", false}, {"B", true}});
     assert(v.library_.selected == 1 && v.library_.resets == 1);
-    assert(v.selected_docked_ && !v.library_back_focused_ && !v.library_back_zoom_);
+    assert(v.selected_docked_ && v.library_back_focused_ && v.library_back_zoom_);
     v.apply_games({{"B", true}, {"A", false}, {"C", false}});
+    assert(!v.library_back_focused_ && !v.library_back_zoom_);
     assert(v.library_.selected == 0 && v.library_.count == 3);
     assert(v.library_.resets == 2 && v.games_[0].file == "B");
 
