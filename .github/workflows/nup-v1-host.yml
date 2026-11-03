@@ -20,6 +20,8 @@ on:
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
       - headless/CMakeLists.txt
+      - headless/game_files.h
+      - tools/check-nup-v1-game-discovery.py
       - headless/nup_v1_runtime.cmake
       - tools/check-nup-v1-runtime-cmake.py
       - tools/nup-v1-native-host.cpp
@@ -48,6 +50,8 @@ on:
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
       - headless/CMakeLists.txt
+      - headless/game_files.h
+      - tools/check-nup-v1-game-discovery.py
       - headless/nup_v1_runtime.cmake
       - tools/check-nup-v1-runtime-cmake.py
       - tools/nup-v1-native-host.cpp
@@ -92,3 +96,5 @@ jobs:
         run: python3 tools/check-nup-v1-real-romfs-host.py
       - name: Configure-only P5 NUP loader gate (no console build)
         run: python3 tools/check-nup-v1-runtime-cmake.py
+      - name: Compile library discovery with NUP OFF and P5 ON
+        run: python3 tools/check-nup-v1-game-discovery.py
