@@ -101,7 +101,7 @@ def main() -> None:
     # unaligned, zero-byte and short HIPC output spans. This is a host
     # contract test, not a PS5 service dispatch or guest IPC proof.
     begin = aoc.index("    const std::size_t capacity = out_addons.size() / sizeof(u32);")
-    end = aoc.index("\\n\\n    R_SUCCEED();", begin)
+    end = aoc.index("\n\n    R_SUCCEED();", begin)
     ipc_policy = aoc[begin:end]
     assert "std::memcpy(out_addons.data(), out.data() + offset," in ipc_policy
     assert "if (*out_count)" in ipc_policy
