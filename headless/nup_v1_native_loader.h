@@ -34,6 +34,8 @@ public:
     bool IsRomFSUpdatable() const override { return false; }
 
 private:
+    // Use the actual common NPDM parser before exposing a program ID or boot.
+    Loader::ResultStatus ValidateProgramIdentity(u64& program_id) const;
     explicit NupAppLoader(FileSys::VirtualFile source);
     std::shared_ptr<Mount> mount_;
     std::unique_ptr<ContentSet> content_;
