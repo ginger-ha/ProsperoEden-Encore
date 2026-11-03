@@ -492,6 +492,8 @@ jobs:
           done
       - name: Enforce per-FD native GPU channel isolation in real NVDRV owner
         run: python3 -B tools/check-ns2-native-gpfifo-fd-scope.py
+      - name: Exercise native pointer-backed GPFIFO kickoff H:0x1b (Clang/GCC)
+        run: python3 -B tools/ns2/check_native_gpfifo_kickoff_host.py
       - name: Compile and run native GPFIFO process and fence host regressions
         shell: bash
         run: |
