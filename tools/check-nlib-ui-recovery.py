@@ -184,6 +184,43 @@ invalidation = texture_cpp.split("void Textures::invalidate(", 1)[1].split(
     "void Textures::pump(", 1)[0]
 assert "pending_deletes_.push_back(it->second.texture);" in invalidation
 assert "batch_.delete_texture" not in invalidation
+assert "queue_.erase(std::remove_if(queue_.begin(), queue_.end()," in invalidation
+assert "is_queued_variant), queue_.end());" in invalidation
+# Compile and execute the ACTUAL invalidation-key predicate so an
+# Nlib refresh cannot consume a distinct game whose path shares a prefix.
+variant_predicate = invalidation.split("const auto is_queued_variant = ", 1)[1].split(
+    ";\n    queue_.erase", 1)[0]
+cover_queue_cpp = """
+#include <algorithm>
+#include <cassert>
+#include <deque>
+#include <string>
+int main() {
+    const std::string path = "/cache/box-front-7.tga";
+    const auto is_queued_variant = """ + variant_predicate + """;
+    std::deque<std::string> queue{
+        "/cache/box-front-7.tga#64", "/cache/box-front-77.tga#64",
+        "/cache/box-front-7.tga#2048", "/cache/box-front-7.tga",
+        "/cache/box-front-7.tgaX#128", "/cache/box-back-7.tga#256"};
+    queue.erase(std::remove_if(queue.begin(), queue.end(),
+                               is_queued_variant), queue.end());
+    assert(queue.size() == 4);
+    assert(queue[0] == "/cache/box-front-77.tga#64");
+    assert(queue[1] == "/cache/box-front-7.tga");
+    assert(queue[2] == "/cache/box-front-7.tgaX#128");
+    assert(queue[3] == "/cache/box-back-7.tga#256");
+}
+"""
+with tempfile.TemporaryDirectory(prefix="encore-cover-queue-") as temp:
+    cpp_path = Path(temp) / "cover_queue.cpp"
+    cpp_path.write_text(cover_queue_cpp)
+    for opt in ("-O0", "-O2"):
+        executable = Path(temp) / ("cover_queue" + opt[2:])
+        subprocess.run(
+            ["c++", "-std=c++20", "-Wall", "-Wextra", "-Werror", opt,
+             str(cpp_path), "-o", str(executable)],
+            check=True, capture_output=True, text=True)
+        subprocess.run([str(executable)], check=True, capture_output=True, text=True)
 assert "deleted_this_frame < kMaxTextureReclaimsPerFrame" in texture_cpp
 assert "deleted_this_frame + reclaimed < kMaxTextureReclaimsPerFrame" in texture_cpp
 assert "pending_deletes_.pop_front();" in texture_cpp
