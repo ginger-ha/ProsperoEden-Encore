@@ -534,6 +534,10 @@ def main() -> int:
                 "BuildResourcePlan(" in qmd_environment.read_text() and
                 "shader_info.storage_buffers_descriptors" in qmd_environment.read_text() and
                 "ReadStorageDescriptor(" in qmd_environment.read_text() and
+                "seen_cbuf_banks" in qmd_environment.read_text() and
+                "reflected_banks" in qmd_environment.read_text() and
+                "forged_mapping_reads==0" in (
+                    ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").read_text() and
                 "offset > 0x10000U - sizeof(u32)" in qmd_environment.read_text() and
                 "offset > 0x10000U - 4U * sizeof(u32)" in qmd_environment.read_text() and
                 "desc.cbuf_offset > 0x10000U - 16U * desc.count" in qmd_environment.read_text() and

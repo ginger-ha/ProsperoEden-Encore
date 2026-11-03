@@ -499,6 +499,23 @@ int main() {
            !plan->requires_memory_layout && !plan->requires_tic_tsc &&
            memory.reads==1 && memory.last_read_bytes==16);
     assert(plan->HasResolvedBufferBindings());
+    // The caller may pass a forged plan to the staging helper. Validate the
+    // exact 8-bank/64-KiB QMD ABI before consulting any permissive GMMU.
+    auto forged_plan=*plan;
+    forged_plan.uniform_buffers[0].bytes=0x10001U;
+    unsigned forged_mapping_reads{};
+    assert(!forged_plan.HasResolvedGpuBufferBindings());
+    assert(!forged_plan.ValidateGpuBufferMappings([&](u64,u32) {
+        ++forged_mapping_reads;
+        return true;
+    }));
+    forged_plan=*plan;
+    forged_plan.uniform_buffers[0].qmd_index=8;
+    assert(!forged_plan.HasResolvedGpuBufferBindings());
+    forged_plan=*plan;
+    forged_plan.uniform_buffers.push_back(forged_plan.uniform_buffers[0]);
+    assert(!forged_plan.HasResolvedGpuBufferBindings());
+    assert(forged_mapping_reads==0);
     // One complete native descriptor mapping failure must refuse the
     // entire resource plan (including address and access permissions).
     memory.mapped=false;
@@ -523,6 +540,10 @@ int main() {
         assert(gp->HasResolvedBufferBindings());
         assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 64));
         assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 256));
+        auto oversized_global_cbuf=*gp;
+        oversized_global_cbuf.uniform_buffers[0].bytes=0x10001U;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            global,oversized_global_cbuf,64));
         auto bad = *gp;
         bad.storage_buffers[0].gpu_address += 4;
         assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, bad, 64));
