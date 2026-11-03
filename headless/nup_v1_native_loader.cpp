@@ -61,12 +61,20 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
         // Use the effective ExeFS control.nacp when the optional TLV is absent.
         const auto exefs = loader->content_->ExeFS();
         const auto control = exefs ? exefs->GetFile("control.nacp") : nullptr;
-        if (control && control->GetSize() == sizeof(FileSys::RawNACP)) {
-            extracted_nacp.resize(sizeof(FileSys::RawNACP));
-            if (control->Read(extracted_nacp.data(), extracted_nacp.size(), 0) ==
-                extracted_nacp.size()) {
-                nacp_data = &extracted_nacp;
+        if (control) {
+            // If an advertised NACP is malformed or fails a hash-verified
+            // read, do not silently fall back to a different DLC family.
+            if (control->GetSize() != sizeof(FileSys::RawNACP)) {
+                if (error) *error = "NUP control.nacp has invalid size";
+                return {};
             }
+            extracted_nacp.resize(sizeof(FileSys::RawNACP));
+            if (control->Read(extracted_nacp.data(), extracted_nacp.size(), 0) !=
+                extracted_nacp.size()) {
+                if (error) *error = "NUP control.nacp integrity failure";
+                return {};
+            }
+            nacp_data = &extracted_nacp;
         }
     }
     if (nacp_data) {
