@@ -127,6 +127,7 @@ def main()->int:
         'c->producer->QueueBuffer(idx,input,&output)',
         'c.producer->DetachNextBuffer(',
         'c.release_fences[slot]=release_fence',
+        'if (fence.num_fences > fence.fences.size()) continue;',
         'if(!image||!image->window_pool||!m_native_module)return {}',
         'GetSyncpointManager().IsSyncpointAllocated(fence)',
         'c->retained[slot]=buffer',
