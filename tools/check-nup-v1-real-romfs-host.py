@@ -59,7 +59,8 @@ def main() -> None:
 
         binary = temp / "nup-real-romfs"
         cmd = [
-            os.environ.get("CXX", "g++"), "-std=c++20", "-O1",
+            os.environ.get("CXX", "g++"), "-std=c++20", "-O1", "-g",
+            "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
             "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
             "-pedantic", "-I", str(ROOT / "tools/nup-native-host-stub"),
             "-I", str(vendor), "-I", str(ROOT / "headless"),
@@ -72,7 +73,10 @@ def main() -> None:
             "-lcrypto", "-lzstd", "-pthread", "-o", str(binary),
         ]
         subprocess.run(cmd, check=True)
-        subprocess.run([str(binary), str(test_archive)], check=True)
+        env = dict(os.environ,
+                   ASAN_OPTIONS="halt_on_error=1:detect_leaks=0",
+                   UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1")
+        subprocess.run([str(binary), str(test_archive)], check=True, env=env)
         print(f"Pinned vendor RomFS builder+concat {pinned[:12]}: NUP overlay/AoC binary layout OK")
 
 
