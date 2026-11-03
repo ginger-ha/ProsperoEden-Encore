@@ -1568,21 +1568,31 @@ if gpu_actual != gpu_expected:
     owner_sha = git_blob_id(gpu_actual)
     n51_sha = "c7923dbbef27a9088dbfcb33c162e3c7069679c1"
     p12_sha = "7dba34b3e300515cd5b0a8579fe893072cb70b24"
-    assert owner_sha in (n51_sha, p12_sha), (
+    # Complete P1.2 successor reviewed against the historical generated TU:
+    # bounds checks on unmap, sparse walks and GMMU address ranges; physical
+    # device-backed block fallbacks and scalar paging are preserved. This is
+    # an exact blob admission, never a general substring-based exception.
+    p12_bounded_sha = "b5caf9fa5b0477b005249d4b87bac89934bf4c50"
+    assert owner_sha in (n51_sha, p12_sha, p12_bounded_sha), (
         "unreviewed changed-PTE/P1.2 GPU source drift", owner_sha)
     assert "#ifdef EDEN_NS2_GPU_RANGE_BATCH" in gpu_actual
-    if owner_sha == p12_sha:
+    if owner_sha in (p12_sha, p12_bounded_sha):
         assert '#include "native_paged_scalar.h"' in gpu_actual
         assert "Eden::GpuScalar::Read(addr, value" in gpu_actual
         assert "Eden::GpuScalar::Write(addr, data" in gpu_actual
         assert gpu_actual.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4
         assert "memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount)" in gpu_actual
         assert "memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount)" in gpu_actual
+        if owner_sha == p12_bounded_sha:
+            assert gpu_actual.count("size > address_space_size -") >= 7
+            assert "const size_t page_last{((addr + size - 1) >> page_bits) + 1};" in gpu_actual
+            assert "GetSubmappedRangeImpl<true>(gpu_addr, size, result);" in gpu_actual
     # N51's independent source-normalisation witness must also pin both
     # complete blobs and recheck all batching operands after removing N51.
     n51_guard = (root / "tools/ns2/check_egl_gpu_range_batch.py").read_text()
     assert f'n51_original = "{n51_sha}"' in n51_guard
     assert f'p12_protected = "{p12_sha}"' in n51_guard
+    assert f'p12_bounded = "{p12_bounded_sha}"' in n51_guard
     assert 't.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4' in n51_guard
 
 assert 'list(APPEND video_sources "${EDEN_NATIVE_GPU_MEMORY_MANAGER}")' in c

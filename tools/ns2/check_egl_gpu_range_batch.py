@@ -24,9 +24,13 @@ t = OWNER.read_text()
 source_blob = blob(t)
 n51_original = "c7923dbbef27a9088dbfcb33c162e3c7069679c1"
 p12_protected = "7dba34b3e300515cd5b0a8579fe893072cb70b24"
-assert source_blob in (n51_original, p12_protected), (
+# Source-level diff reviewed 2026-11-03: this complete owner additionally
+# bounds GPU unmap, sparse walkers and 40/49-bit VA probes. The paging tests
+# compile real owner-derived C++ in O0/O2 under UBSan; keep exact blob pinning.
+p12_bounded = "b5caf9fa5b0477b005249d4b87bac89934bf4c50"
+assert source_blob in (n51_original, p12_protected, p12_bounded), (
     "N51 GPU owner source drift (review before changing baseline)", source_blob)
-if source_blob == p12_protected:
+if source_blob in (p12_protected, p12_bounded):
     assert '#include "native_paged_scalar.h"' in t
     assert "Eden::GpuScalar::Read(addr, value" in t
     assert "Eden::GpuScalar::Write(addr, data" in t
@@ -37,7 +41,7 @@ assert HELPER.is_file() and "class ChangedPageRuns" in HELPER.read_text()
 # P1.2 introduced a scalar safety include between the canonical header
 # and the N51 opt-in block. Remove only N51, never the P1.2 include.
 owner_header = '#include "video_core/memory_manager.h"\n'
-if source_blob == p12_protected:
+if source_blob in (p12_protected, p12_bounded):
     owner_header += '#include "native_paged_scalar.h"\n'
 t = once(t,
     owner_header + '#ifdef EDEN_NS2_GPU_RANGE_BATCH\n'
@@ -73,6 +77,15 @@ if source_blob == n51_original:
     assert blob(t) == "f30099dfb5df01d9cd787d199e3e61f28205669a", "N51 changed unrelated PS5 GPU logic"
 else:
     assert "EDEN_NS2_GPU_RANGE_BATCH" not in t
+
+if source_blob == p12_bounded:
+    # Unlike an allowlist update alone, prove that each new range guard is
+    # present before the corresponding guest GPU page-table walk.
+    assert "size == 0 || addr >= address_space_size ||" in OWNER.read_text()
+    assert "size == 0 || gpu_addr >= address_space_size ||" in OWNER.read_text()
+    assert "size == 0 || src_addr >= address_space_size ||" in OWNER.read_text()
+    assert "size > address_space_size -" in OWNER.read_text()
+    assert "const size_t page_last{((addr + size - 1) >> page_bits) + 1};" in OWNER.read_text()
 
 assert "EDEN_NS2_GPU_RANGE_BATCH_EXPERIMENTAL OR" in CMAKE
 assert "EDEN_NS2_GPU_RANGE_BATCH=1" in CMAKE
