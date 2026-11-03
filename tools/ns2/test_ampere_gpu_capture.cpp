@@ -204,6 +204,26 @@ int main() {
             table[0].cbuf_index==7 && table[0].cbuf_offset==0xffc0U &&
             table[0].entries==16,
             "BRX table ending at 64-KiB CBUF boundary is valid metadata");
+    auto spaced_motif=motif;
+    spaced_motif.insert(spaced_motif.begin()+1,
+                        Instruction{{pred_true|0x918U,0,0,0}});
+    // BRX moved one native instruction: its absolute-zero relative base
+    // must change from -64 to -80 bytes as well.
+    spaced_motif[4].words[1]=0xffffffb0U;
+    Require(TrackCaptureIndirectBranches(spaced_motif).size()==1,
+            "canonical NOP between jump-table definitions is transparent");
+    auto clobbered_motif=motif;
+    clobbered_motif.insert(clobbered_motif.begin()+3,
+                          Instruction{{pred_true|0x202U|(6U<<16),0,0,0}});
+    clobbered_motif[4].words[1]=0xffffffb0U;
+    Require(TrackCaptureIndirectBranches(clobbered_motif).empty(),
+            "intervening register overwrite cannot reuse stale LDC target");
+    auto interleaved_motif=motif;
+    interleaved_motif.insert(interleaved_motif.begin()+1,
+                            Instruction{{pred_true|0x202U|(9U<<16),0,0,0}});
+    interleaved_motif[4].words[1]=0xffffffb0U;
+    Require(TrackCaptureIndirectBranches(interleaved_motif).empty(),
+            "unproved interleaved source instructions fail closed");
     motif[2].words[1]=(7U<<22)|(0xffc4U<<6);
     Require(TrackCaptureIndirectBranches(motif).empty(),
             "BRX table crossing 64-KiB CBUF boundary must not be read");

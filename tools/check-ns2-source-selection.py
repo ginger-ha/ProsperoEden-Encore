@@ -416,6 +416,8 @@ def main() -> int:
                 "indirect_uniform.status==NativeCaptureStatus::UnresolvedIndirectBranch" in native_capture_fixture and
                 "table[0].cbuf_offset==0xffc0U" in native_capture_fixture and
                 "TrackCaptureIndirectBranches(motif).empty()" in native_capture_fixture and
+                "clobbered_motif" in native_capture_fixture and
+                "transparent_gap" in native_branch_tables and
                 "TranslateCaptureIndirectTargets" in native_branch_tables and
                 "prior.native_code_offset != native_offset" in native_branch_tables and
                 "mapped_header_table->front().entries" in native_capture_fixture and
