@@ -58,12 +58,30 @@ def main() -> None:
         ("Result IAddOnContentManager::GetAddOnContentListChangedEvent(",
          "void LoopProcess("),
     ):
-        assert between(aoc_old, first, last) == between(aoc, first, last), (
+        upstream_region = between(aoc_old, first, last)
+        patched_region = between(aoc, first, last)
+        if first == "static std::vector<u64> AccumulateAOCTitleIDs(":
+            # The only permitted difference in the common NCA enumeration
+            # is the explicit null guard against stale provider entries.
+            previous = """                return rcu.GetEntry(tid, FileSys::ContentRecordType::Data)->GetStatus() !=
+                       Loader::ResultStatus::Success;"""
+            corrected = """                // Content inventories may outlive a removed or unreadable
+                // NCA. Do not dereference a missing entry while creating aoc:u.
+                const auto entry = rcu.GetEntry(tid, FileSys::ContentRecordType::Data);
+                return !entry || entry->GetStatus() != Loader::ResultStatus::Success;"""
+            assert previous in upstream_region
+            assert corrected in patched_region
+            upstream_region = upstream_region.replace(previous, corrected)
+        assert upstream_region == patched_region, (
             f"upstream aoc:u owner drift: {first}")
     for marker in (
         "VisibleAddOnTitleIds(", "SoleActiveAddOns()",
         "nup->BaseId(title_id)", "nup->OpenRomFS(program_id",
         "Settings::values.disabled_addons[current]",
+        "const std::size_t capacity = out_addons.size() / sizeof(u32)",
+        "const u64 requested_id = aoc_base + static_cast<u32>(addon_index)",
+        "requested_id) !=",
+        "AM::ResultApplicationRecordNotFound",
     ):
         assert marker in aoc, f"missing NUP AoC gate: {marker}"
 
