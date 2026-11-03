@@ -83,6 +83,7 @@ struct MockMappedGpu {
     std::array<u32,8> words{0xabcdef01,0x11223344,0x55667788,0x99aabbcc};
     unsigned reads{};
     std::size_t last_read_bytes{};
+    std::size_t accessible_bytes{32};
     bool mapped{true};
 };
 static bool Read(void* context,u64 address,void* destination,std::size_t bytes) {
@@ -95,7 +96,8 @@ static bool Read(void* context,u64 address,void* destination,std::size_t bytes) 
     if (!memory.mapped || !destination ||
         (bytes!=sizeof(u32) && bytes!=4*sizeof(u32)) ||
         address < memory.address ||
-        bytes > sizeof(memory.words) ||
+        bytes > sizeof(memory.words) || bytes > memory.accessible_bytes ||
+        address-memory.address > memory.accessible_bytes-bytes ||
         address-memory.address > sizeof(memory.words)-bytes ||
         (address-memory.address)%4)
         return false;
@@ -370,6 +372,11 @@ int main() {
     memory.mapped=false;
     assert(!env.BuildResourcePlan(shader_info));
     memory.mapped=true;
+    // The first three 4-byte CBUF words may be reachable while the fourth
+    // lives on an inaccessible page. Reject the WHOLE 16-byte record.
+    memory.accessible_bytes=12;
+    assert(!env.BuildResourcePlan(shader_info));
+    memory.accessible_bytes=32;
     // P2.2: reflected TIC/TSC handle words must be read from the native QMD
     // CBUF, in the shared cache descriptor order. This is NOT an image binding.
     {
