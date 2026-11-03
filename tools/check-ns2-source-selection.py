@@ -394,6 +394,8 @@ def main() -> int:
                 "NativeQmdGlobalMemoryLayoutMatches(" in qmd_environment.read_text() and
                 "result.global_layout_resolved = result.uses_global_memory;" in qmd_environment.read_text() and
                 "info.nvn_buffer_used.test(i)" in qmd_environment.read_text() and
+                "i < info.nvn_buffer_used.size(); ++i" in qmd_environment.read_text() and
+                "if (info.nvn_buffer_used.test(i))" in qmd_environment.read_text() and
                 "info.stores_global_memory && !storage.is_written" in qmd_environment.read_text() and
                 "host_ssbo_alignment" in qmd_environment.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in qmd_api.read_text() and
