@@ -387,7 +387,28 @@ int main() {
         assert(tp->ValidateGpuBufferMappings(image_spans));
         assert(admitted_spans == 2);
         assert(!tp->ValidateGpuMappings(image_spans));
-        assert(admitted_spans == 2); // no image descriptor may reach Vulkan
+        assert(admitted_spans == 2); // buffer-only admission remains closed
+        // Actual QMD3 CBUF/SSBO staging must stay fail-closed WITHOUT a
+        // fence-owned image binding, then use the existing BufferCache owner
+        // when a real image/sampler lease is supplied by the rasterizer.
+        unsigned image_uniform_binds{}, image_storage_binds{}, image_rollbacks{};
+        const auto image_uniform = [&](u32, u32, u64, u32) {
+            ++image_uniform_binds;
+            return true;
+        };
+        const auto image_storage = [&](u32, u64, u32, bool) {
+            ++image_storage_binds;
+            return true;
+        };
+        const auto image_rollback = [&] { ++image_rollbacks; };
+        assert(!tp->StageVulkanBufferBindings(
+            image_spans, image_uniform, image_storage, image_rollback));
+        assert(image_uniform_binds == 0 && image_storage_binds == 0 &&
+               image_rollbacks == 0);
+        assert(tp->StageVulkanBufferBindings(
+            image_spans, image_uniform, image_storage, image_rollback, true));
+        assert(image_uniform_binds == 1 && image_storage_binds == 1 &&
+               image_rollbacks == 0);
         auto malformed = *tp;
         malformed.requires_memory_layout = true;
         assert(!malformed.HasResolvedGpuBufferBindings());
