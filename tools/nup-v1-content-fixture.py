@@ -147,7 +147,15 @@ def executable_fixture() -> bytes:
         {"title_id": title + 0x1000, "version": 0, "kind": 2, "files": {
             "romfs/addon.dat": b"addon-one",
         }},
-        {"title_id": title + 0x2000, "version": 0, "kind": 2, "files": {
+        {"title_id": title + 0x1001, "version": 0, "kind": 2, "files": {
             "romfs/addon.dat": b"addon-two",
+        }},
+        # Highest revision of the first DLC replaces its older package.
+        {"title_id": title + 0x1000, "version": 2, "kind": 2, "files": {
+            "romfs/addon.dat": b"addon-one-v2",
+        }},
+        # A foreign title must not appear in this base game's AoC list.
+        {"title_id": title + 0x2000, "version": 0, "kind": 2, "files": {
+            "romfs/addon.dat": b"foreign-dlc",
         }},
     ])
