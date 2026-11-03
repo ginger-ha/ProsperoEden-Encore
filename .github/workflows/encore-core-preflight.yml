@@ -26,6 +26,9 @@ on:
       - 'docs/FC27_F07_CROSS_SYSTEM_OPTIMIZATION_AUDIT_2026-10-26.md'
       - 'docs/EDEN_CORE_AUDIT_DEPENDENCIES.md'
       - 'docs/EDEN_ACTIVE_SOURCE_CATALOG.md'
+      # CMake source-owner tables are executable CI contracts, not prose.
+      - 'docs/EDEN_OVERRIDE_SOURCE_OF_TRUTH.md'
+      - 'docs/EDEN_OVERRIDE_MIGRATION_INVENTORY.md'
       - 'docs/EDEN_NATIVE_CONFIG_METADATA_REVIEW_2026-10-21.md'
       - '.github/workflows/encore-core-fast-gate.yml'
       - '.github/workflows/encore-core-preflight.yml'
