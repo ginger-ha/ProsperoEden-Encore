@@ -403,6 +403,18 @@ def main() -> int:
                 "CompileCapturedNs2ComputeSpirv(" in pipeline_source.read_text() and
                 (ROOT / "tools/ns2/test_native_qmd_compute_environment.cpp").is_file(),
                 "QMD3 49-bit Compute metadata must reach authenticated SPIR-V compilation")
+        # P2.3 bounded global memory reuses the real shared SPIR-V
+        # U64 address -> NVN SSBO dispatch. The QMD3 adapter authenticates
+        # the descriptor count and all referenced backing before Vulkan.
+        global_emit = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
+        require("void EmitContext::DefineGlobalMemoryFunctions(const Info& info)" in global_emit and
+                "if (!info.uses_global_memory || !profile.support_int64)" in global_emit and
+                "if (!info.nvn_buffer_used[index])" in global_emit and
+                "ssbo_addr_cbuf_offset" in global_emit and
+                "ssbo_size_cbuf_offset" in global_emit and
+                "min_ssbo_alignment" in global_emit and
+                "global_layout_resolved" in qmd_environment.read_text(),
+                "Native global memory requires genuine SPIR-V SSBO lookup and authenticated QMD backing")
         # Native Vulkan must use the authenticated Ampere SPIR-V shader and
         # QMD buffer resources, never the legacy Maxwell launch descriptor.
         native_vk_rasterizer = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
