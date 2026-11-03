@@ -26,7 +26,7 @@ assert "VideoCommon::ReadNs2GpuShader(" in rasterizer
 assert "NativeQmdTextureTables" in native
 assert "kepler_compute.regs" in native
 assert "launch.linked_tsc" in native
-assert "return false; // no unbacked image/sampler descriptor publication" in native
+assert "if (native_images.size() != typed_descriptors->size())" in native
 assert "resources->HasResolvedBufferBindings()" in native
 print("NS2_NATIVE_TIC_METADATA_SOURCE_PASS real_tables=1 no_false_vk_images=1")
 
