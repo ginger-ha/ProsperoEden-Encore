@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
         constexpr std::string_view base = "@base/romfs/";
         constexpr std::string_view first_update = "@update1/romfs/";
         constexpr std::string_view second_update = "@update2/romfs/";
+        constexpr std::string_view addon = "@addon/romfs/";
         if (name.starts_with(effective))
             file = archive->FindEffectiveMember(Eden::NupV1::ContentView::RomFS,
                                                 name.substr(effective.size()));
@@ -71,7 +72,15 @@ int main(int argc, char** argv) {
         else if (name.starts_with(second_update))
             file = archive->FindPackageMember(2, Eden::NupV1::ContentView::RomFS,
                                               name.substr(second_update.size()));
-        else
+        else if (name.starts_with(addon)) {
+            for (std::size_t i = 0; i < archive->Packages().size(); ++i) {
+                if (archive->Packages()[i].kind == 2) {
+                    file = archive->FindPackageMember(i, Eden::NupV1::ContentView::RomFS,
+                                                      name.substr(addon.size()));
+                    break;
+                }
+            }
+        } else
             file = archive->FindFile(0, name);
         if (!file) {
             std::cerr << "Member not found in package 0\n";
