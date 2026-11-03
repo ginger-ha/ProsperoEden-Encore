@@ -98,6 +98,14 @@ jobs:
           set -euo pipefail
           git clone --depth 1 --branch 12.1.0 https://github.com/fmtlib/fmt.git build-ns2-a64/fmt
           test "$(git -C build-ns2-a64/fmt rev-parse HEAD)" = "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f"
+      - name: Pinned Vulkan-Headers v1.4.345 (Eden cpmfile.json)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v1.4.345 \
+            https://github.com/KhronosGroup/Vulkan-Headers.git build-ns2-a64/vulkan-headers
+          test "$(git -C build-ns2-a64/vulkan-headers rev-parse HEAD)" = \
+            "74d8a6cb930c68ef617b202c3ff3c59d919e086b"
       - name: Pinned VulkanMemoryAllocator v3.3.0 headers (Eden cpmfile.json)
         shell: bash
         run: |
@@ -114,6 +122,7 @@ jobs:
             "$cxx" -std=c++20 -fsyntax-only -Wno-unused-parameter \
               -DPS5_NATIVE=1 -DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1 \
               -Ibuild-ns2-a64/fmt/include \
+              -Ibuild-ns2-a64/vulkan-headers/include \
               -Ibuild-ns2-a64/vma/include \
               -Ivendor/encore-active/ns2-astc/include \
               -Ivendor/encore-active/eden-vulkan/include \
