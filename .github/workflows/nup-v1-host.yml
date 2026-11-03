@@ -10,6 +10,11 @@ on:
       - tools/nup-v1-vfs-host.cpp
       - headless/nup_v1_vfs.h
       - headless/nup_v1_vfs.cpp
+      - headless/nup_v1_native_vfs.h
+      - headless/nup_v1_native_vfs.cpp
+      - tools/nup-v1-native-host.cpp
+      - tools/check-nup-v1-native-host.py
+      - tools/nup-native-host-stub/**
       - .github/workflows/nup-v1-host.yml
   pull_request:
     paths:
@@ -19,6 +24,11 @@ on:
       - tools/nup-v1-vfs-host.cpp
       - headless/nup_v1_vfs.h
       - headless/nup_v1_vfs.cpp
+      - headless/nup_v1_native_vfs.h
+      - headless/nup_v1_native_vfs.cpp
+      - tools/nup-v1-native-host.cpp
+      - tools/check-nup-v1-native-host.py
+      - tools/nup-native-host-stub/**
       - .github/workflows/nup-v1-host.yml
   workflow_dispatch:
 
@@ -40,3 +50,5 @@ jobs:
         run: python3 tools/check-nup-v1-payload-host.py --self-test
       - name: Compile and exercise isolated NUP C++ VFS (host only)
         run: python3 tools/check-nup-v1-vfs-host.py
+      - name: Compile and exercise inactive native FileSys adapter (host ABI stub)
+        run: python3 tools/check-nup-v1-native-host.py
