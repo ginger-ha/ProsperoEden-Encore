@@ -232,6 +232,25 @@ int main() {
         assert(f.signal(0x81000, 7).empty());
         assert(f.released.size() == 2);
     }
+    // Invalid guest QMD addresses/headers must not consume the 4096-entry
+    // quota. A real QMD arriving afterwards must still launch normally.
+    {
+        Fixture f;
+        auto invalid = EmptyGrid();
+        invalid[18] = 0x20;
+        for (Address i = 0; i < 4200; ++i) {
+            const Address address = 0x2000000ULL + (i << 8);
+            assert(f.signal(address, 3) == "unmapped QMD");
+            f.descriptors[address] = invalid;
+            assert(f.signal(address, 3) == "unsupported QMD version or queue");
+            f.descriptors.erase(address);
+        }
+        auto valid = EmptyGrid();
+        SetRelease(valid, 24, 0x8300, 17);
+        f.descriptors[0x90000] = valid;
+        assert(f.signal(0x90000, 3).empty());
+        assert(f.released.size() == 1 && std::get<0>(f.released[0]) == 0x8300);
+    }
     // A compute queue may decrement another channel's QMD after its launch
     // record arrives. An early decrement must be retained for the same title.
     {
