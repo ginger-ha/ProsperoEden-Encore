@@ -33,6 +33,9 @@ public:
     Loader::ResultStatus ReadNSOModules(Modules& out_modules) override;
     // NUP has already applied its highest-version directory overlay.
     bool IsRomFSUpdatable() const override { return false; }
+    // Exposes verified package directory handles for a future AoC provider.
+    // Does NOT register titles with aoc:u or make DLC visible to the guest.
+    const std::vector<AddOnDirectory>& SelectedAddOns() const;
 
 private:
     // Use the actual common NPDM parser before exposing a program ID or boot.
