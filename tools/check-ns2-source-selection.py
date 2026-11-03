@@ -303,7 +303,7 @@ def main() -> int:
                 "engine == static_cast<EngineID>(0xc7c0)" in puller and
                 "EDEN_NS2_COMPUTE_QMD_UNSUPPORTED" in puller and
                 "CallNativeCompute(" in puller and
-                "native_compute->Execute(" in puller and
+                "native_compute->ExecuteStaged(" in puller and
                 "native_compute_macro_method" in puller and
                 "native_compute_parameters" in puller and
                 "if (method == 0xae || method == 0xaf || method == 0xb0)" in puller and
@@ -311,8 +311,8 @@ def main() -> int:
                 "NS2 compute MME must emit native PCAS into QMD3 without Maxwell launch")
         require("bool invalid_compute_register_read = false;" in puller and
                 "if (index >= Tegra::Engines::KeplerCompute::Regs::NUM_REGS)" in puller and
-                "if (invalid_compute_register_read ||" in puller and
-                "if (!result.success || invalid_compute_register_read)" in puller and
+                "const auto allowed = [&](u32 reg, u32)" in puller and
+                "return !invalid_compute_register_read;" in puller and
                 'fail("compute MME interpreter or register access rejected");' in puller,
                 "Untrusted Ampere MME register reads must fail closed before QMD publication")
         require("BindGraphicsEngine(" in puller and
