@@ -234,6 +234,8 @@ def main() -> int:
                 'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
                 'info.constant_buffer_mask = enabled_mask;' in qmd_indirect and
                 'return declared_mask == program.info.constant_buffer_mask;' in qmd_indirect and
+                'Reflection without uses_cbuf_indirect' in qmd_indirect and
+                'non_indirect(true,false,0,0,1,false)' in ir_native_fixture and
                 '!(enabled_mask & bit)' in qmd_indirect and
                 'NativeQmdStaticCbufReadExtent(offset.U32())' in qmd_indirect and
                 'all_offsets_static' in qmd_indirect and

@@ -147,6 +147,45 @@ static void CheckNativeQmdIndirectCbufIR() {
     run(sparse, false, false, 1, 28, false, 0);
     run(sparse, true, false, 0, 0x10000, false, 0);
     run(0, true, false, 0, 28, false, 0);
+    // A stale compiler reflection flag cannot conceal a real dynamically
+    // selected bank. Otherwise SPIR-V would call an uninitialized indirect
+    // CBUF accessor after metadata normalization.
+    const auto non_indirect = [&](bool dynamic_bank, bool dynamic_offset,
+                                  u32 bank, u32 offset, u32 enabled_mask,
+                                  bool accepted) {
+        Shader::ObjectPool<Shader::IR::Inst> pool{8};
+        Shader::IR::Block block{pool};
+        Shader::IR::Program program{};
+        program.stage=Shader::Stage::Compute;
+        program.blocks.push_back(&block);
+        program.info.uses_cbuf_indirect=false;
+        program.info.constant_buffer_mask=1;
+        program.info.constant_buffer_descriptors.push_back({0,1});
+        Shader::IR::Value bank_arg{bank};
+        Shader::IR::Value offset_arg{offset};
+        if(dynamic_bank) {
+            block.AppendNewInst(Shader::IR::Opcode::IAdd32,
+                                {Shader::IR::Value{u32{0}},
+                                 Shader::IR::Value{u32{1}}});
+            bank_arg=Shader::IR::Value{&block.back()};
+        }
+        if(dynamic_offset) {
+            block.AppendNewInst(Shader::IR::Opcode::IAdd32,
+                                {Shader::IR::Value{u32{0}},
+                                 Shader::IR::Value{u32{16}}});
+            offset_arg=Shader::IR::Value{&block.back()};
+        }
+        block.AppendNewInst(Shader::IR::Opcode::GetCbufU32,
+                            {bank_arg,offset_arg});
+        Require(NormalizeNativeQmdIndirectCbufIR(program,enabled_mask)==accepted,
+                "non-indirect reflection must match actual CBUF selector and 64-KiB bounds");
+    };
+    non_indirect(false,false,0,0,1,true);
+    non_indirect(false,true,0,0,1,true);
+    non_indirect(true,false,0,0,1,false);
+    non_indirect(false,false,8,0,1,false);
+    non_indirect(false,false,0,0x10000U,1,false);
+    non_indirect(false,false,0,0,2,false);
     std::puts("NS2 QMD3 real IR CBUF sparse/static/dynamic admission: PASS");
 }
 int main(int argc,char** argv) {
