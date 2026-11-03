@@ -79,6 +79,8 @@ def main():
         partial_compressed.write_bytes(content_module.compressed_nacp_fixture(variant="partial-entry"))
         oversized_icon = temp / "oversized-exefs-icon.nup"
         oversized_icon.write_bytes(content_module.oversized_icon_fixture())
+        large_raw = temp / "large-raw.nup"
+        large_raw.write_bytes(content_module.large_raw_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
                         str(sibling_npdm), str(malformed_meta), str(duplicate_locale),
@@ -86,7 +88,7 @@ def main():
                         str(nacp_extracted), str(corrupt_nacp),
                         str(short_nacp), str(valid_compressed),
                         str(overlong_compressed), str(partial_compressed),
-                        str(oversized_icon)], check=True)
+                        str(oversized_icon), str(large_raw)], check=True)
 
 if __name__ == "__main__":
     main()
