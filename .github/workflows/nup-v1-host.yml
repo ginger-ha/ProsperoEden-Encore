@@ -47,6 +47,12 @@ on:
 permissions:
   contents: read
 
+# Multiple small NUP commits must not consume the host runner queue with
+# obsolete builds. Keep only the newest verification for each branch/PR.
+concurrency:
+  group: nup-v1-host-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   format-preflight:
     runs-on: ubuntu-latest
