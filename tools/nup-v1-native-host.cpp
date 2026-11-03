@@ -479,6 +479,12 @@ int main(int argc, char** argv) {
     assert(nacp_loader->SelectedAddOns()[0].package_index == 1);
     assert(nacp_loader->SelectedAddOns()[0].title_id ==
            0x0100123400003001ULL);
+    const auto* registered_nacp_loader = nacp_loader.get();
+    auto published_nacp =
+        Eden::NupV1::Native::ActiveAddOnsForLoader(registered_nacp_loader);
+    assert(published_nacp);
+    assert(published_nacp->Count(0x0100123400000000ULL) == 1);
+    assert(!Eden::NupV1::Native::ActiveAddOnsForLoader(nullptr));
     auto aoc_from_nacp = nacp_loader->MakeAddOnIndex();
     assert(aoc_from_nacp);
     assert(aoc_from_nacp->BaseId(0x0100123400000000ULL) ==
@@ -488,6 +494,20 @@ int main(int argc, char** argv) {
     assert(Read(aoc_from_nacp->OpenRomFS(0x0100123400000000ULL, 1)) ==
            "addon.dat=nacp-declared\n");
     assert(!aoc_from_nacp->OpenRomFS(0x0100123400002000ULL, 1));
+    // Snapshot ownership survives teardown of its loader, but the registry
+    // must revoke the old key immediately so a later title can't reuse it.
+    error.clear();
+    auto temporary = Eden::NupV1::Native::NupAppLoader::Open(
+        std::make_shared<MemoryFile>(Load(argv[11])), &error);
+    assert(temporary && error.empty());
+    const auto* old_loader_address = temporary.get();
+    auto keep_alive = Eden::NupV1::Native::ActiveAddOnsForLoader(
+        old_loader_address);
+    assert(keep_alive);
+    temporary.reset();
+    assert(!Eden::NupV1::Native::ActiveAddOnsForLoader(old_loader_address));
+    assert(keep_alive->Count(0x0100123400000000ULL) == 1);
+
     assert(Read(nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
            "nacp-declared");
     // The same declared AoC family must be recovered from extracted
