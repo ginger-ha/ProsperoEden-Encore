@@ -27,6 +27,13 @@ assert "if (params.num_entries != 0) {" in method
 assert "const auto it = sessions.find(fd);" in method
 assert "if (!session || !session->process)" in method
 assert "std::memcpy(entries.command_lists.data(), commands.data()" in method
+# Ioctl2 supplies a separate inline-input span and has its own copy path.
+# It too must handle a fence-only zero-entry submission without memcpy(0).
+end_base2 = "\\nNvResult nvhost_gpu::GetWaitbase("
+assert OWNER.count(end_base2) == 1
+method2 = OWNER[OWNER.index(end) + 1:OWNER.index(end_base2)]
+assert "if (params.num_entries != 0)" in method2
+assert "params.num_entries > commands.size()" in method2
 
 cpp = r"""
 #include <array>
@@ -85,8 +92,10 @@ public:
     }
     NvResult SubmitGPFIFOBase1(IoctlSubmitGpfifo&,
                                std::span<Tegra::CommandListHeader>,DeviceFD,bool);
+    NvResult SubmitGPFIFOBase2(IoctlSubmitGpfifo&,
+                               std::span<const Tegra::CommandListHeader>,DeviceFD);
 };
-""" + method + r"""
+""" + method + "\n" + method2 + r"""
 int main() {
     nvhost_gpu gpu;
     IoctlSubmitGpfifo pointer{0x1000,3};
@@ -140,6 +149,18 @@ int main() {
            == NvResult::Success);
     assert(gpu.captured.empty() && gpu.memory.reads == 1 &&
            gpu.submissions == 4);
+    assert(gpu.SubmitGPFIFOBase2(empty, {}, 42) == NvResult::Success);
+    assert(gpu.captured.empty() && gpu.memory.reads == 1 &&
+           gpu.submissions == 5);
+    IoctlSubmitGpfifo inline2{0,3};
+    assert(gpu.SubmitGPFIFOBase2(inline2, inline_entries, 42)
+           == NvResult::Success);
+    assert(gpu.captured.size() == 3 && gpu.captured[2].word == 9 &&
+           gpu.submissions == 6);
+    inline2.num_entries = 4;
+    assert(gpu.SubmitGPFIFOBase2(inline2, inline_entries, 42)
+           == NvResult::InvalidSize);
+    assert(gpu.submissions == 6);
 }
 """
 compilers = list(dict.fromkeys(p for name in ("clang++", "g++")
