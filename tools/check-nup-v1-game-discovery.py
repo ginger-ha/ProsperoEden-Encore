@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parent.parent
 CODE = r"""
 #include "game_files.h"
 #include <cassert>
-int main() {
+#include <filesystem>
+#include <fstream>
+int main(int argc, char** argv) {
+    assert(argc == 2);
+    namespace fs = std::filesystem;
     // Repeated library scans classify ASCII names without heap allocations.
     // Keep mixed-case addon exclusion and ordinary base-name acceptance.
     assert(Eden::IsAddOnContainerName("UpDaTeS"));
@@ -39,6 +43,19 @@ int main() {
 #endif
     assert(Eden::IsNestedGameFileSelection("MyGame/base/game.nsp"));
     assert(!Eden::IsNestedGameFileSelection("../game.nsp"));
+    // One non-following status probe per entry must preserve the package
+    // ranking, addon exclusion and symlink protection of both scan paths.
+    const fs::path game = fs::path(argv[1]) / "Game";
+    fs::create_directories(game / "base");
+    fs::create_directories(game / "dlc");
+    std::ofstream(game / "base" / "game.nsp").put('g');
+    std::ofstream(game / "dlc" / "update.nsp").put('u');
+    fs::create_directory_symlink(game / "base", game / "linked-base");
+    assert(Eden::FindNestedGamePackage(game) == "base/game.nsp");
+    assert(Eden::IsSafeNestedGameFilePath(game.parent_path(), "Game/base/game.nsp"));
+    assert(!Eden::IsSafeNestedGameFilePath(game.parent_path(), "Game/linked-base/game.nsp"));
+    const auto addon_roots = Eden::FindAddOnContentDirectories(game);
+    assert(addon_roots.size() == 1 && addon_roots.front() == game / "dlc");
     return 0;
 }
 """
@@ -56,7 +73,7 @@ def main() -> None:
             if flag:
                 cmd.append("-DEDEN_NUP_V1_RUNTIME=1")
             subprocess.run(cmd + [str(source), "-o", str(exe)], check=True)
-            subprocess.run([str(exe)], check=True)
+            subprocess.run([str(exe), str(root / ("fixture-on" if flag else "fixture-off"))], check=True)
     print("NUP game discovery: existing formats unchanged, default OFF, P5 ON OK")
 
 if __name__ == "__main__":
