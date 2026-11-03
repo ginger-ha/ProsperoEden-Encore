@@ -53,6 +53,9 @@ struct PackageMetadata {
     std::string publisher;
     std::string display_version;
     std::vector<std::uint8_t> default_icon;
+    // Opaque, size-checked vendor NACP blob. Never executed or used as
+    // program identity; the native bridge may consult its AoC base ID.
+    std::vector<std::uint8_t> control_nacp;
     std::map<std::string, std::string> localized_titles;
     std::map<std::string, std::vector<std::uint8_t>> localized_icons;
 
