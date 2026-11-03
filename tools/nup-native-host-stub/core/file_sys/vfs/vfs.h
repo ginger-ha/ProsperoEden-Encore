@@ -4,6 +4,7 @@
 #include "core/file_sys/vfs/vfs_types.h"
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -19,6 +20,10 @@ public:
     virtual bool IsWritable() const = 0;
     virtual bool IsReadable() const = 0;
     virtual std::size_t Read(u8*, std::size_t, std::size_t) const = 0;
+    template <typename T> std::size_t ReadObject(T* output,
+                                                  std::size_t offset = 0) const {
+        return Read(reinterpret_cast<u8*>(output), sizeof(T), offset);
+    }
     virtual std::optional<u8> ReadByte(std::size_t offset) const {
         u8 value{};
         return Read(&value, 1, offset) == 1 ?
@@ -30,7 +35,17 @@ public:
         result.resize(count);
         return result;
     }
+    virtual std::vector<u8> ReadAllBytes() const {
+        return ReadBytes(GetSize(), 0);
+    }
     virtual std::size_t Write(const u8*, std::size_t, std::size_t) = 0;
+    virtual bool WriteByte(u8 value, std::size_t offset) {
+        return Write(&value, 1, offset) == 1;
+    }
+    virtual std::size_t WriteBytes(const std::vector<u8>& bytes,
+                                   std::size_t offset) {
+        return Write(bytes.data(), bytes.size(), offset);
+    }
     virtual bool Rename(std::string_view) = 0;
 };
 class VfsDirectory {

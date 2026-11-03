@@ -129,6 +129,29 @@ std::map<std::string, std::string> DecodeRomFS(const FileSys::VirtualFile& image
     return collected;
 }
 
+std::map<std::string, std::string> ExtractContents(const FileSys::VirtualDir& root) {
+    assert(root);
+    std::map<std::string, std::string> collected;
+    const auto visit = [&](auto&& self, const FileSys::VirtualDir& dir,
+                           const std::string& prefix, int depth) -> void {
+        assert(dir && depth < 20);
+        for (const auto& file : dir->GetFiles()) {
+            assert(file);
+            const auto bytes = ReadAt(file, 0, file->GetSize());
+            const auto name = prefix.empty() ? file->GetName() :
+                              prefix + "/" + file->GetName();
+            assert(collected.emplace(name, std::string(bytes.begin(), bytes.end())).second);
+        }
+        for (const auto& child : dir->GetSubdirectories()) {
+            const auto name = prefix.empty() ? child->GetName() :
+                              prefix + "/" + child->GetName();
+            self(self, child, name, depth + 1);
+        }
+    };
+    visit(visit, root, "", 0);
+    return collected;
+}
+
 std::vector<u8> ReadFile(const char* path) {
     std::ifstream stream(path, std::ios::binary);
     assert(stream);
@@ -136,18 +159,6 @@ std::vector<u8> ReadFile(const char* path) {
 }
 } // namespace
 
-namespace FileSys {
-VirtualFile PatchIPS(const VirtualFile&, const VirtualFile&); // host stub is inline
-VirtualFile CreateRomFS(VirtualDir dir, VirtualDir ext) {
-    if (!dir || ext) return {};
-    // Keep the directory name before transferring ownership to the
-    // builder; dereferencing dir after std::move is a host-test bug.
-    auto name = dir->GetName();
-    RomFSBuildContext builder(std::move(dir), nullptr);
-    return ConcatenatedVfsFile::MakeConcatenatedFile(
-        0, std::move(name), builder.Build());
-}
-} // namespace FileSys
 
 int main(int argc, char** argv) {
     assert(argc == 2);
@@ -164,6 +175,10 @@ int main(int argc, char** argv) {
     assert(base_files.at("sub/base.dat") == "base-only");
     assert(base_files.at("sub/update.dat") == "update-only");
     assert(!base_files.contains("addon.dat"));
+    // Prove the actual vendor ROMFS extractor reverses the builder/concat
+    // without using our independently written table decoder.
+    const auto extracted_base = FileSys::ExtractRomFS(base);
+    assert(ExtractContents(extracted_base) == base_files);
 
     auto addon_one = content.CreateAddOnRomFS(5);
     auto addon_two = content.CreateAddOnRomFS(4);
@@ -172,6 +187,8 @@ int main(int argc, char** argv) {
     const auto second_files = DecodeRomFS(addon_two);
     assert(first_files.size() == 1 && first_files.at("addon.dat") == "addon-one-v2");
     assert(second_files.size() == 1 && second_files.at("addon.dat") == "addon-two");
+    assert(ExtractContents(FileSys::ExtractRomFS(addon_one)) == first_files);
+    assert(ExtractContents(FileSys::ExtractRomFS(addon_two)) == second_files);
     assert(!content.CreateAddOnRomFS(3)); // older DLC revision
     assert(!content.CreateAddOnRomFS(6)); // unrelated title
 
@@ -191,5 +208,5 @@ int main(int argc, char** argv) {
     // never returned through the actual vendor-generated RomFS offsets.
     assert(Read64(ReadAt(base, 0, 0x50), 0) == 0x50);
 
-    std::cout << "Real vendor RomFSBuildContext+ConcatenatedVfsFile: binary overlay and mutable SHA rejection OK\n";
+    std::cout << "Real vendor RomFS Create+Extract/Concat/Vector+Offset: binary overlay and SHA rejection OK\n";
 }
