@@ -35,6 +35,22 @@ static std::array<W,3> Insn(W method, W value, bool fifo, bool end, bool emit=tr
 static void Append(std::vector<W>& dst,const std::array<W,3>& insn){
     dst.insert(dst.end(),insn.begin(),insn.end());
 }
+static std::array<W,3> RegisterReadInsn(W index) {
+    std::array<W,3> bits{};
+    const auto set=[&](unsigned low,unsigned width,W data){
+        for(unsigned bit=0;bit<width;++bit)
+            if(data & (1u<<bit))
+                bits[(low+bit)/32] |= W{1}<<((low+bit)%32);
+    };
+    set(0,1,1); // end after the next (nonemitting) instruction
+    set(10,5,22); // TU104 MME_READ
+    set(15,5,0); set(20,5,25); set(25,5,24);
+    set(30,16,index); // first ALU operand = sign-extended immediate
+    set(51,5,24); set(56,5,24); set(61,5,24);
+    set(66,16,0x250);
+    set(82,3,6); set(85,4,1); // method from imm1, emitted ALU read
+    return {bits[2],bits[1],bits[0]};
+}
 int main(){
     std::vector<W> code;
     Append(code,Insn(0x230,0x9876,false,true));
@@ -93,4 +109,31 @@ int main(){
     Append(code,Insn(0,0,false,false,false));Append(code,Insn(0,0,false,false,false));
     result=macro.Execute(std::span<const W>(code),0,fifo,read,emit);
     assert(!result.success && result.error=="instruction outside uploaded RAM");
+
+    // P2.4: a guest MME_READ may request a register beyond its native
+    // class's declared bank. The engine must reject that read before an
+    // emitted QMD/PCAS method can use a fabricated zero register value.
+    code.clear(); fifo.clear(); emitted.clear();
+    Append(code,RegisterReadInsn(0x120));
+    Append(code,Insn(0,0,false,false,false));
+    bool out_of_range=false;
+    const auto checked_read=[&](W index)->W {
+        if(index >= 0x1000) {out_of_range=true; return 0;}
+        assert(index == 0x120);
+        return 0xFEEDBEEF;
+    };
+    const auto checked_emit=[&](W address,W value)->bool {
+        if(out_of_range) return false;
+        emitted.emplace_back(address,value);
+        return true;
+    };
+    result=macro.Execute(std::span<const W>(code),0,fifo,checked_read,checked_emit);
+    assert(result.success && !out_of_range && emitted.size()==1);
+    assert(emitted.front().first==0x250 && emitted.front().second==0xFEEDBEEF);
+    code.clear(); emitted.clear();
+    Append(code,RegisterReadInsn(0x4000));
+    Append(code,Insn(0,0,false,false,false));
+    out_of_range=false;
+    result=macro.Execute(std::span<const W>(code),0,fifo,checked_read,checked_emit);
+    assert(out_of_range && !result.success && emitted.empty());
 }
