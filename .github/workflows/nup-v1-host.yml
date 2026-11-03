@@ -12,6 +12,8 @@ on:
       - headless/nup_v1_vfs.cpp
       - headless/nup_v1_native_vfs.h
       - headless/nup_v1_native_vfs.cpp
+      - headless/nup_v1_native_content.h
+      - headless/nup_v1_native_content.cpp
       - tools/nup-v1-native-host.cpp
       - tools/check-nup-v1-native-host.py
       - tools/check-nup-v1-native-abi.py
@@ -27,6 +29,8 @@ on:
       - headless/nup_v1_vfs.cpp
       - headless/nup_v1_native_vfs.h
       - headless/nup_v1_native_vfs.cpp
+      - headless/nup_v1_native_content.h
+      - headless/nup_v1_native_content.cpp
       - tools/nup-v1-native-host.cpp
       - tools/check-nup-v1-native-host.py
       - tools/check-nup-v1-native-abi.py
