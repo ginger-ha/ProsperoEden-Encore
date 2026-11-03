@@ -354,6 +354,19 @@ int main(int argc, char** argv) {
     assert(second_scoped.AddOns().front().package_index == 1);
     assert(Read(second_scoped.CreateAddOnRomFS(1)) == "addon.dat=family-two\n");
     assert(!second_scoped.CreateAddOnRomFS(0));
+    // A trusted NACP can specify a distinct AoC base (e.g., an upgrade
+    // pack). Never guess it from the Switch-generation prefix or game ID.
+    Eden::NupV1::Native::ContentSet explicit_nacp_base(
+        addon_mount, 0x0100123400000000ULL, 0x0100123400003000ULL);
+    assert(explicit_nacp_base.AddOns().size() == 1);
+    assert(explicit_nacp_base.AddOns().front().package_index == 1);
+    assert(Read(explicit_nacp_base.CreateAddOnRomFS(1)) ==
+           "addon.dat=family-two\n");
+    assert(!explicit_nacp_base.CreateAddOnRomFS(0));
+    // Custom AoC family without a caller is never an authority to expose DLC.
+    Eden::NupV1::Native::ContentSet unscoped_nacp(
+        addon_mount, std::nullopt, 0x0100123400003000ULL);
+    assert(unscoped_nacp.AddOns().empty());
     auto base_mounted_again = Eden::NupV1::Native::Mount::Open(
         executable_input, &error);
     assert(base_mounted_again);
