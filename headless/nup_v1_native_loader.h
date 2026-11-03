@@ -4,6 +4,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@ private:
     std::shared_ptr<Mount> mount_;
     std::unique_ptr<ContentSet> content_;
     std::unique_ptr<Loader::AppLoader> extracted_loader_;
+    mutable std::mutex romfs_mutex_;
     FileSys::VirtualFile effective_romfs_;
 };
 
