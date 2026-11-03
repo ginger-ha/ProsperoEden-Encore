@@ -159,3 +159,16 @@ def executable_fixture() -> bytes:
             "romfs/addon.dat": b"foreign-dlc",
         }},
     ])
+
+
+def foreign_update_fixture() -> bytes:
+    """Structurally valid, but an unrelated title attempts to shadow the base."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0, "files": {
+            "romfs/state.bin": b"base-v1",
+        }},
+        {"title_id": title + 0x2000, "version": 99, "kind": 1, "files": {
+            "romfs/state.bin": b"foreign-hijack",
+        }},
+    ])
