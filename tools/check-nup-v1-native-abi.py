@@ -49,7 +49,9 @@ def main() -> None:
             target.write_bytes(data)
         subprocess.run([
             os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only",
-            "-Wall", "-Wextra", "-Werror", "-pedantic",
+            # The actual vendor AppLoader header intentionally names unused
+            # virtual-function parameters. Keep all other warnings fatal.
+            "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-pedantic",
             "-I", str(includes),
             "-I", str(ROOT / "headless"),
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
