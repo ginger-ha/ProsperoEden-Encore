@@ -20,6 +20,7 @@
 #include "core/file_sys/fsmitm_romfsbuild.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs.h"
+#include "core/file_sys/vfs/vfs_concat.h"
 
 namespace {
 class MemoryFile final : public FileSys::VfsFile {
@@ -48,44 +49,8 @@ private:
     std::vector<u8> bytes_;
 };
 
-// Only the concatenation VFS object is host-specific. Offsets and RomFS
-// binary tables come from the real vendor RomFSBuildContext::Build().
-class SegmentVfsFile final : public FileSys::VfsFile {
-public:
-    explicit SegmentVfsFile(std::vector<std::pair<u64, FileSys::VirtualFile>> parts)
-        : parts_(std::move(parts)) {
-        for (const auto& [offset, file] : parts_) {
-            assert(file && offset <= std::numeric_limits<std::size_t>::max());
-            assert(file->GetSize() <= std::numeric_limits<std::size_t>::max() - offset);
-            size_ = std::max<std::size_t>(size_, offset + file->GetSize());
-        }
-    }
-    std::string GetName() const override { return "real-vendor.romfs"; }
-    std::size_t GetSize() const override { return size_; }
-    bool Resize(std::size_t) override { return false; }
-    FileSys::VirtualDir GetContainingDirectory() const override { return {}; }
-    bool IsWritable() const override { return false; }
-    bool IsReadable() const override { return true; }
-    std::size_t Read(u8* out, std::size_t count, std::size_t pos) const override {
-        if (pos >= size_ || !out) return 0;
-        const auto n = std::min(count, size_ - pos);
-        std::fill_n(out, n, u8{});
-        for (const auto& [offset, file] : parts_) {
-            const auto first = std::max<std::size_t>(pos, offset);
-            const auto last = std::min<std::size_t>(pos + n, offset + file->GetSize());
-            if (first >= last) continue;
-            const auto len = last - first;
-            if (file->Read(out + (first - pos), len, first - offset) != len) return 0;
-        }
-        return n;
-    }
-    std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
-    bool Rename(std::string_view) override { return false; }
-private:
-    std::vector<std::pair<u64, FileSys::VirtualFile>> parts_;
-    std::size_t size_{};
-};
-
+// RomFSBuildContext and ConcatenatedVfsFile are both compiled from the
+// actual vendor. Their input NUP VirtualFiles use only the host VFS ABI.
 std::vector<u8> ReadAt(const FileSys::VirtualFile& file, std::size_t pos,
                        std::size_t count) {
     assert(file && count <= file->GetSize() && pos <= file->GetSize() - count);
@@ -176,7 +141,8 @@ VirtualFile PatchIPS(const VirtualFile&, const VirtualFile&); // host stub is in
 VirtualFile CreateRomFS(VirtualDir dir, VirtualDir ext) {
     if (!dir || ext) return {};
     RomFSBuildContext builder(std::move(dir), nullptr);
-    return std::make_shared<SegmentVfsFile>(builder.Build());
+    return ConcatenatedVfsFile::MakeConcatenatedFile(
+        0, dir->GetName(), builder.Build());
 }
 } // namespace FileSys
 
@@ -222,5 +188,5 @@ int main(int argc, char** argv) {
     // never returned through the actual vendor-generated RomFS offsets.
     assert(Read64(ReadAt(base, 0, 0x50), 0) == 0x50);
 
-    std::cout << "Real vendor RomFSBuildContext: base/updates/nested/DLC binaries and mutable SHA rejection OK\n";
+    std::cout << "Real vendor RomFSBuildContext+ConcatenatedVfsFile: binary overlay and mutable SHA rejection OK\n";
 }

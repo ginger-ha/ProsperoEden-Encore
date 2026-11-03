@@ -4,6 +4,7 @@
 #include "core/file_sys/vfs/vfs_types.h"
 #include <algorithm>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,6 +19,17 @@ public:
     virtual bool IsWritable() const = 0;
     virtual bool IsReadable() const = 0;
     virtual std::size_t Read(u8*, std::size_t, std::size_t) const = 0;
+    virtual std::optional<u8> ReadByte(std::size_t offset) const {
+        u8 value{};
+        return Read(&value, 1, offset) == 1 ?
+               std::optional<u8>(value) : std::nullopt;
+    }
+    virtual std::vector<u8> ReadBytes(std::size_t length, std::size_t offset) const {
+        std::vector<u8> result(length);
+        const auto count = length ? Read(result.data(), length, offset) : 0;
+        result.resize(count);
+        return result;
+    }
     virtual std::size_t Write(const u8*, std::size_t, std::size_t) = 0;
     virtual bool Rename(std::string_view) = 0;
 };

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Compile actual pinned vendor RomFSBuildContext with the native NUP VFS.
 
-The host-only VFS concatenation adapter substitutes for vendor vfs_concat.
+Both RomFSBuildContext and ConcatenatedVfsFile are real pinned vendor code.
+Only the base VFS API and extension IPS patching use small host stubs.
 Neither the PS5 core nor renderer is built.
 """
 from __future__ import annotations
@@ -18,6 +19,9 @@ SOURCES = (
     "core/file_sys/fsmitm_romfsbuild.h",
     "common/alignment.h",
     "common/common_types.h",
+    "core/file_sys/vfs/vfs_concat.cpp",
+    "core/file_sys/vfs/vfs_concat.h",
+    "core/file_sys/vfs/vfs_static.h",
 )
 
 
@@ -63,12 +67,13 @@ def main() -> None:
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
             str(ROOT / "headless/nup_v1_native_content.cpp"),
             str(vendor / "core/file_sys/fsmitm_romfsbuild.cpp"),
+            str(vendor / "core/file_sys/vfs/vfs_concat.cpp"),
             str(ROOT / "tools/nup-v1-real-romfs-host.cpp"),
             "-lcrypto", "-lzstd", "-pthread", "-o", str(binary),
         ]
         subprocess.run(cmd, check=True)
         subprocess.run([str(binary), str(test_archive)], check=True)
-        print(f"Pinned vendor RomFS builder {pinned[:12]}: NUP overlay/AoC binary layout OK")
+        print(f"Pinned vendor RomFS builder+concat {pinned[:12]}: NUP overlay/AoC binary layout OK")
 
 
 if __name__ == "__main__":
