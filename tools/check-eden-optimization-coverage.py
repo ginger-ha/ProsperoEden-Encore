@@ -219,10 +219,15 @@ assert not post_f07_nup_vfs_owners & (
 # The native router is prepared but must remain *conditional*, never a
 # default shipping source. The old "not in CMake at all" rule became stale
 # when the explicit P5 gate was introduced.
-assert release_cmake.count("option(EDEN_NUP_V1_RUNTIME") == 1
-assert 'route verified NUP containers to shared loader" OFF)' in release_cmake
-assert release_cmake.count("if(EDEN_NUP_V1_RUNTIME)") == 1
-nup_gate = release_cmake.split("if(EDEN_NUP_V1_RUNTIME)", 1)[1].split("\nendif()", 1)[0]
+# The active headless CMake entrypoint explicitly includes the isolated
+# P5 NUP selector; test the actual included file, not stale inline CMake.
+nup_include = 'include("${CMAKE_CURRENT_LIST_DIR}/nup_v1_runtime.cmake")'
+assert release_cmake.count(nup_include) == 1
+nup_select = (ROOT / "headless/nup_v1_runtime.cmake").read_text()
+assert nup_select.count("option(EDEN_NUP_V1_RUNTIME") == 1
+assert 'route verified NUP containers to shared loader" OFF)' in nup_select
+assert nup_select.count("if(EDEN_NUP_V1_RUNTIME)") == 1
+nup_gate = nup_select.split("if(EDEN_NUP_V1_RUNTIME)", 1)[1].split("\nendif()", 1)[0]
 assert 'if(EDEN_FINAL_RELEASE_PROFILE)' in nup_gate
 assert "NUP v1 P5 qualification is not yet allowed in a final release" in nup_gate
 assert "target_sources(core PRIVATE" in nup_gate
@@ -233,7 +238,8 @@ for selected in (
 ):
     source_ref = '"${EDEN_PORT_DIR}/' + selected + '"'
     assert nup_gate.count(source_ref) == 1
-    assert release_cmake.count(source_ref) == 1
+    assert release_cmake.count(source_ref) == 0
+assert (ROOT / "tools/check-nup-v1-runtime-cmake.py").is_file()
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
 assert "Not wired into the PS5 loader or game catalogue." in nup_core
