@@ -1,0 +1,28 @@
+name: NUP v1 host preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - tools/check-nup-v1-host.py
+      - .github/workflows/nup-v1-host.yml
+  pull_request:
+    paths:
+      - tools/check-nup-v1-host.py
+      - .github/workflows/nup-v1-host.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  format-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate NUP v1 structure and reject corrupted fixtures
+        run: python3 tools/check-nup-v1-host.py --self-test
