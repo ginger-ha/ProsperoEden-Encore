@@ -133,6 +133,9 @@ snapshot_test = r"""
 #include <utility>
 """ + snapshot_owner + r"""
 int main() {
+    // Both native scanner locks are intentional; keep the extracted owner
+    // under -Werror without excluding the production job mutex.
+    assert(&ScanAddOnsJobMutex() != &ScannedAddOnsMutex());
     assert(!UpdatesScanCompleted());
     {
         std::map<uint64_t, AddOns> first;
