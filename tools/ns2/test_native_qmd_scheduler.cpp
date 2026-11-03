@@ -243,6 +243,17 @@ int main() {
             assert(f.signal(address, 3) == "unmapped QMD");
             f.descriptors[address] = invalid;
             assert(f.signal(address, 3) == "unsupported QMD version or queue");
+            // Later structural failures also must not leave a brand-new
+            // entry in the process map after a rejected first dispatch.
+            auto dependent = EmptyGrid();
+            dependent[16] = 1U << 5;
+            f.descriptors[address] = dependent;
+            assert(f.signal(address, 3) == "second dependent QMD unsupported");
+            auto release = EmptyGrid();
+            SetRelease(release, 24, 0x8900, 1);
+            release[25] |= 1U << 25;
+            f.descriptors[address] = release;
+            assert(f.signal(address, 3) == "unsupported QMD release format");
             f.descriptors.erase(address);
         }
         auto valid = EmptyGrid();
