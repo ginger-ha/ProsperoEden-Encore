@@ -244,6 +244,19 @@ def main() -> int:
                 "std::equal(e.native.begin(), e.native.end(), native.begin())" in native_negative and
                 "u64 negative_hits{};" in native_negative_header,
                 "NS2 negative shader cache must verify full bytes, bound entries and retain rejected status")
+        # A QMD may be produced by the guest GPU immediately before
+        # PCAS. A raw CPU-side ReadBlockUnsafe would miss Vulkan buffer/
+        # query-cache dirty data even when all 4 KiB GMMU pages are mapped.
+        qmd_reader = puller.split(
+            "void Puller::ProcessNativeComputeQmdAt(", 1)[1].split(
+            "auto release = ", 1)[0]
+        require("IsFullyMappedRange(addr, sizeof(data))" in qmd_reader and
+                "pusher.memory_manager.ReadBlock(addr, data.data(), sizeof(data));" in qmd_reader and
+                "ReadBlockUnsafe" not in qmd_reader and
+                qmd_reader.index("IsFullyMappedRange") < qmd_reader.index("ReadBlock(") and
+                "memory->ReadBlock(address, dest, size)" in
+                    (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text(),
+                "P2.7 QMD3 must see GPU-dirty descriptor bytes via coherent GMMU read")
         require("class NativeQmdScheduler" in qmd_header and
                 "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
                 "std::unordered_map<Address, State> states;" in qmd_header and
