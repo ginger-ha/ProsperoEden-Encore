@@ -10,12 +10,14 @@
 #include <vector>
 #include "core/file_sys/vfs/vfs.h"
 namespace Core { class System {}; }
+namespace FileSys { class NACP; }
 namespace Kernel { class KProcess {}; }
 namespace Loader {
 enum class FileType { Error, Unknown, DeconstructedRomDirectory };
 enum class ResultStatus {
     Success, ErrorNoExeFS, ErrorNoRomFS, ErrorNoIcon, ErrorNoControl,
     ErrorNotInitialized, ErrorMissingNPDM, ErrorBadNPDMHeader, ErrorAlreadyLoaded,
+    ErrorIntegrityVerificationFailed,
 };
 class AppLoader {
 public:
@@ -28,6 +30,7 @@ public:
     virtual LoadResult Load(Kernel::KProcess&, Core::System&) = 0;
     virtual ResultStatus ReadRomFS(FileSys::VirtualFile&) { return ResultStatus::ErrorNoRomFS; }
     virtual ResultStatus ReadIcon(std::vector<u8>&) { return ResultStatus::ErrorNoIcon; }
+    virtual ResultStatus ReadControlData(FileSys::NACP&) { return ResultStatus::ErrorNoControl; }
     virtual ResultStatus ReadProgramId(std::uint64_t&) { return ResultStatus::ErrorNoExeFS; }
     virtual ResultStatus ReadTitle(std::string&) { return ResultStatus::ErrorNoControl; }
     virtual ResultStatus ReadNSOModules(Modules&) { return ResultStatus::ErrorNotInitialized; }

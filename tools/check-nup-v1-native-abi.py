@@ -21,6 +21,7 @@ FILES = (
     "core/file_sys/romfs.h",
     "core/file_sys/vfs/vfs.h",
     "core/file_sys/vfs/vfs_types.h",
+    "core/file_sys/vfs/vfs_vector.h",
     "common/bit_field.h",
     "common/swap.h",
     "core/file_sys/control_metadata.h",

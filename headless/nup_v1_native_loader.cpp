@@ -9,6 +9,7 @@
 #include "core/file_sys/common_funcs.h"
 #include "core/file_sys/program_metadata.h"
 #include "core/file_sys/vfs/vfs.h"
+#include "core/file_sys/vfs/vfs_vector.h"
 #include "core/loader/deconstructed_rom_directory.h"
 
 namespace Eden::NupV1::Native {
@@ -178,6 +179,33 @@ Loader::ResultStatus NupAppLoader::ReadIcon(std::vector<u8>& out_buffer) {
     }
     return extracted_loader_ ? extracted_loader_->ReadIcon(out_buffer)
                              : Loader::ResultStatus::ErrorNoIcon;
+}
+
+Loader::ResultStatus NupAppLoader::ReadControlData(FileSys::NACP& out_control) {
+    // Use the real vendor NACP constructor, not a parallel, incomplete NACP
+    // decoder. This path is inert until the NUP AppLoader is registered.
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
+    std::vector<u8> bytes;
+    if (const auto* metadata = mount_->ApplicationMetadata();
+        metadata && metadata->control_nacp.size() == sizeof(FileSys::RawNACP)) {
+        bytes = metadata->control_nacp;
+    } else {
+        const auto exefs = content_->ExeFS();
+        const auto nacp = exefs ? exefs->GetFile("control.nacp") : nullptr;
+        if (!nacp) return Loader::ResultStatus::ErrorNoControl;
+        if (nacp->GetSize() != sizeof(FileSys::RawNACP))
+            return Loader::ResultStatus::ErrorNoControl;
+        bytes.resize(sizeof(FileSys::RawNACP));
+        if (nacp->Read(bytes.data(), bytes.size(), 0) != bytes.size())
+            return Loader::ResultStatus::ErrorIntegrityVerificationFailed;
+    }
+    // The native NACP constructor fills compressed or plain language tables
+    // as well as raw fields. Do not assign only RawNACP and leave it partial.
+    out_control = FileSys::NACP(
+        std::make_shared<FileSys::VectorVfsFile>(std::move(bytes)));
+    return Loader::ResultStatus::Success;
 }
 
 Loader::ResultStatus NupAppLoader::ReadProgramId(u64& out_program_id) {

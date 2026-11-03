@@ -4,6 +4,7 @@
 #include "nup_v1_native_content.h"
 #include "nup_v1_native_loader.h"
 #include "core/file_sys/romfs.h"
+#include "core/file_sys/control_metadata.h"
 #include "core/file_sys/vfs/vfs.h"
 
 #include <algorithm>
@@ -231,6 +232,8 @@ int main(int argc, char** argv) {
     assert(app && error.empty());
     assert(app->GetFileType() == Loader::FileType::Unknown);
     assert(!app->IsRomFSUpdatable()); // already overlaid highest NCM version
+    FileSys::NACP no_control;
+    assert(app->ReadControlData(no_control) == Loader::ResultStatus::ErrorNoControl);
     FileSys::VirtualFile romfs_result;
     assert(app->ReadRomFS(romfs_result) == Loader::ResultStatus::Success);
     assert(Read(romfs_result) == "state.bin=latest-v3\n");
@@ -320,6 +323,9 @@ int main(int argc, char** argv) {
     assert(mutable_app->ReadNSOModules(denied_modules) ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
     assert(denied_modules.empty());
+    FileSys::NACP denied_control;
+    assert(mutable_app->ReadControlData(denied_control) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
     Kernel::KProcess blocked_process;
     Core::System blocked_system;
     assert(mutable_app->Load(blocked_process, blocked_system).first ==
@@ -394,6 +400,11 @@ int main(int argc, char** argv) {
         nacp_source, &error);
     assert(nacp_loader && error.empty());
     assert(nacp_loader->SelectedAddOns().size() == 1);
+    FileSys::NACP nacp_from_tlv;
+    assert(nacp_loader->ReadControlData(nacp_from_tlv) ==
+           Loader::ResultStatus::Success);
+    assert(nacp_from_tlv.IsValidForHostTest());
+    assert(nacp_from_tlv.GetDLCBaseTitleId() == 0x0100123400003000ULL);
     assert(nacp_loader->SelectedAddOns()[0].package_index == 1);
     assert(nacp_loader->SelectedAddOns()[0].title_id ==
            0x0100123400003001ULL);
@@ -407,6 +418,12 @@ int main(int argc, char** argv) {
         extracted_nacp_source, &error);
     assert(extracted_nacp_loader && error.empty());
     assert(extracted_nacp_loader->SelectedAddOns().size() == 1);
+    FileSys::NACP nacp_from_exefs;
+    assert(extracted_nacp_loader->ReadControlData(nacp_from_exefs) ==
+           Loader::ResultStatus::Success);
+    assert(nacp_from_exefs.IsValidForHostTest());
+    assert(nacp_from_exefs.GetDLCBaseTitleId() ==
+           nacp_from_tlv.GetDLCBaseTitleId());
     assert(extracted_nacp_loader->SelectedAddOns()[0].package_index == 1);
     assert(Read(extracted_nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
            "nacp-declared");

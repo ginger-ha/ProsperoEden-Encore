@@ -28,6 +28,7 @@ public:
     LoadResult Load(Kernel::KProcess& process, Core::System& system) override;
     Loader::ResultStatus ReadRomFS(FileSys::VirtualFile& out_file) override;
     Loader::ResultStatus ReadIcon(std::vector<u8>& out_buffer) override;
+    Loader::ResultStatus ReadControlData(FileSys::NACP& out_control) override;
     Loader::ResultStatus ReadProgramId(u64& out_program_id) override;
     Loader::ResultStatus ReadTitle(std::string& out_title) override;
     Loader::ResultStatus ReadNSOModules(Modules& out_modules) override;

@@ -14,4 +14,18 @@ struct RawNACP {
 };
 static_assert(sizeof(RawNACP) == 0x4000);
 static_assert(offsetof(RawNACP, dlc_base_title_id) == 0x3070);
+class NACP {
+public:
+    NACP() = default;
+    explicit NACP(VirtualFile file) {
+        if (file && file->GetSize() == sizeof(raw) &&
+            file->Read(reinterpret_cast<u8*>(&raw), sizeof(raw), 0) == sizeof(raw))
+            valid_ = true;
+    }
+    std::uint64_t GetDLCBaseTitleId() const { return raw.dlc_base_title_id; }
+    bool IsValidForHostTest() const { return valid_; }
+    RawNACP raw{};
+private:
+    bool valid_{};
+};
 } // namespace FileSys
