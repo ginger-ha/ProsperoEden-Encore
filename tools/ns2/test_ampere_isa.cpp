@@ -11,6 +11,7 @@
 #include "shader_recompiler/frontend/ampere/ampere_isa_table.h"
 #include "shader_recompiler/frontend/ampere/probe.h"
 #include "shader_recompiler/frontend/ampere/program_address_map.h"
+#include "shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"
 
 using namespace Shader::Ampere;
 static_assert(sizeof(Instruction)==16);
@@ -61,4 +62,11 @@ int main() {
     code[code.size()-2]=3;
     code.back()=0;
     assert(!NativeProgramAddress(code,0));
+    // P2.4: authentic native 3D pipeline builder needs VertexB; standalone
+    // VertexA and unsupported tessellation/geometry must never enter its CFG.
+    for (u32 mask : {0x02U, 0x03U, 0x22U, 0x23U})
+        assert(NativeGraphicsStageMaskSupported(mask));
+    for (u32 mask : {0x00U, 0x01U, 0x04U, 0x06U, 0x08U, 0x10U,
+                     0x20U, 0x21U, 0x24U, 0x26U, 0x40U, 0xffU})
+        assert(!NativeGraphicsStageMaskSupported(mask));
 }

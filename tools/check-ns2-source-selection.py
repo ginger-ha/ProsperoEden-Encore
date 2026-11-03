@@ -214,6 +214,8 @@ def main() -> int:
                 'const Id cond = ctx.OpULessThanEqual(ctx.TypeBool(), buffer_offset, ctx.Const(0xFFFFu));' in native_direct_cbuf and
                 'NativeSpirvCbufBoundsScope native_bounds;' in qmd_bridge and
                 'Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;' in native_graphics_cache and
+                'NativeGraphicsStageMaskSupported(configured_stages)' in native_graphics_cache and
+                'NativeGraphicsStageMaskSupported(keyed_stages)' in native_graphics_cache and
                 'NativeSpirvCbufBoundsActive(), "native CBUF mode not enabled"' in ir_native_fixture and
                 'ctx.OpAccessChain(uniform_type, cbuf, ctx.u32_zero_value,' in native_direct_cbuf and
                 'if (offset.IsImmediate() || !ctx.profile.has_broken_robust)' in pristine_direct_cbuf and
@@ -547,7 +549,12 @@ def main() -> int:
         require(stage_policy.is_file() and
                 'stage == Shader::Stage::VertexB || stage == Shader::Stage::Fragment' in stage_policy.read_text() and
                 'static_assert(!IsStandaloneNativeGraphicsStage(Shader::Stage::VertexA))' in stage_policy.read_text() and
-                'static_assert(!IsStandaloneNativeGraphicsStage(Shader::Stage::Compute))' in stage_policy.read_text(),
+                'static_assert(!IsStandaloneNativeGraphicsStage(Shader::Stage::Compute))' in stage_policy.read_text() and
+                'NativeGraphicsStageMaskSupported(u32 mask)' in stage_policy.read_text() and
+                'static_assert(!NativeGraphicsStageMaskSupported(0x01))' in stage_policy.read_text() and
+                'static_assert(NativeGraphicsStageMaskSupported(0x23))' in stage_policy.read_text() and
+                'assert(NativeGraphicsStageMaskSupported(mask))' in
+                    (ROOT / "tools/ns2/test_ampere_isa.cpp").read_text(),
                 "NS2 standalone shader admission must exclude VertexA merge and compute")
         require(bridge_source.is_file() and
                 "CompileReviewedNativeGraphicsSpirv(" in bridge_source.read_text() and
