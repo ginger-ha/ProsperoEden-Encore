@@ -175,7 +175,8 @@ for path in (
         "return Shader::Ampere::NativeQmdContiguousGpuSpan(", 1)[0]
     assert "layer_offset > u32_limit" in start, path
     assert "u64{info.layer_stride} * info.resources.layers > u32_limit" in start, path
-    assert "if (!bytes) return false;" in start, path
+    assert "if (!bytes || bytes < minimum_bytes) return false;" in start, path
+    assert "VideoCommon::CalculateGuestSizeInBytes(info)" in start, path
 print("NS2_NATIVE_TIC_U32_LAYOUT_BOUNDS_PASS no_truncated_view_offset=1")
 
 # Both native rasterizer variants must check the reflection-to-TIC/TSC
