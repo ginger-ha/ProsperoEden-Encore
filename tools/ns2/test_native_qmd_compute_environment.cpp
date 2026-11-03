@@ -273,6 +273,27 @@ int main() {
         malformed.constant_buffer_mask |= (1U << 14);
         malformed.constant_buffer_descriptors.push_back({14, 1});
         assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(malformed));
+        auto zero_enabled = reflected;
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(
+            zero_enabled, 0));
+        auto invalid_enabled = reflected;
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(
+            invalid_enabled, 0x100U));
+        // The QMD3 enable mask can be sparse. Bind only the real slots,
+        // without aliasing disabled banks 1/2/4/6 into the next descriptor.
+        auto sparse = reflected;
+        constexpr u32 sparse_mask = (1U << 0) | (1U << 3) | (1U << 7);
+        assert(Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(
+            sparse, sparse_mask));
+        assert(sparse.constant_buffer_mask == sparse_mask &&
+               sparse.constant_buffer_descriptors.size() == 3 &&
+               sparse.constant_buffer_descriptors[0].index == 0 &&
+               sparse.constant_buffer_descriptors[1].index == 3 &&
+               sparse.constant_buffer_descriptors[2].index == 7);
+        for (u32 bank = 0; bank < Shader::Info::MAX_INDIRECT_CBUFS; ++bank)
+            assert(sparse.constant_buffer_used_sizes[bank] ==
+                   ((sparse_mask & (1U << bank)) ? 0x10000U : 0U));
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(sparse));
         assert(Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(reflected));
         assert(reflected.constant_buffer_mask == 0xffU &&
                reflected.constant_buffer_descriptors.size() == 8);
@@ -339,6 +360,43 @@ int main() {
     memory.address=decoded->constant_buffers[0].gpu_address;
     NativeQmdComputeEnvironment env{
         *decoded,Read,&memory,std::make_unique<TextureMetadata>()};
+    // A QMD3 shader using indirect loads must not silently bind a short
+    // 16-byte CBUF as if the 64-KiB dynamic-offset footprint were mapped.
+    Shader::Info indirect_one{};
+    indirect_one.uses_cbuf_indirect = true;
+    indirect_one.constant_buffer_mask = 1;
+    indirect_one.constant_buffer_descriptors.push_back({0, 1});
+    indirect_one.constant_buffer_used_sizes[0] = 0x10000U;
+    assert(!env.BuildResourcePlan(indirect_one));
+    auto wide_launch = *decoded;
+    wide_launch.constant_buffers[0].size = 0x10000U;
+    NativeQmdComputeEnvironment wide_env{
+        wide_launch, Read, &memory, std::make_unique<TextureMetadata>()};
+    auto one_plan = wide_env.BuildResourcePlan(indirect_one);
+    assert(one_plan && one_plan->uniform_buffers.size() == 1 &&
+           one_plan->uniform_buffers[0].qmd_index == 0 &&
+           one_plan->uniform_buffers[0].bytes == 0x10000U);
+    auto sparse_launch = wide_launch;
+    sparse_launch.constant_buffers[7] = {
+        0x1000012350000ULL, 0x10000U, true};
+    NativeQmdComputeEnvironment sparse_env{
+        sparse_launch, Read, &memory, std::make_unique<TextureMetadata>()};
+    auto indirect_sparse = indirect_one;
+    indirect_sparse.constant_buffer_mask = 0x81U;
+    indirect_sparse.constant_buffer_descriptors.push_back({7, 1});
+    indirect_sparse.constant_buffer_used_sizes[7] = 0x10000U;
+    const auto sparse_plan = sparse_env.BuildResourcePlan(indirect_sparse);
+    assert(sparse_plan && sparse_plan->uniform_buffers.size() == 2 &&
+           sparse_plan->uniform_buffers[0].qmd_index == 0 &&
+           sparse_plan->uniform_buffers[1].qmd_index == 7);
+    assert(sparse_plan->ValidateGpuBufferMappings([&](u64 addr, u32 bytes) {
+        return bytes == 0x10000U &&
+               (addr == wide_launch.constant_buffers[0].gpu_address ||
+                addr == sparse_launch.constant_buffers[7].gpu_address);
+    }));
+    auto inconsistent_mask = indirect_sparse;
+    inconsistent_mask.constant_buffer_mask = 0x83U; // bank 1 not bound
+    assert(!sparse_env.BuildResourcePlan(inconsistent_mask));
     assert(env.ShaderStage()==Shader::Stage::Compute);
     assert(env.Launch().program_address==0x1000012000080ULL);
     assert((env.WorkgroupSize()==std::array<u32,3>{8,16,2}));

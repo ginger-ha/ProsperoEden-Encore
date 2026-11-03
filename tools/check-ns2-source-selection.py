@@ -192,15 +192,24 @@ def main() -> int:
         qmd_indirect = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_indirect_cbuf.h").read_text()
         qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
         qmd_env = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h").read_text()
+        qmd_launch_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.cpp").read_text()
+        qmd_spirv_header = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.h").read_text()
+        pristine_spirv = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
         require('set(EDEN_NS2_QMD_CBUF_SPIRV' in CMAKE and
                 'list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/spirv_emit_context.cpp")' in CMAKE and
                 'list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_SPIRV}")' in CMAKE and
                 'std::span{buf_labels}.first(bank_count)' in qmd_spirv and
                 'OpReturnValue(ConstantNull(buffer_type))' in qmd_spirv and
-                'NormalizeNativeQmdIndirectCbufIR(ir)' in qmd_bridge and
+                'NormalizeNativeQmdIndirectCbufIR(ir, qmd_enabled_cbuf_mask)' in qmd_bridge and
                 'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
-                'shader_info.constant_buffer_descriptors.size() != 8' in qmd_env,
-                "Native QMD3 indirect CBUF lowering must match SPIR-V and real eight-slot binding")
+                'info.constant_buffer_mask = enabled_mask;' in qmd_indirect and
+                'bank_indices[bank_count] = bank;' in qmd_spirv and
+                'const Id cbuf{cbufs[bank_indices[i]].*member_ptr};' in qmd_spirv and
+                'enabled_cbuf_mask |= u32{1} << bank;' in qmd_launch_capture and
+                'qmd_enabled_cbuf_mask = 0xffU' in qmd_spirv_header and
+                'shader_info.constant_buffer_mask != declared_banks' in qmd_env and
+                'OpSwitch(binding, buf_labels[0], buf_literals, buf_labels);' in pristine_spirv,
+                "Sparse native QMD3 CBUF mask must match SPIR-V, QMD3 and real Vulkan layout")
         qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
         require("AcquireNativeQmdSession(" in engine_registry and
                 "qmd_sessions.erase(process)" in engine_registry and
