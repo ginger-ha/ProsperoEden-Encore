@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -177,6 +178,30 @@ int main(){
     assert(ram_state.SetCodePointer(3));
     for(W w:code) assert(ram_state.PushCode(w));
     assert(ram_state.SetPositionPointer(1) && ram_state.BindPosition(3));
+    result=ram_state.ExecuteStaged(
+        0xe02,std::span<const W>{},read,allowed,commit,valid);
+    assert(result.success && committed.size()==1 &&
+           (committed[0]==std::pair<W,W>(0x230,0)));
+    committed.clear();
+    // A validator may throw after a successful TU104 DWRITE. Validation
+    // still precedes GPU-method commit, so the channel's DRAM must be
+    // restored before unwinding and the next macro must read the old zero.
+    code.clear();
+    Append(code,DataRamInsn(31,0x27,0x42,false,false));
+    Append(code,Insn(0x230,0xA55A,false,true));
+    Append(code,Insn(0,0,false,false,false));
+    assert(ram_state.SetCodePointer(5));
+    for(W w:code) assert(ram_state.PushCode(w));
+    assert(ram_state.SetPositionPointer(2) && ram_state.BindPosition(5));
+    bool validator_threw{};
+    try {
+        (void)ram_state.ExecuteStaged(
+            0xe04,std::span<const W>{},read,allowed,commit,
+            []() -> bool { throw std::runtime_error("channel epoch changed"); });
+    } catch (const std::runtime_error&) {
+        validator_threw = true;
+    }
+    assert(validator_threw && committed.empty());
     result=ram_state.ExecuteStaged(
         0xe02,std::span<const W>{},read,allowed,commit,valid);
     assert(result.success && committed.size()==1 &&
