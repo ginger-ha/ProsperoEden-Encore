@@ -57,8 +57,15 @@ inline std::array<const std::string*, 3> BackScenes(
     const std::vector<std::string>& screenshots) noexcept
 {
     std::array<const std::string*, 3> selected{nullptr, nullptr, nullptr};
+    // If there is no Hero, the front uses the first cached screenshot.
+    // Exclude that *actual* front paper too: previously the same image
+    // could be copied onto the rear panel as an independent scene.
+    const std::string* const front = FrontPaper(featured, cover, screenshots);
+    const auto is_front = [&](const std::string& image) {
+        return front && *front == image;
+    };
     const auto accept = [&](const std::string& image) {
-        if (image.empty() || image == featured || image == cover) return;
+        if (image.empty() || image == cover || is_front(image)) return;
         for (const auto* existing : selected)
             if (existing && *existing == image) return;
         for (auto& entry : selected)
@@ -74,7 +81,7 @@ inline std::array<const std::string*, 3> BackScenes(
     for (std::size_t category = 0; category < kSceneMarkers.size(); ++category) {
         for (const auto& image : screenshots) {
             if (image.find(kSceneMarkers[category]) == std::string::npos ||
-                image == featured || image == cover) continue;
+                image == cover || is_front(image)) continue;
             selected[category] = &image;
             break;
         }
