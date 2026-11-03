@@ -18,6 +18,8 @@ public:
             program_id_ = 0x0100123400000000ULL;
         } else if (data == "foreign-npdm") {
             program_id_ = 0x0100123400002000ULL;
+        } else if (data == "sibling-npdm") {
+            program_id_ = 0x0100123400000001ULL;
         } else {
             return Loader::ResultStatus::ErrorBadNPDMHeader;
         }
