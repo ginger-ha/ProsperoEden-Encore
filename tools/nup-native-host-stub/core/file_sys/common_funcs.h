@@ -3,6 +3,7 @@
 // The CI separately syntax-checks the actual pinned vendor header.
 #pragma once
 #include "core/file_sys/vfs/vfs_types.h"
+using u64 = std::uint64_t;
 namespace FileSys {
 constexpr u64 AOC_TITLE_ID_MASK = 0x7FF;
 constexpr u64 AOC_TITLE_ID_OFFSET = 0x1000;
