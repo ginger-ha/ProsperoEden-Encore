@@ -97,6 +97,16 @@ int main() {
         assert(!Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 9);
         SetRelease(qmd, 52, 0x3000, 9);
         assert(Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 12);
+        // A sparse GMMU unmap may invalidate the mapping during preflight.
+        // The rejected callback must not tear down the GPU thread or let a
+        // shader launch whose completion queue has no valid destination.
+        unsigned probes{};
+        const auto throwing = [&](Address, std::size_t) -> bool {
+            ++probes;
+            throw 7;
+        };
+        assert(!Tegra::NativeQmdReleaseTargetsMapped(qmd, throwing));
+        assert(probes == 1);
     }
     // MKW native Compute hot path: side-effect-free register writes avoid
     // KeplerCompute::CallMethod. The special methods MUST still execute
