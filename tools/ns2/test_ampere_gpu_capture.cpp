@@ -449,6 +449,37 @@ int main() {
             compiled_brx.image.TranslateNativeAddress(8*16).has_value() &&
             stable_cbuf.reads>=3*stable_cbuf.entries.size(),
             "checked graphics BRX captures post-EXIT target and lowers dispatch");
+    // Verify both legitimate PC conventions without guessing a table
+    // origin from the first nonzero CBUF word. The native image and every
+    // generated branch must retain the exact selected convention.
+    for(u32 i=0;i<stable_cbuf.entries.size();++i)
+        stable_cbuf.entries[i]=i&1 ? 0x80U : 0U;
+    stable_cbuf.reads=0;
+    const auto code_relative_brx=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,Read,&brx_memory,ReadCheckedCbuf,&stable_cbuf);
+    Require(code_relative_brx.Ready() &&
+            code_relative_brx.captured_native_bytes==10*sizeof(Instruction) &&
+            code_relative_brx.image.ValidForCompiler() &&
+            code_relative_brx.image.diagnostic_cache_key!=
+                compiled_brx.image.diagnostic_cache_key,
+            "code-relative BRX CBUF addresses use the independent verified origin");
+    // Both candidate origins can be fully mapped on a sufficiently long
+    // shader. Reject this ambiguity, rather than running the wrong block.
+    auto ambiguous_memory=brx_memory;
+    for (u32 i=10;i<19;++i)
+        Push(ambiguous_memory.data,pred_true|0x918U);
+    Push(ambiguous_memory.data,pred_true|0x94dU,0,exit_true);
+    ambiguous_memory.mapped_bytes=ambiguous_memory.data.size();
+    for(u32 i=0;i<stable_cbuf.entries.size();++i)
+        stable_cbuf.entries[i]=i&1 ? 0x110U : 0x100U;
+    const auto ambiguous_brx=CaptureNativeGraphicsShaderChecked(
+        ambiguous_memory.base,4,Read,&ambiguous_memory,
+        ReadCheckedCbuf,&stable_cbuf);
+    Require(!ambiguous_brx.Ready() && ambiguous_brx.image.code.empty(),
+            "simultaneously valid BRX origins must fail closed");
+    for(u32 i=0;i<stable_cbuf.entries.size();++i)
+        stable_cbuf.entries[i]=i&1 ? 0x100U : 0x80U;
+    stable_cbuf.reads=0;
     const auto no_cbuf_brx=CaptureNativeGraphicsShader(
         brx_memory.base,4,Read,&brx_memory);
     Require(no_cbuf_brx.status==NativeCaptureStatus::UnresolvedIndirectBranch,

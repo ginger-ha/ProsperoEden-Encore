@@ -438,6 +438,9 @@ def main() -> int:
                 "compiled_brx.Ready()" in native_capture_fixture and
                 "changed_shader.status==NativeCaptureStatus::TranslationFailed" in native_capture_fixture and
                 "changed_header.status==NativeCaptureStatus::TranslationFailed" in native_capture_fixture and
+                "code_relative_brx.Ready()" in native_capture_fixture and
+                "ambiguous_brx.image.code.empty()" in native_capture_fixture and
+                "bool(header_table) == bool(code_table)" in native_capture_core and
                 "current->words != native[native_index].words" in native_capture_core and
                 "if (live_header != header)" in native_capture_core and
                 "cbuf->stage_index != required_bank" in native_capture and
