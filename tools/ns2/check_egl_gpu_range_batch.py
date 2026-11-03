@@ -34,10 +34,15 @@ if source_blob == p12_protected:
     assert "memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount)" in t
     assert "memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount)" in t
 assert HELPER.is_file() and "class ChangedPageRuns" in HELPER.read_text()
+# P1.2 introduced a scalar safety include between the canonical header
+# and the N51 opt-in block. Remove only N51, never the P1.2 include.
+owner_header = '#include "video_core/memory_manager.h"\n'
+if source_blob == p12_protected:
+    owner_header += '#include "native_paged_scalar.h"\n'
 t = once(t,
-    '#include "video_core/memory_manager.h"\n#ifdef EDEN_NS2_GPU_RANGE_BATCH\n'
+    owner_header + '#ifdef EDEN_NS2_GPU_RANGE_BATCH\n'
     '#include "video_core/ns2_egl_gpu_range_batch.h"\n#endif',
-    '#include "video_core/memory_manager.h"')
+    owner_header.rstrip("\n"))
 for page in ("page_size", "big_page_size"):
     init = (
         "#ifdef EDEN_NS2_GPU_RANGE_BATCH\n"
