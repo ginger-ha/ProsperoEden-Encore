@@ -176,7 +176,7 @@ int main() {
         {limit-1, 2}, {limit-4096, 4097},
         {std::numeric_limits<GPUVAddr>::max(), 16}, {10, huge},
     }};
-    for (const auto [addr, bytes] : bad) {
+    for (const auto& [addr, bytes] : bad) {
         assert(!gpu.GpuToCpuAddress(addr, bytes));
         assert(!gpu.IsContinuousRange(addr, bytes));
         assert(!gpu.IsFullyMappedRange(addr, bytes));
@@ -185,7 +185,7 @@ int main() {
     const std::array<std::pair<GPUVAddr, std::size_t>, 4> valid{{
         {0, 1}, {4095, 2}, {limit - 4096, 4096}, {0, limit},
     }};
-    for (const auto [addr, bytes] : valid) {
+    for (const auto& [addr, bytes] : valid) {
         assert(gpu.GpuToCpuAddress(addr, bytes).has_value());
         assert(gpu.IsContinuousRange(addr, bytes));
         assert(gpu.IsFullyMappedRange(addr, bytes));
