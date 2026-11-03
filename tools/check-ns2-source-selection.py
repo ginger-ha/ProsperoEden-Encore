@@ -257,6 +257,18 @@ def main() -> int:
                 "memory->ReadBlock(address, dest, size)" in
                     (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text(),
                 "P2.7 QMD3 must see GPU-dirty descriptor bytes via coherent GMMU read")
+        qmd_dispatch = puller.split(
+            "void Puller::ProcessNativeComputeQmdAt(", 1)[1].split(
+            "/// Calls a GPU engine method.", 1)[0]
+        require("NativeQmdReleaseTargetsMapped(" in qmd_header and
+                "for (const std::uint32_t base : {24U, 28U, 52U})" in qmd_header and
+                "!is_mapped(addr, sizeof(std::uint32_t))" in qmd_header and
+                "Tegra::NativeQmdReleaseTargetsMapped(" in qmd_dispatch and
+                "if (mapped && release_targets_mapped)" in qmd_dispatch and
+                qmd_dispatch.index("NativeQmdReleaseTargetsMapped(") <
+                    qmd_dispatch.index("pusher.rasterizer->DispatchNativeCompute(*launch)") and
+                'if (!addr || (addr & 3U)' in qmd_dispatch,
+                "Native QMD3 completion targets must all be mapped before shader submission")
         require("class NativeQmdScheduler" in qmd_header and
                 "std::array<Word, 3> ReleaseSlots{24, 28, 52}" in qmd_header and
                 "std::unordered_map<Address, State> states;" in qmd_header and
