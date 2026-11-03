@@ -33,8 +33,9 @@ with tempfile.TemporaryDirectory(prefix="encore-firmware-auto-") as temp:
     commented.write_bytes(original)
     with zipfile.ZipFile(commented,"a") as z:
         z.comment=b"Firmware notes PK\x05\x06" + b"padding-"*8
-    with zipfile.ZipFile(commented) as z:
-        assert z.testzip() is None
+    # Python's zipfile parser itself uses a last-signature heuristic and
+    # cannot reopen this valid EOCD-comment fixture. The native importer
+    # under test must select the real end record and verify all entries.
     local=info.header_offset
     assert original[local:local+4] == b"PK\x03\x04"
     name_offset=local+30
