@@ -193,6 +193,7 @@ def main() -> int:
         qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
         qmd_env = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h").read_text()
         host_native_spirv = (ROOT / "tools/check-ns2-spirv-host.py").read_text()
+        ir_native_fixture = (ROOT / "tools/ns2/test_ampere_real_spirv.cpp").read_text()
         qmd_launch_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.cpp").read_text()
         qmd_spirv_header = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.h").read_text()
         pristine_spirv = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
@@ -208,6 +209,12 @@ def main() -> int:
                 'all_offsets_static' in qmd_indirect and
                 'info.uses_global_memory || info.stores_global_memory' in qmd_indirect and
                 'bank_indices[bank_count] = bank;' in qmd_spirv and
+                'OpULessThan(' in qmd_spirv and
+                '0x10000U / bytes_per_element' in qmd_spirv and
+                'OpSelect(U32[1], valid_offset, binding, Const(~u32{0}))' in qmd_spirv and
+                'make_accessor(U32[4], &UniformDefinitions::U32x4, 16)' in qmd_spirv and
+                'CheckNativeQmdIndirectCbufIR();' in ir_native_fixture and
+                'run(sparse, true, true, 0, 0, true, 0x10000);' in ir_native_fixture and
                 'const Id cbuf{cbufs[bank_indices[i]].*member_ptr};' in qmd_spirv and
                 'enabled_cbuf_mask |= u32{1} << bank;' in qmd_launch_capture and
                 'qmd_enabled_cbuf_mask = 0xffU' in qmd_spirv_header and

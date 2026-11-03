@@ -14,6 +14,8 @@
 #include "common/settings.h"
 #include "shader_recompiler/frontend/ampere/renderer_spirv_bridge.h"
 #include "shader_recompiler/frontend/ampere/native_qmd_compute_environment.h"
+#include "shader_recompiler/frontend/ampere/native_indirect_cbuf.h"
+#include "shader_recompiler/object_pool.h"
 #include "video_core/ns2_shader_spirv_compile.h"
 #include "core/hle/service/nvdrv/devices/native_gpu_process_registry.h"
 #include "shader_recompiler/frontend/ampere/ir_bridge.h"
@@ -76,8 +78,67 @@ static bool ReadGuest(void* ptr,u64 address,void* output,std::size_t count) {
     }
     return true;
 }
+// Exercise the real IR instruction owners used by the QMD3 Compute bridge.
+// These are not models of the metadata algorithm: Normalize inspects the
+// actual BasicBlock and OpCode/Value objects later passed to SPIR-V.
+static void CheckNativeQmdIndirectCbufIR() {
+    const auto run = [](u32 enabled_mask, bool indirect_bank, bool indirect_offset,
+                        u32 bank, u32 byte_offset, bool expected_ok,
+                        u32 expected_size) {
+        Shader::ObjectPool<Shader::IR::Inst> inst_pool{16};
+        Shader::IR::Block block{inst_pool};
+        Shader::IR::Program program{};
+        program.stage = Shader::Stage::Compute;
+        program.blocks.push_back(&block);
+        program.info.uses_cbuf_indirect = true;
+        for (u32 index = 0; index < Shader::Info::MAX_INDIRECT_CBUFS; ++index) {
+            program.info.constant_buffer_descriptors.push_back({index, 1});
+            program.info.constant_buffer_mask |= u32{1} << index;
+            program.info.constant_buffer_used_sizes[index] = 0x10000U;
+        }
+        Shader::IR::Value index_value{bank};
+        Shader::IR::Value offset_value{byte_offset};
+        if (indirect_bank) {
+            block.AppendNewInst(Shader::IR::Opcode::IAdd,
+                {Shader::IR::Value{u32{0}}, Shader::IR::Value{u32{1}}});
+            index_value = Shader::IR::Value{&block.back()};
+        }
+        if (indirect_offset) {
+            block.AppendNewInst(Shader::IR::Opcode::IAdd,
+                {Shader::IR::Value{u32{0}}, Shader::IR::Value{u32{48}}});
+            offset_value = Shader::IR::Value{&block.back()};
+        }
+        block.AppendNewInst(Shader::IR::Opcode::GetCbufU32,
+                            {index_value, offset_value});
+        const bool accepted = NormalizeNativeQmdIndirectCbufIR(program, enabled_mask);
+        Require(accepted == expected_ok, "IR bank/offset admission mismatch");
+        if (!accepted) return;
+        Require(program.info.constant_buffer_mask == enabled_mask,
+                "IR reflection dropped or fabricated a QMD3 bank");
+        u32 seen{};
+        for (const auto& desc : program.info.constant_buffer_descriptors) {
+            Require(desc.index < 8 && desc.count == 1 &&
+                    (enabled_mask & (u32{1} << desc.index)) &&
+                    !(seen & (u32{1} << desc.index)),
+                    "IR generated an invalid native CBUF descriptor");
+            seen |= u32{1} << desc.index;
+            Require(program.info.constant_buffer_used_sizes[desc.index] == expected_size,
+                    "IR shortened a dynamic CBUF offset or miscomputed static extent");
+        }
+        Require(seen == enabled_mask, "IR omitted an enabled sparse bank");
+    };
+    constexpr u32 sparse = (1U << 0) | (1U << 3) | (1U << 7);
+    run(sparse, true, false, 0, 28, true, 32);
+    run(sparse, true, false, 0, 0xffff, true, 0x10000);
+    run(sparse, true, true, 0, 0, true, 0x10000);
+    run(sparse, false, false, 1, 28, false, 0);
+    run(sparse, true, false, 0, 0x10000, false, 0);
+    run(0, true, false, 0, 28, false, 0);
+    std::puts("NS2 QMD3 real IR CBUF sparse/static/dynamic admission: PASS");
+}
 int main(int argc,char** argv) {
     Require(argc==2,"missing output prefix");
+    CheckNativeQmdIndirectCbufIR();
     std::array<u8,0x50> header{};
     constexpr u32 pred=7U<<12,exit_true=7U<<23;
     std::vector<u8> code;
