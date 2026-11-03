@@ -176,6 +176,8 @@ post_f07_nup_vfs_owners = {
     "headless/nup_v1_vfs.cpp",
     "headless/nup_v1_native_vfs.h",
     "headless/nup_v1_native_vfs.cpp",
+    "headless/nup_v1_native_content.h",
+    "headless/nup_v1_native_content.cpp",
 }
 assert post_f07_nup_vfs_owners <= all_owners, sorted(
     post_f07_nup_vfs_owners - all_owners)
@@ -187,12 +189,15 @@ assert not post_f07_nup_vfs_owners & (
 )
 assert 'nup_v1_vfs.cpp' not in release_cmake
 assert 'nup_v1_native_vfs.cpp' not in release_cmake
+assert 'nup_v1_native_content.cpp' not in release_cmake
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
 assert "Not wired into the PS5 loader or game catalogue." in nup_core
 assert "Deliberately NOT registered" in nup_adapter
 assert "AllowsVerifiedMemberCache() const override { return false; }" in (
     ROOT / "headless/nup_v1_native_vfs.cpp").read_text()
+assert "Inactive native NUP content bridge" in (
+    ROOT / "headless/nup_v1_native_content.h").read_text()
 print("NUP_V1_POST_F07_OWNER_ISOLATION_PASS",
       f"not_retroactive_F07={len(post_f07_nup_vfs_owners)}",
       "shipping_selection=absent")
