@@ -79,7 +79,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 4);
+    assert(argc == 5);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -200,5 +200,9 @@ int main(int argc, char** argv) {
     exefs.reset();
     playable_mount.reset();
     assert(Read(still_readable) == "latest-main");
+    auto cross_title_input = std::make_shared<MemoryFile>(Load(argv[4]));
+    error.clear();
+    auto cross_title = Eden::NupV1::Native::Mount::Open(cross_title_input, &error);
+    assert(!cross_title && error == "unrelated base/update title ID");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
