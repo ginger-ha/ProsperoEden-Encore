@@ -573,6 +573,7 @@ jobs:
           python3 -B tools/check-ps5-descriptor-entry-canonical-host.py
           python3 -B tools/check-ps5-software-bilinear.py
           python3 -B tools/ns2/check_paged_gpu_scalar_host.py
+          python3 -B tools/ns2/check_native_gpu_command_fetch_owner.py
           python3 -B tools/check-gpu-physical-copy-bounds-host.py
           python3 -B tools/check-gpu-physical-copy-cpp-host.py
           python3 -B tools/check-gpu-atomic-forward-cpp-host.py
