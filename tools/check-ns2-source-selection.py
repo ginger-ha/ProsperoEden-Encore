@@ -443,6 +443,15 @@ def main() -> int:
                 "snapshot_reads>16" in native_capture_fixture and
                 "unexpected_brx" in native_capture_fixture,
                 "Native BRX/BRXU must never publish unresolved targets or probe CBUF past 64 KiB")
+        native_pipeline_source = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
+        require(native_pipeline_source.count(
+                    "const VideoCommon::Ns2GraphicsCbufContext cbuf_context{") == 2 and
+                "i == 5 ? 4U : 0U" in native_pipeline_source and
+                "native_translation_cache.get(), &cbuf_context" in native_pipeline_source and
+                "native_translation_cache.get(),\n                &cbuf_context" in native_pipeline_source and
+                "const auto& buffers = owner->engine->state" in native_capture and
+                "if (!cbuf.enabled || !cbuf.address" in native_capture,
+                "NS2 graphics BRX requires real per-stage mapped CBUF admission at both pipeline paths")
         require("const auto checked_read = " in native_capture_core and
                 "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and
                 "checked_read(addr, page.data(), aligned_batch)" in native_capture_core and
