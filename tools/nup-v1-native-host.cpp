@@ -150,7 +150,12 @@ int main(int argc, char** argv) {
     // First successful read MUST NOT memoize integrity on mutable VfsFile.
     input->Corrupt("latest-v3");
     u8 scratch[16]{};
+    std::fill(std::begin(scratch), std::end(scratch), u8{0xA5});
     assert(newest->Read(scratch, 9, 0) == 0);
+    assert(std::all_of(std::begin(scratch), std::begin(scratch) + 9,
+                       [](u8 byte) { return byte == 0; }));
+    assert(std::all_of(std::begin(scratch) + 9, std::end(scratch),
+                       [](u8 byte) { return byte == 0xA5; }));
 
     auto standalone_input = std::make_shared<MemoryFile>(Load(argv[2]));
     auto standalone = Eden::NupV1::Native::Mount::Open(standalone_input, &error);
