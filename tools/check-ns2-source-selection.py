@@ -205,6 +205,8 @@ def main() -> int:
                 'NormalizeNativeQmdIndirectCbufIR(ir, qmd_enabled_cbuf_mask)' in qmd_bridge and
                 'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
                 'info.constant_buffer_mask = enabled_mask;' in qmd_indirect and
+                'return declared_mask == program.info.constant_buffer_mask;' in qmd_indirect and
+                '!(enabled_mask & bit)' in qmd_indirect and
                 'NativeQmdStaticCbufReadExtent(offset.U32())' in qmd_indirect and
                 'all_offsets_static' in qmd_indirect and
                 'info.uses_global_memory || info.stores_global_memory' in qmd_indirect and
@@ -215,6 +217,10 @@ def main() -> int:
                 'make_accessor(U32[4], &UniformDefinitions::U32x4, 16)' in qmd_spirv and
                 'CheckNativeQmdIndirectCbufIR();' in ir_native_fixture and
                 'run(sparse, true, true, 0, 0, true, 0x10000);' in ir_native_fixture and
+                'verify_native_ldc(0, 0x01U, true);' in ir_native_fixture and
+                'verify_native_ldc(7, 0x80U, true);' in ir_native_fixture and
+                'verify_native_ldc(7, 0x01U, false);' in ir_native_fixture and
+                'verify_native_ldc(8, 0xffU, false);' in ir_native_fixture and
                 'const Id cbuf{cbufs[bank_indices[i]].*member_ptr};' in qmd_spirv and
                 'enabled_cbuf_mask |= u32{1} << bank;' in qmd_launch_capture and
                 'qmd_enabled_cbuf_mask = 0xffU' in qmd_spirv_header and

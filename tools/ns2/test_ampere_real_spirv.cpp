@@ -214,6 +214,64 @@ int main(int argc,char** argv) {
             real_qmd_spirv.words.size()>5 &&
             real_qmd_spirv.words[0]==0x07230203U,
             "native QMD3 metadata failed real Ampere IR/SPIR-V emission");
+    // P2.3: compile real native LDC.U32 (0xb82) through Ampere lowering,
+    // Maxwell's byte-offset translator and the native QMD3 CBUF binder.
+    // The encoded LDC uses RZ as the byte-offset register, so this is a
+    // real direct-bank shader, not synthetic IR manually inserted downstream.
+    const auto verify_native_ldc = [&](u32 bank, u32 enabled_mask,
+                                        bool should_compile) {
+        std::vector<u8> ldc_code;
+        Emit(ldc_code, pred | 0x918);
+        Emit(ldc_code, pred | 0xb82 | (1U << 16) | (255U << 24),
+             bank << 22, 4U << 9); // LDC.U32 R1, c[bank][RZ+0]
+        Emit(ldc_code, pred | 0x918);
+        Emit(ldc_code, pred | 0x918);
+        Emit(ldc_code, pred | 0x94d, 0, exit_true);
+        auto ldc_image = BuildMaxwellShaderImage(
+            header, ldc_code, static_cast<u32>(Shader::Stage::Compute));
+        Require(ldc_image.ValidForCompiler(), "native LDC image rejected");
+        auto ldc_launch = *launch;
+        for (u32 i = 0; i < ldc_launch.constant_buffers.size(); ++i) {
+            ldc_launch.constant_buffers[i].enabled =
+                (enabled_mask & (1U << i)) != 0;
+            if (ldc_launch.constant_buffers[i].enabled) {
+                ldc_launch.constant_buffers[i].gpu_address = cbuf_guest.address;
+                ldc_launch.constant_buffers[i].size = 16;
+            }
+        }
+        auto reader = std::make_unique<NativeQmdComputeEnvironment>(
+            ldc_launch, ReadGuest, &cbuf_guest,
+            std::make_unique<SyntheticSource>(Shader::Stage::Compute));
+        auto* const planner = reader.get();
+        auto ldc_env = NativeMaxwellEnvironment::CreateComputeOwned(
+            std::move(reader), std::move(ldc_image));
+        Require(bool(ldc_env), "native LDC compute environment rejected");
+        const auto compiled = CompileReviewedNativeComputeSpirv(
+            *ldc_env, host, profile, Shader::RuntimeInfo{},
+            Shader::Backend::Bindings{}, enabled_mask);
+        if (!should_compile) {
+            Require(compiled.status == NativeSpirvStatus::CompilationFailed &&
+                    compiled.words.empty(),
+                    "unbacked QMD3 bank was accepted by native SPIR-V");
+            return;
+        }
+        Require(compiled.ComputeMetadataReady() &&
+                compiled.words.size() > 5 &&
+                compiled.words[0] == 0x07230203U,
+                "authentic LDC 0xb82 did not reach SPIR-V");
+        auto plan = planner->BuildResourcePlan(*compiled.info);
+        Require(plan && plan->uniform_buffers.size() == 1 &&
+                plan->uniform_buffers[0].qmd_index == bank &&
+                plan->uniform_buffers[0].gpu_address == cbuf_guest.address &&
+                plan->uniform_buffers[0].bytes == 16,
+                "native LDC QMD3 bank and reflected descriptor differ");
+    };
+    verify_native_ldc(0, 0x01U, true);
+    verify_native_ldc(7, 0x80U, true);
+    verify_native_ldc(7, 0x01U, false);
+    verify_native_ldc(8, 0xffU, false);
+    std::puts("NS2 QMD3 native LDC 0xb82 direct-bank SPIR-V: PASS");
+
     // The real host Vulkan shader-module/pipeline/queue test consumes THIS
     // QMD3-backed compiler output, rather than the earlier mock source.
     {
