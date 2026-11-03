@@ -207,6 +207,24 @@ int main(){
     assert(result.success && committed.size()==1 &&
            (committed[0]==std::pair<W,W>(0x230,0)));
     committed.clear();
+    // Commit callbacks can also fail after a successful interpreter run.
+    // External GPU effects cannot be undone, so the Puller poisons its
+    // native channel; the reusable MME DRAM must not retain the write.
+    bool commit_threw{};
+    try {
+        (void)ram_state.ExecuteStaged(
+            0xe04,std::span<const W>{},read,allowed,
+            [](W,W) { throw std::runtime_error("GPU method commit failed"); },
+            valid);
+    } catch (const std::runtime_error&) {
+        commit_threw = true;
+    }
+    assert(commit_threw && committed.empty());
+    result=ram_state.ExecuteStaged(
+        0xe02,std::span<const W>{},read,allowed,commit,valid);
+    assert(result.success && committed.size()==1 &&
+           (committed[0]==std::pair<W,W>(0x230,0)));
+    committed.clear();
     std::vector<W> oversized(Tegra::NativeAmpereMacroState::MaxFifo+1,3);
     auto too_many=state.Execute(0xe00,std::span<const W>{oversized},read,emit);
     assert(!too_many.success &&

@@ -399,6 +399,9 @@ def main() -> int:
                 "MaxPendingMethods = 65536" in mme_state and
                 "native_3d->ExecuteStaged(" in puller and
                 "native_compute->ExecuteStaged(" in puller and
+                "native 3D MME staging/commit exception" in puller and
+                "native Compute MME staging/commit exception" in puller and
+                "validation_ok = valid();" in mme_state and
                 "return !bad_read;" in puller and
                 "return !invalid_compute_register_read;" in puller,
                 "P2.4 native TU104 macros must stage all emissions and restore DRAM on failure")
