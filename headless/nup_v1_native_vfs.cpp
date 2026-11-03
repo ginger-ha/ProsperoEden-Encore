@@ -72,9 +72,15 @@ public:
         const auto size = GetSize();
         if (!dst || offset >= size || len == 0) return 0;
         const auto count = (std::min)(len, size - offset);
-        // On failure the destination is untrusted; the VFS reports zero bytes.
-        return state_->archive->ReadMember(index_, offset,
-            std::span<std::uint8_t>(dst, count)) ? count : 0;
+        // ReadMember can write a partial range before finding an integrity
+        // or decoding error. Clear that range so callers can never observe
+        // unverified data even when they mishandle a short VFS read.
+        if (!state_->archive->ReadMember(index_, offset,
+                                         std::span<std::uint8_t>(dst, count))) {
+            std::fill_n(dst, count, u8{});
+            return 0;
+        }
+        return count;
     }
     std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
     bool Rename(std::string_view) override { return false; }
