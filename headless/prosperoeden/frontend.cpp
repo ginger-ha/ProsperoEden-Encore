@@ -407,11 +407,33 @@ std::string RunApp(const std::string& launch_error, bool first_start, bool* rest
                             const std::size_t row_bytes =
                                 static_cast<std::size_t>(width) * 4;
                             snapshot.rgba.resize(row_bytes * static_cast<std::size_t>(height));
+                            // Restore the menu renderer's pixel-pack state: a bound
+                            // PBO treats the pointer as an offset, and a custom row
+                            // length/skip can write beyond the RGBA host buffer.
+                            GLint old_pack_alignment = 4;
+                            GLint old_pack_row_length = 0;
+                            GLint old_pack_skip_rows = 0;
+                            GLint old_pack_skip_pixels = 0;
+                            GLint old_pack_buffer = 0;
+                            glGetIntegerv(GL_PACK_ALIGNMENT, &old_pack_alignment);
+                            glGetIntegerv(GL_PACK_ROW_LENGTH, &old_pack_row_length);
+                            glGetIntegerv(GL_PACK_SKIP_ROWS, &old_pack_skip_rows);
+                            glGetIntegerv(GL_PACK_SKIP_PIXELS, &old_pack_skip_pixels);
+                            glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &old_pack_buffer);
+                            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
                             glPixelStorei(GL_PACK_ALIGNMENT, 1);
+                            glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+                            glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+                            glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
                             glReadPixels(0, 0, width, height, GL_RGBA,
                                          GL_UNSIGNED_BYTE, snapshot.rgba.data());
                             const GLenum error = glGetError();
-                            glPixelStorei(GL_PACK_ALIGNMENT, 4);
+                            glPixelStorei(GL_PACK_ALIGNMENT, old_pack_alignment);
+                            glPixelStorei(GL_PACK_ROW_LENGTH, old_pack_row_length);
+                            glPixelStorei(GL_PACK_SKIP_ROWS, old_pack_skip_rows);
+                            glPixelStorei(GL_PACK_SKIP_PIXELS, old_pack_skip_pixels);
+                            glBindBuffer(GL_PIXEL_PACK_BUFFER,
+                                         static_cast<GLuint>(old_pack_buffer));
                             if (error == GL_NO_ERROR) {
                                 // GL readback starts at the lower left; Vulkan
                                 // buffer copies expect image rows from the top.
