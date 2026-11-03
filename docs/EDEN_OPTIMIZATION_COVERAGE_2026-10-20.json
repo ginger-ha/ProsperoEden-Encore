@@ -316,7 +316,7 @@
       "path": "headless/game_files.h",
       "disposition": "format_feature_source_integrated",
       "source_scope": "header_only",
-      "reviewed_source_git_blob": "d292275239472a9df01205ceabbcd96a2e6a2877",
+      "reviewed_source_git_blob": "fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e",
       "feature_review_document": "docs/EDEN_FORMAT_SOURCE_REVIEW_2026-10-23.md",
       "proof_ref": "tools/check-exefs-directory-host.py",
       "evidence": "New format-loader code path inspected and pinned: Picker formats and ExeFS path restrictions; no guest draw/JIT hotpath. This is source integration, NOT a claimed F01-F06 optimization or console runtime proof. Source drift re-reviewed for flexible layout on 2026-10-31; see docs/FLEXIBLE_LAYOUT_INTEGRATION_SOURCE_REVIEW_2026-10-31.md. Historical optimization disposition is unchanged; hardware and FPS not claimed. Arbitrary nested package add-on discovery re-reviewed, host fixture excludes the selected base and symlinks (31 October 2026). Mixed XCI/NSP folder selection re-reviewed; no native gameplay claim. Explicit extracted AOC Title ID wrappers recognized with strictly bounded selection; source-review updated 2026-10-31. Re-reviewed 2026-11-03: only three mixed-case ExeFS/Base directory-owner checks change (strict 5-character ExeFS leaf and path segment, stable priority for Base/ExeFS); update and DLC segments remain rejected and every directory still passes symlink_status. No new file extensions, decryption, guest code, renderer or hot-loop behavior. tools/check-exefs-directory-host.py now tests Mixed Case/Base/ExeFS discovery, nested decoy priority, valid persisted selection, prefixExeFS rejection and uppercase Updates exclusion, with host CI pending; no PS5 validation claimed."

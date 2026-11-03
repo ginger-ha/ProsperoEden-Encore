@@ -159,6 +159,19 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
     if (IsAddOnContainerName(root_name) || (root_name.size() == 5 && EndsWithNoCase(root_name, "romfs")))
         return {};
     if (IsDeconstructedGameDirectory(title)) return "main";
+    // Canonical dumps must remain discoverable even when this title folder
+    // has hundreds of unrelated assets. Probe only validated, symlink-free
+    // base/ExeFS paths before the generic bounded wrapper search.
+    for (const char* base_name : {"base", "Base", "BASE"}) {
+        const auto base = title / base_name;
+        if (!IsSafeExtractedDirectory(base)) continue;
+        for (const char* exefs_name : {"exefs", "ExeFS", "EXEFS"}) {
+            const auto executable = base / exefs_name;
+            if (IsSafeExtractedDirectory(executable) &&
+                IsDeconstructedGameDirectory(executable))
+                return std::string(base_name) + "/" + exefs_name + "/main";
+        }
+    }
     std::size_t visited = 0;
     const auto search = [&](const auto& self, const fs::path& dir,
                             const std::string& relative, unsigned depth) -> std::string {
@@ -168,9 +181,15 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
             return relative + "/main";
         std::error_code error;
         std::vector<fs::path> subdirs;
+        std::size_t examined = 0;
         for (fs::directory_iterator it{dir, fs::directory_options::skip_permission_denied, error},
                                     end;
-             !error && it != end && subdirs.size() < 128; it.increment(error)) {
+             !error && it != end; it.increment(error)) {
+            // Invalid/unrelated files previously escaped the directory limit:
+            // a large folder could stall the library scan indefinitely.
+            // Refuse partial wrapper results rather than select an accidental
+            // ExeFS from an unsorted subset of an oversized directory.
+            if (++examined > 512 || subdirs.size() >= 128) return {};
             const auto path = it->path();
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.' ||

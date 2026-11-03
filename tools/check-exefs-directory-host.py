@@ -183,6 +183,25 @@ int main() {
     std::ofstream(deeper / "base" / "some" / "path" / "exefs" / "main") << "code";
     std::ofstream(deeper / "base" / "some" / "path" / "exefs" / "main.npdm") << "meta";
     assert(Eden::FindDeconstructedGameMain(deeper) == "base/some/path/exefs/main");
+    // A flood of unrelated files cannot hide the canonical base dump or
+    // force an unbounded directory walk. Noncanonical oversized folders
+    // fail closed instead of exposing a partial, order-dependent result.
+    const auto large = root / "Many Unrelated Assets";
+    fs::create_directory(large);
+    for (int i = 0; i < 520; ++i)
+        std::ofstream(large / ("junk" + std::to_string(i) + ".dat")) << "junk";
+    fs::create_directories(large / "BASE" / "ExeFS");
+    std::ofstream(large / "BASE" / "ExeFS" / "main") << "exec";
+    std::ofstream(large / "BASE" / "ExeFS" / "main.npdm") << "meta";
+    assert(Eden::FindDeconstructedGameMain(large) == "BASE/ExeFS/main");
+    const auto oversized = root / "Oversized Noncanonical";
+    fs::create_directory(oversized);
+    for (int i = 0; i < 520; ++i)
+        std::ofstream(oversized / ("decoy" + std::to_string(i) + ".dat")) << "junk";
+    fs::create_directories(oversized / "custom" / "exefs");
+    std::ofstream(oversized / "custom" / "exefs" / "main") << "exec";
+    std::ofstream(oversized / "custom" / "exefs" / "main.npdm") << "meta";
+    assert(Eden::FindDeconstructedGameMain(oversized).empty());
     const fs::path bad = root / "Unsafe Game";
     fs::create_directory(bad);
     fs::create_directory_symlink(nested / "base", bad / "base");

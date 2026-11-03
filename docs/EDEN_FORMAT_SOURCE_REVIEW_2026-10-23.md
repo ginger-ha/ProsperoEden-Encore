@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `d292275239472a9df01205ceabbcd96a2e6a2877` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
+| `headless/game_files.h` | `fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -100,3 +100,7 @@ L'objet source `headless/game_files.h` (`0432c4c2651b2af22343f1401751b3222e30cdc
 ### Revue du 3 novembre — sélections enregistrées d'updates/DLC
 
 Le blob `headless/game_files.h` `d292275239472a9df01205ceabbcd96a2e6a2877` applique désormais **la même exclusion** de noms réservés aux packages rencontrés lors de la découverte et aux chemins de titre déjà enregistrés. Les stems exacts update/patch/DLC/AOC/addon et leurs variantes avec suffixe `_` ou `-` sont refusés comme *base*; les noms de conteneurs AOC/patch sont aussi écartés des racines extraites. Les packages réels sont toujours classés via leurs métadonnées par le provider AoC; aucun routage de DLC n'est supprimé. Un fichier caché `.nsp` ou `.xci` ne peut pas être sélectionné depuis un ancien cache. Les tests hôte `tools/check-exefs-directory-host.py` couvrent la découverte et une sélection persistée, sans changement du chemin NS1 normal, du lecteur NUP P5 ou de la console.
+
+### Revue supplémentaire du 3 novembre 2026 — parcours ExeFS borné
+
+Nouvel objet `headless/game_files.h` : `fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e`. La recherche de l'ExeFS extrait accepte les chemins canoniques `base/Base/BASE` × `exefs/ExeFS/EXEFS` seulement après vérification de chaque composant sans symlink et des fichiers `main`/`main.npdm`. Les dossiers non canoniques restent pris en charge par la recherche récursive existante, désormais bornée à **512 entrées examinées par dossier et 128 sous-dossiers**, refusant un résultat partiel plutôt que d'exposer un candidat dépendant de l'ordre des entrées. Le test hôte `tools/check-exefs-directory-host.py` crée de véritables dossiers contenant plus de 512 fichiers pour vérifier le maintien du chemin standard et le refus du parcours partiel. Aucun changement au moteur Vulkan/JIT, aux formats NUP P5, ni aux workflows PS5.
