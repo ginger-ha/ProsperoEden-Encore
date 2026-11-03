@@ -368,3 +368,16 @@ def compressed_nacp_fixture(*, variant: str) -> bytes:
              "exefs/main.npdm": b"latest-npdm",
          }},
     ])
+
+
+def oversized_icon_fixture() -> bytes:
+    """Preconstructed extracted-loader icon must not be read into memory."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "files": {
+             "exefs/main": b"synthetic-main",
+             "exefs/main.npdm": b"latest-npdm",
+             "exefs/icon_EnglishAmerican.dat": b"I" * (4 * 1024 * 1024 + 1),
+         }},
+    ])

@@ -81,7 +81,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 18);
+    assert(argc == 19);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -463,5 +463,10 @@ int main(int argc, char** argv) {
         std::make_shared<MemoryFile>(Load(argv[17])), &error);
     assert(!compressed_partial &&
            error == "NUP unsafe control.nacp language metadata");
+    // Eager icon extraction must never allocate from an unbounded ExeFS file.
+    error.clear();
+    auto huge_icon = Eden::NupV1::Native::NupAppLoader::Open(
+        std::make_shared<MemoryFile>(Load(argv[18])), &error);
+    assert(!huge_icon && error == "NUP ExeFS icon too large");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }

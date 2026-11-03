@@ -135,6 +135,27 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     loader->content_ = std::make_unique<ContentSet>(
         loader->mount_, validated_program_id, aoc_base);
 
+    // The extracted loader eagerly reads the selected icon into memory in
+    // its constructor. Refuse oversized image candidates before invoking it;
+    // TLV icons are already limited by the package metadata parser.
+    constexpr std::size_t MaxExtractedIconBytes = 4U * 1024U * 1024U;
+    if (const auto exefs = loader->content_->ExeFS()) {
+        for (const auto& candidate : exefs->GetFiles()) {
+            if (!candidate) continue;
+            const auto name = candidate->GetName();
+            const bool named_icon = name.starts_with("icon_") && name.ends_with(".dat");
+            const bool image_file = name.ends_with(".jpg") ||
+                                    name.ends_with(".jpeg") ||
+                                    name.ends_with(".png") ||
+                                    name.ends_with(".bmp");
+            if ((named_icon || image_file) &&
+                candidate->GetSize() > MaxExtractedIconBytes) {
+                if (error) *error = "NUP ExeFS icon too large";
+                return {};
+            }
+        }
+    }
+
     // No double patching of the NUP effective ExeFS directory: explicitly
     // disable the deconstructed loader's own update-overlay flag.
     // The main-file constructor initializes title/icon/control metadata,
