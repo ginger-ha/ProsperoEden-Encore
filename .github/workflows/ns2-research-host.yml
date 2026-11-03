@@ -560,6 +560,7 @@ jobs:
               tools/ns2/test_ampere_lower_bridge.cpp \
               vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/probe.cpp \
               vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_bridge.cpp \
+              vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/maxwell_image.cpp \
               -o "build-ns2-a64/ampere-lower-${cxx//+/}"
             "build-ns2-a64/ampere-lower-${cxx//+/}"
           done

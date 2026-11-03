@@ -433,21 +433,21 @@ int main() {
             !NativeGpuRange49(1,0) &&
             !NativeGpuRange49(~u64{0},16),
             "native shader GMMU reads enforce complete 49-bit range");
-    MappedMemory high_shader{};
-    high_shader.base=GmmuLimit49-0xa0U;
-    high_shader.data.resize(0x80U);
-    high_shader.data[0]=0x38;
-    Push(high_shader.data,pred_true|0x918U);
-    Push(high_shader.data,pred_true|0x94dU,0,exit_true);
-    high_shader.mapped_bytes=high_shader.data.size();
+    MappedMemory edge_shader{};
+    edge_shader.base=GmmuLimit49-0xa0U;
+    edge_shader.data.resize(0x80U);
+    edge_shader.data[0]=0x38;
+    Push(edge_shader.data,pred_true|0x918U);
+    Push(edge_shader.data,pred_true|0x94dU,0,exit_true);
+    edge_shader.mapped_bytes=edge_shader.data.size();
     const auto valid_edge_shader=CaptureNativeGraphicsShader(
-        high_shader.base,4,Read,&high_shader);
+        edge_shader.base,4,Read,&edge_shader);
     Require(valid_edge_shader.Ready() &&
             valid_edge_shader.captured_native_bytes==2*sizeof(Instruction),
             "short native shader ending at top of 49-bit VA stays supported");
-    high_shader.base=GmmuLimit49-0x90U;
+    edge_shader.base=GmmuLimit49-0x90U;
     const auto over_edge_shader=CaptureNativeGraphicsShader(
-        high_shader.base,4,Read,&high_shader);
+        edge_shader.base,4,Read,&edge_shader);
     Require(over_edge_shader.status==NativeCaptureStatus::Unmapped &&
             over_edge_shader.first_error_offset==0x90U &&
             over_edge_shader.image.code.empty(),
