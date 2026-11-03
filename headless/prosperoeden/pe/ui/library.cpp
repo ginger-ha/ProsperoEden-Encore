@@ -215,7 +215,12 @@ void flat_back_fallback(Canvas& c, const Game& game, const Rect& r)
             });
     }
     const auto shots = case_media::BackScenes(
-        front ? *front : game.cover, game.cover, game.screenshots);
+        front ? *front : game.cover, game.cover, game.screenshots,
+        [&](const std::string& path) {
+            // An async decode is still eligible, but a confirmed-bad source
+            // must not occupy the large rear background slot.
+            return !c.textures.cover(path, front_bucket).missing;
+        });
     const std::string* first = shots[0];
     const std::string* second = shots[1];
     const std::string* third = shots[2];
@@ -486,18 +491,20 @@ bool composed_case_face_ready(Textures& textures, const Game& game,
         return (item.texture != 0 && item.age >= 0.22f) ||
                (allow_missing && item.missing);
     };
-    const auto* front = case_media::FrontPaper(
+    const std::string* front = case_media::FrontPaper(
         game.hero, game.cover, game.screenshots);
-    if (!rear) {
-        if (front && textures.cover(*front, 704.0f).missing) {
-            front = case_media::FrontPaperAvailable(
-                game.hero, game.cover, game.screenshots,
-                [&](const std::string& path) {
-                    return !textures.cover(path, 704.0f).missing;
-                });
-        }
-        return !front || ready(*front, 704.0f);
+    // Both the painter and this readiness check must agree on the selected
+    // front after a confirmed Hero decode failure. Otherwise the rear
+    // falsely waits for a discarded source or duplicates its replacement.
+    if (front && textures.cover(*front, 704.0f).missing) {
+        front = case_media::FrontPaperAvailable(
+            game.hero, game.cover, game.screenshots,
+            [&](const std::string& path) {
+                return !textures.cover(path, 704.0f).missing;
+            });
     }
+    if (!rear)
+        return !front || ready(*front, 704.0f);
 
     constexpr float paper_w = 440.0f;
     constexpr float dynamic_h = 704.0f * (1.0f - 0.41f);
@@ -505,7 +512,10 @@ bool composed_case_face_ready(Textures& textures, const Game& game,
     constexpr float left_w = paper_w * 0.39f;
     const float gap = std::max(2.0f, paper_w * 0.007f);
     const auto shots = case_media::BackScenes(
-        front ? *front : game.cover, game.cover, game.screenshots);
+        front ? *front : game.cover, game.cover, game.screenshots,
+        [&](const std::string& path) {
+            return !textures.cover(path, paper_w).missing;
+        });
     if (shots[0] && !ready(*shots[0], paper_w)) return false;
     if (shots[1] && !ready(*shots[1], std::max(left_w - gap, top_h)))
         return false;
