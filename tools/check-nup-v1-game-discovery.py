@@ -11,6 +11,19 @@ CODE = r"""
 #include "game_files.h"
 #include <cassert>
 int main() {
+    // Repeated library scans classify ASCII names without heap allocations.
+    // Keep mixed-case addon exclusion and ordinary base-name acceptance.
+    assert(Eden::IsAddOnContainerName("UpDaTeS"));
+    assert(Eden::IsAddOnContainerName("ADD-ON"));
+    assert(!Eden::IsAddOnContainerName("updating"));
+    assert(Eden::IsReservedAddOnPackageStem("DLc_MKW"));
+    assert(Eden::IsReservedAddOnPackageStem("aoc-Bananza"));
+    assert(!Eden::IsReservedAddOnPackageStem("updateable"));
+    assert(Eden::IsExtractedAssetFolderName("EXEFS"));
+    assert(Eden::IsExtractedAssetFolderName("RomFS"));
+    assert(!Eden::IsExtractedAssetFolderName("romfs-old"));
+    assert(!Eden::IsNestedGameFileSelection("MKW/DlC/extra.nsp"));
+    assert(!Eden::IsNestedGameFileSelection("MKW/BASE/Patch_2.nsp"));
     assert(Eden::IsGameFile("game.nsp"));
     assert(Eden::IsGameFile("game.xci"));
     assert(Eden::IsGameFile("game.nsz"));
