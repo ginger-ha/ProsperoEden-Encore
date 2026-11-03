@@ -105,6 +105,23 @@ int main() {
     assert(alone[0] && *alone[0] == "extra.tga" && !alone[1]);
     const auto no_media = BackScenes(empty, empty, {});
     assert(!no_media[0] && !no_media[1]);
+
+    // Missing Hero: the first cached screenshot becomes the actual front.
+    // It must not reappear on the back under another scene slot.
+    const std::vector<std::string> fallback_front{
+        "first-front.tga", "back-one.tga", "back-two.tga"};
+    const auto no_hero_back = BackScenes(empty, icon, fallback_front);
+    assert(no_hero_back[0] == &fallback_front[1]);
+    assert(no_hero_back[1] == &fallback_front[2]);
+    assert(!no_hero_back[2]);
+    const std::vector<std::string> indexed_front{
+        "/cache/box-scene-1-FIRST.tga", "/cache/box-scene-2-SECOND.tga"};
+    const auto indexed_no_hero = BackScenes(empty, icon, indexed_front);
+    assert(!indexed_no_hero[0]);
+    assert(indexed_no_hero[1] == &indexed_front[1]);
+    assert(!indexed_no_hero[2]);
+    const auto only_front = BackScenes(empty, icon, {"only-front.tga"});
+    assert(!only_front[0] && !only_front[1] && !only_front[2]);
     assert(FrontAlternate(hero, empty, {"hero.tga"}) == nullptr);
 
     // When a game only has a front icon/poster, the back stays plain ink.
