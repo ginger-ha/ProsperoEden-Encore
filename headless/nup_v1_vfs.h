@@ -23,6 +23,8 @@ public:
     virtual bool ReadAt(std::uint64_t offset, std::span<std::uint8_t> dst) const = 0;
 };
 
+enum class ContentView : std::uint8_t { ExeFS, RomFS };
+
 struct Package {
     std::uint64_t title_id{};
     std::uint32_t version{};
@@ -48,6 +50,15 @@ public:
     // Paths are package-root-relative, with '/' separators. No traversal.
     std::optional<std::size_t> FindFile(std::size_t package_index,
                                         std::string_view relative_path) const;
+    // Look beneath the explicit ExeFS/RomFS node in the selected package.
+    std::optional<std::size_t> FindPackageMember(std::size_t package_index,
+                                                 ContentView view,
+                                                 std::string_view relative_path) const;
+    // Pick the highest NCM update version in this archive and shadow the base
+    // on matching paths. For base-less archives, only standalone updates apply.
+    // Add-ons remain separate and are addressed by FindPackageMember.
+    std::optional<std::size_t> FindEffectiveMember(ContentView view,
+                                                   std::string_view relative_path) const;
     // Reads exactly dst.size() bytes, never past member bounds; checks the
     // SHA-256 of the ENTIRE member before reporting success, including a
     // zstd member decoded without retaining full output in memory.
@@ -59,6 +70,8 @@ public:
 private:
     explicit Archive(const Source& source) : source_(source) {}
     void Parse();
+    std::optional<std::size_t> FindFromDir(std::uint32_t dir,
+                                           std::string_view relative_path) const;
 
     struct Directory {
         std::string name;
