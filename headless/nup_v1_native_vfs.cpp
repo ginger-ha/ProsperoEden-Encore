@@ -64,7 +64,7 @@ public:
         return static_cast<std::size_t>(state_->archive->MemberSize(index_));
     }
     bool Resize(std::size_t) override { return false; }
-    FileSys::VirtualDir GetContainingDirectory() const override { return parent_.lock(); }
+    FileSys::VirtualDir GetContainingDirectory() const override { return parent_; }
     bool IsWritable() const override { return false; }
     bool IsReadable() const override { return true; }
 
@@ -83,7 +83,7 @@ private:
     std::shared_ptr<Detail::State> state_;
     std::size_t index_{};
     std::string name_;
-    std::weak_ptr<FileSys::VfsDirectory> parent_;
+    FileSys::VirtualDir parent_;
 };
 
 class NativeDirectory final : public FileSys::ReadOnlyVfsDirectory,
@@ -126,7 +126,7 @@ public:
     }
 
     std::string GetName() const override { return name_; }
-    FileSys::VirtualDir GetParentDirectory() const override { return parent_.lock(); }
+    FileSys::VirtualDir GetParentDirectory() const override { return parent_; }
 
 private:
     std::optional<std::vector<DirEntry>> Entries() const {
@@ -139,7 +139,7 @@ private:
     ContentView view_;
     std::string path_;
     std::string name_;
-    std::weak_ptr<FileSys::VfsDirectory> parent_;
+    FileSys::VirtualDir parent_;
 };
 } // namespace
 
