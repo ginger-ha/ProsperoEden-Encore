@@ -17,8 +17,8 @@
 
 1. **Conserver une seule responsabilité maintenue** pour JIT, buffers, cache texture, shaders, renderer, services et UI; n'admettre des adaptations qu'aux frontières matérielles (ISA/QMD, formats/ABI/services). Pas de fork parallèle du moteur.
 2. Remplacer chaque flag de recherche **après validation** par sélection automatique selon le programme invité/la capacité matérielle, ou supprimer le code devenu redondant. Ne pas remplacer un mode OFF par un « succès » artificiel.
-3. Faire passer les tests hôte négatifs, la parité source, la CI commune et la non-régression NS1 **sur le même SHA**, puis qualifier sur la PS5.
+3. Faire passer les tests hôte négatifs, la parité source, la CI commune et la non-régression NS1 **sur le même couple SHA main/vendor** avant P5. **Aucun build PS5 ni test console en P0–P4** : la qualification matérielle s'effectuera exclusivement en P5 après autorisation explicite.
 4. L'inventaire est contrôlé par `tools/check-ns2-production-flags-host.py`. L'ajout, le renommage ou le retrait d'un flag doit mettre ce document et les tests à jour dans le même commit.
-5. Les workflows de build PS5 restent verrouillés avant les critères P4 de la roadmap. La validation console demandera ensuite un build expressément autorisé; aucune preuve console ne peut être obtenue sans exécution.
+5. Les workflows de build PS5 restent verrouillés **pendant tout P4**. Leur premier déverrouillage et la validation console appartiennent à **P5 uniquement**, après clôture des prérequis hôte et autorisation explicite.
 
 Ce document est un **inventaire des travaux restants**, pas un engagement selon lequel les 22 chemins sont déjà fonctionnels.
