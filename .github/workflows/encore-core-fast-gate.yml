@@ -443,6 +443,7 @@ jobs:
           python3 -B tools/check-vulkan-buffer-usage-reset-host.py
           python3 -B tools/check-ps5-quad-index-initial-fence-host.py
           python3 -B tools/check-vulkan-worker-fatal-drain-host.py
+          python3 -B tools/check-shared-gpu-queue-lifetime-host.py
           python3 -B tools/check-ps5-gpu-time-batch-host.py
           python3 -B tools/check-vulkan-query-allocation-host.py
           python3 -B tools/check-ps5-vulkan-oom-source.py
