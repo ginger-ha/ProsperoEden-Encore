@@ -57,6 +57,20 @@ unmapped_uniform_before = "    const std::optional<DAddr> device_addr = gpu_memo
 unmapped_uniform_after = "    const std::optional<DAddr> device_addr = gpu_memory->GpuToCpuAddress(gpu_addr);\n    if (!device_addr) {\n        // An unmapped cbuf is not a valid CPU-backed GPU buffer. Retire any\n        // previous slot binding instead of dereferencing an empty optional.\n        channel_state->uniform_buffers[stage][index] = NULL_BINDING;\n        return;\n    }\n    const Binding binding{\n        .device_addr = *device_addr,\n        .size = size,\n        .buffer_id = BufferId{},\n    };"
 assert expected.count(unmapped_uniform_before) == 1
 expected = expected.replace(unmapped_uniform_before, unmapped_uniform_after)
+# Lichii nx2's page-table guard also needs the entire guest-physical span
+# checked before CreateBuffer: only the native maintained owner is changed.
+find_page_before = ("BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size, bool sparse_compatible) {\n"
+                    "    if (device_addr == 0) {\n        return NULL_BUFFER_ID;\n    }\n"
+                    "    const u64 page = device_addr >> CACHING_PAGEBITS;\n")
+find_page_after = ("BufferId BufferCache<P>::FindBuffer(DAddr device_addr, u32 size, bool sparse_compatible) {\n"
+                   "    // An unmapped/invalid guest-physical address must never index outside\n"
+                   "    // the fixed 16 GiB page table. Keep this guard before any buffer lookup.\n"
+                   "    const u64 page = device_addr >> CACHING_PAGEBITS;\n"
+                   "    if (device_addr == 0 || page >= page_table.size() ||\n"
+                   "        size > (u64{page_table.size()} << CACHING_PAGEBITS) - device_addr) {\n"
+                   "        return NULL_BUFFER_ID;\n    }\n")
+assert expected.count(find_page_before) == 1
+expected = expected.replace(find_page_before, find_page_after)
 # Native-only vertex buffer extent hardening: never truncate a 64-bit
 # guest GPU range to u32 before checking the exclusive-end bounds.
 vertex_extent_old = "    const u32 address_size = static_cast<u32>(gpu_addr_end - gpu_addr_begin);\n    u32 size = address_size; // TODO: Analyze stride and number of vertices"
