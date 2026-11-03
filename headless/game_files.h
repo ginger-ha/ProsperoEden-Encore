@@ -302,13 +302,15 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.' || IsAddOnContainerName(name) ||
                 (name.size() == 5 && EndsWithNoCase(name, "romfs"))) continue;
-            if (IsSafeExtractedDirectory(path)) {
+            // One non-following stat per entry. The old directory probe and
+            // subsequent file probe both called symlink_status for every NSP.
+            std::error_code entry_error;
+            const auto status = fs::symlink_status(path, entry_error);
+            if (entry_error || fs::is_symlink(status)) continue;
+            if (fs::is_directory(status)) {
                 subdirs.push_back(path);
                 continue;
             }
-            error.clear();
-            const auto status = fs::symlink_status(path, error);
-            if (error) { error.clear(); continue; }
             if (!fs::is_regular_file(status) ||
                 (!IsPackageFile(name) && !IsCardImageFile(name) &&
                  !IsNupFile(name))) continue;
@@ -414,7 +416,12 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
             const auto path = it->path();
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.') continue;
-            if (IsSafeExtractedDirectory(path)) {
+            // Preserve symlink rejection without two filesystem probes
+            // for each ordinary file in a wrapper or DLC directory.
+            std::error_code entry_error;
+            const auto status = fs::symlink_status(path, entry_error);
+            if (entry_error || fs::is_symlink(status)) continue;
+            if (fs::is_directory(status)) {
                 // Do not descend into extracted payloads or into a detected
                 // add-on container: the native package provider handles the
                 // latter recursively using package CNMT/Title ID metadata.
@@ -432,10 +439,7 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
             // A package with any name in any wrapper can be an update/DLC.
             // Do not rely on a "dlc" filename prefix; the native provider
             // classifies its actual content records. Ignore symlinks.
-            error.clear();
-            const auto status = fs::symlink_status(path, error);
-            if (error) { error.clear(); continue; }
-            if (fs::is_regular_file(status) && !fs::is_symlink(status) &&
+            if (fs::is_regular_file(status) &&
                 (IsPackageFile(name) || IsCardImageFile(name)) &&
                 path != base_package)
                 loose_add_on = true;
