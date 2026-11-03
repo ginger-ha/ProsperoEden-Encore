@@ -564,3 +564,41 @@ for path in (
     assert "tables.MatchesSnapshot(" in renderer, path
 print("NS2_NATIVE_VULKAN_TEXTURE_PIN_PASS cache=shared gpu_retire=leased"
       " sampled=real storage=real ns1_path=unchanged")
+
+
+# P2.2b ASTC/Vulkan native TextureCache owner parity.
+# The optional ASTC include root may shadow the canonical Vulkan cache
+# owner. Both must implement the same channel-identity, TIC/TSC acquisition
+# and fence-held image/view/sampler pin API, without removing ASTC features.
+astc_root = vendor / "encore-active/ns2-astc/include/video_core/texture_cache"
+vulkan_root = vendor / "encore-active/eden-vulkan/vulkan-cache/video_core/texture_cache"
+astc_base = (astc_root / "texture_cache_base.h").read_text()
+astc_impl = (astc_root / "texture_cache.h").read_text()
+vulkan_base = (vulkan_root / "texture_cache_base.h").read_text()
+vulkan_impl = (vulkan_root / "texture_cache.h").read_text()
+native_gate = "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)"
+
+
+def native_cache_slice(text: str, start: str, following: str) -> str:
+    assert text.count(start) == 1, ("native cache gate drift", start[:70])
+    block = text.split(start, 1)[1]
+    assert block.count(following) == 1, ("native cache boundary drift", following[:70])
+    return start + block.split(following, 1)[0].rstrip()
+
+
+declarations_end = "\n    /// Fill image_view_ids with the graphics/compute images in indices"
+implementation_start = native_gate + "\n// NS2 and NS1 use one TextureCache channel map"
+implementation_end = "\ntemplate <class P>\nImageViewId TextureCache<P>::VisitImageView("
+base_start = native_gate + "\n    // An already authenticated native TIC/TSC record"
+assert native_cache_slice(astc_base, base_start, declarations_end) == native_cache_slice(
+    vulkan_base, base_start, declarations_end
+), "ASTC shadow cache lost the canonical native GPU pin/channel API"
+assert native_cache_slice(astc_impl, implementation_start, implementation_end) == native_cache_slice(
+    vulkan_impl, implementation_start, implementation_end
+), "ASTC shadow cache diverged from canonical native acquisition/lease implementation"
+assert "#include <memory>" in astc_base
+assert "Ns2AstcEligible(const ImageBase&)" in astc_base
+assert "Ns2UploadDirtyLayers(Image&)" in astc_base
+assert "#include \"video_core/texture_cache/ns2_astc_texture_cache_bridge.inc\"" in astc_impl
+print("NS2_ASTC_VULKAN_TEXTURE_CACHE_NATIVE_PARITY_PASS shared_api=1"
+      " channel=locked image_view=pin sampler=pin astc_layer_bridge=preserved")
