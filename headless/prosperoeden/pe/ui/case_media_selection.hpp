@@ -52,9 +52,10 @@ inline const std::string* FrontAlternate(
 // Rear source priorities: LaunchBox fanart, game-title screenshot, gameplay.
 // Missing categories use distinct Nlib screenshots; the cover/front is never
 // injected as a floating square. Results reference owned game metadata.
+template <typename Usable>
 inline std::array<const std::string*, 3> BackScenes(
     const std::string& featured, const std::string& cover,
-    const std::vector<std::string>& screenshots) noexcept
+    const std::vector<std::string>& screenshots, Usable&& usable)
 {
     std::array<const std::string*, 3> selected{nullptr, nullptr, nullptr};
     // If there is no Hero, the front uses the first cached screenshot.
@@ -65,7 +66,7 @@ inline std::array<const std::string*, 3> BackScenes(
         return front && *front == image;
     };
     const auto accept = [&](const std::string& image) {
-        if (image.empty() || image == cover || is_front(image)) return;
+        if (image.empty() || image == cover || is_front(image) || !usable(image)) return;
         for (const auto* existing : selected)
             if (existing && *existing == image) return;
         for (auto& entry : selected)
@@ -81,7 +82,7 @@ inline std::array<const std::string*, 3> BackScenes(
     for (std::size_t category = 0; category < kSceneMarkers.size(); ++category) {
         for (const auto& image : screenshots) {
             if (image.find(kSceneMarkers[category]) == std::string::npos ||
-                image == cover || is_front(image)) continue;
+                image == cover || is_front(image) || !usable(image)) continue;
             selected[category] = &image;
             break;
         }
@@ -93,6 +94,18 @@ inline std::array<const std::string*, 3> BackScenes(
         accept(image);
     }
     return selected;
+}
+
+// The ordinary source-only selector retains its original three-argument API.
+// The renderer may additionally reject confirmed-bad asynchronous images
+// without temporary vectors, changing the back's category mapping or
+// triggering a network fetch.
+inline std::array<const std::string*, 3> BackScenes(
+    const std::string& featured, const std::string& cover,
+    const std::vector<std::string>& screenshots) noexcept
+{
+    return BackScenes(featured, cover, screenshots,
+                      [](const std::string&) noexcept { return true; });
 }
 
 // One-shot fallback after a short media warm-up is allowed only for a NEW
