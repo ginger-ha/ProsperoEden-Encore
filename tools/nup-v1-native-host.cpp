@@ -171,6 +171,24 @@ int main(int argc, char** argv) {
     assert(effective->GetName() == "romfs");
     assert(effective->GetFiles().size() == 1);
     assert(effective->GetSubdirectories().empty());
+    // The VFS directory metadata is immutable after mount: GetFiles and
+    // GetSubdirectories reuse one lazily published snapshot, including when
+    // concurrent service threads enumerate the same directory.
+    std::atomic<bool> directory_snapshot_ok{true};
+    std::vector<std::thread> directory_workers;
+    for (int worker = 0; worker < 6; ++worker) {
+        directory_workers.emplace_back([&] {
+            for (int iteration = 0; iteration < 64; ++iteration) {
+                const auto files = effective->GetFiles();
+                const auto subdirs = effective->GetSubdirectories();
+                if (files.size() != 1 || files[0]->GetName() != "state.bin" ||
+                    !subdirs.empty())
+                    directory_snapshot_ok.store(false, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& worker : directory_workers) worker.join();
+    assert(directory_snapshot_ok.load(std::memory_order_relaxed));
     auto newest = effective->GetFile("state.bin");
     assert(newest && newest->GetContainingDirectory() == effective);
     assert(Read(newest) == "latest-v3");
