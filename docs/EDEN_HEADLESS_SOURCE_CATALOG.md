@@ -2,7 +2,7 @@
 
 **Branche :** `dev/ps5-sparse-jit`. **Date du relevé :** 30 octobre 2026.
 
-Ce registre complémentaire couvre les **184 chemins** de code, en-têtes et
+Ce registre complémentaire couvre les **186 chemins** de code, en-têtes et
 fragments `.c/.cc/.cpp/.h/.hpp/.inc/.cl` du dossier `headless/`.
 Il ne remplace pas `EDEN_ACTIVE_SOURCE_CATALOG.md` : les 326 fichiers
 de `vendor/encore-active` sont déjà inventoriés séparément.
@@ -13,9 +13,9 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **184** chemins sous `headless/`, dont **62** sources C/C++ et **122** en-têtes/fragments.
+- **186** chemins sous `headless/`, dont **63** sources C/C++ et **123** en-têtes/fragments.
 - **98** chemins déjà présents dans le graphe moteur.
-- **86** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
+- **88** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
   sont des entrées de l'inventaire, **pas** de nouveaux patchs CMake.
@@ -30,10 +30,10 @@ toujours 176/177 chemins ; il n'y a pas 80 overrides de dépendances oubliés.
 | --- | ---: |
 | `launcher/UI` | **66** |
 | `harness/test` | **10** |
-| `outil auxiliaire` | **8** |
+| `outil auxiliaire` | **10** |
 | `données générées` | **2** |
 | `en-tête/fragment` | **0** |
-| **Total non indexé** | **86** |
+| **Total non indexé** | **88** |
 
 Les 66 chemins du launcher et de son handoff sont réservés au périmètre UI séparé.
 Les 10 harnais, 4 outils et 2 ressources générées ne sont pas déclarés
@@ -145,6 +145,8 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/network_domain_rules.c` | runtime/bridge | U07 | Chemin indexé, preuve dépend du graphe |
 | `headless/network_domain_rules.h` | en-tête/fragment | U38 | Chemin indexé, preuve dépend du graphe |
 | `headless/ns2_title_catalog.h` | en-tête/fragment | U89 | Chemin indexé, preuve dépend du graphe |
+| `headless/nup_v1_native_content.cpp` | outil auxiliaire | — | À qualifier |
+| `headless/nup_v1_native_content.h` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_native_vfs.cpp` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_native_vfs.h` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_vfs.cpp` | outil auxiliaire | — | À qualifier |
