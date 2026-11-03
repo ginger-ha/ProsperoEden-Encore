@@ -172,10 +172,16 @@ Result IAddOnContentManager::ListAddOnContent(Out<u32> out_count,
 
     R_UNLESS(out.size() >= offset, AM::ResultApplicationRecordNotFound);
 
-    *out_count = static_cast<u32>(std::min<size_t>(out.size() - offset, count));
-    std::rotate(out.begin(), out.begin() + offset, out.end());
-
-    std::memcpy(out_addons.data(), out.data(), *out_count * sizeof(u32));
+    // IPC supplies the actual destination span, not a promise that the
+    // caller's requested count fits it. Never write past a short HIPC
+    // map-alias buffer, even when the NUP addon index is otherwise valid.
+    const std::size_t capacity = out_addons.size() / sizeof(u32);
+    *out_count = static_cast<u32>(std::min({
+        out.size() - offset, static_cast<std::size_t>(count), capacity}));
+    if (*out_count) {
+        std::memcpy(out_addons.data(), out.data() + offset,
+                    static_cast<std::size_t>(*out_count) * sizeof(u32));
+    }
 
     R_SUCCEED();
 }
