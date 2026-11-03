@@ -55,6 +55,9 @@ def main() -> None:
         assert "out.size() - offset, static_cast<std::size_t>(count), capacity" in source
         assert "if (*out_count)" in source
         assert "return !entry || entry->GetStatus() != Loader::ResultStatus::Success;" in source
+        assert "const u64 requested_id = aoc_base + static_cast<u32>(addon_index);" in source
+        assert "AM::ResultApplicationRecordNotFound" in source
+        assert '(STUBBED) called with addon_index=' not in source
     # Construction, existing NCA/extracted enumeration and event services
     # are intentionally unmodified. Only Count/List/Base/Prepare are bridged.
     for first, last in (
