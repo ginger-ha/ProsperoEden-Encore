@@ -144,68 +144,76 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # P2.3: reconstruct the exact reviewed mutable-QMD CBUF/SSBO
     # revalidation in the generated rasterizer. Preserve full-file parity:
     # do not substitute the checked-in implementation as the oracle.
-    qmd_binding_previous = "        scheduler.RequestOutsideRenderPassOperationContext();\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        if (!registry.IsComputeCurrent(kepler_compute, *ticket)) {"
-    qmd_binding_reviewed = "        // The original QMD resource plan was read before shader compilation.\n        // CBUF descriptors are mutable even when both GPU address ranges\n        // remain mapped. Refuse stale/aliased captures before staging Vulkan.\n        const auto before_binding = resource_owner->BuildResourcePlan(*compiled.info);\n        if (!before_binding || !resources->SameBufferBindings(*before_binding) ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket))\n            return false;\n        scheduler.RequestOutsideRenderPassOperationContext();\n        native_recording_started = true;\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        // ConfigureNative may have recorded descriptor closures already.\n        // Validate CBUF bytes one final time after staging; an inconsistent\n        // dispatch must retain its Vulkan owner until those commands retire.\n        bool current_after_staging = false;\n        try {\n            const auto after_binding = resource_owner->BuildResourcePlan(*compiled.info);\n            current_after_staging = after_binding &&\n                resources->SameBufferBindings(*after_binding);\n        } catch (...) {\n            // A guest CBUF may become unmapped while re-reading it. A failed\n            // read is a refused dispatch, never early pipeline destruction.\n        }\n        if (!current_after_staging ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket)) {"
-    assert raster.count(qmd_binding_previous) == 1, "pinned QMD binding path moved"
-    assert expected["vulkan_rasterizer.cpp"].read_text().count(qmd_binding_reviewed) == 1, (
-        "reviewed native QMD mutation protection drifted")
-    raster = raster.replace(qmd_binding_previous, qmd_binding_reviewed)
-    # P2.3: the two real rasterizer owners retain native pipelines after
-    # a rejected/throwing descriptor-stage closure. Mirror only reviewed
-    # changes in the historical generator; final full-file parity stays on.
-    native_pipeline_retirement_deltas = (
-        ("        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};", "        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};\n        // ConfigureNative and Scheduler::Record can throw AFTER recording\n        // closures that capture ComputePipeline*. A normal return-false or\n        // exception must not release that owner before its GPU timeline.\n        // The scope guard is armed only after descriptor staging can start.\n        bool native_recording_started = false;\n        auto native_compute_retirement = SCOPE_GUARD {\n            if (!native_recording_started || !pipeline) return;\n            try {\n                Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                    scheduler, fence_manager, pipeline);\n            } catch (...) {\n                // The retention helper already waits a submitted tick on\n                // callback-registration failure. Keep this final emergency\n                // drain noexcept while unwinding another exception.\n                try { scheduler.Finish(); } catch (...) {}\n            }\n        };"),
-        ("            // ConfigureNative has already recorded a Vulkan descriptor-bind\n            // closure that captures ComputePipeline*. Even when this QMD is\n            // refused, retain the object until those queued commands retire.\n            Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n            return false;", "            // Scope retirement also handles this rejection; do not release\n            // already recorded Vulkan descriptor-bind closures early.\n            return false;"),
-        ("        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;", "        // Successful submissions already hold their exact timeline owner.\n        // Cancel exception/early-return recovery before normal retirement.\n        native_compute_retirement.Cancel();\n        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;"),
-    )
-    for old, new in native_pipeline_retirement_deltas:
-        assert raster.count(old) == 1, "native pipeline retirement source drift"
-        assert expected["vulkan_rasterizer.cpp"].read_text().count(new) == 1, (
-            "native pipeline retirement reviewed source drift")
-        raster = raster.replace(old, new)
-    # P2.2: the native table-register lifetime check is shared by both
-    # Vulkan owners. Mirror only this audited delta from the pinned source,
-    # preserving the generator's final full-file byte-for-byte comparison.
-    table_register_previous = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // TIC/TSC can be rewritten while the shader is compiled."
-    table_register_reviewed = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // The engine epoch can stay valid while guest code rewrites\n                // TIC/TSC base/limit registers. Never authenticate bytes from\n                // an OLD table and bind them as the currently active one.\n                if (same_cache_channel) {\n                    const auto& live_regs = kepler_compute.regs;\n                    same_cache_channel = tables.SameRegisters(\n                        live_regs.tic.Address(), live_regs.tic.limit,\n                        live_regs.tsc.Address(), live_regs.tsc.limit,\n                        launch.linked_tsc);\n                }\n                // TIC/TSC can be rewritten while the shader is compiled."
-    assert raster.count(table_register_previous) == 1, (
-        "generated native TIC/TSC table ownership drift")
-    assert expected["vulkan_rasterizer.cpp"].read_text().count(
-        table_register_reviewed) == 1, "reviewed TIC/TSC register guard drift"
-    raster = raster.replace(table_register_previous, table_register_reviewed)
-    # P2.2: native SPIR-V dimensions must match the same typed TIC
-    # snapshot in both renderer owners before any cache view acquisition.
-    typed_previous = ("            if (!typed_descriptors ||\\n"
-                      "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
-                      "                return false;").replace("\\n", "\n")
-    typed_reviewed = ("            if (!typed_descriptors ||\\n"
-                      "                !Shader::Ampere::NativeQmdTypedImageLayoutMatches(\\n"
-                      "                    *compiled.info, *typed_descriptors) ||\\n"
-                      "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
-                      "                return false;").replace("\\n", "\n")
-    assert raster.count(typed_previous) == 1, "generated native TIC type contract drift"
-    assert expected["vulkan_rasterizer.cpp"].read_text().count(typed_reviewed) == 1, (
-        "reviewed native TIC reflected type contract drift")
-    raster = raster.replace(typed_previous, typed_reviewed)
-    # P2.2: shader translation must reject invalid TIC layout/size/MSAA
-    # using the SAME admission contract as the later typed cache replay.
-    shader_tic_previous = (
-        '        if (static_cast<u32>(entry.header_version.Value()) >\n'
-        '            static_cast<u32>(Tegra::Texture::TICHeaderVersion::BlockLinearColorKey))\n'
-        '            throw std::runtime_error{"unsupported native Compute TIC header"};'
-    )
-    shader_tic_reviewed = (
-        '        // Shader metadata must not be translated from a TIC the later\n'
-        '        // shared TextureCache cannot admit. Reject an invalid format layout,\n'
-        '        // MSAA mode or overflow budget before spending CPU on native SPIR-V.\n'
-        '        if (!Shader::Ampere::NativeQmdTicLayoutSupported(entry))\n'
-        '            throw std::runtime_error{"unsupported native Compute TIC layout"};'
-    )
-    assert raster.count(shader_tic_previous) == 1, "generated TIC translation guard moved"
-    assert expected["vulkan_rasterizer.cpp"].read_text().count(shader_tic_reviewed) == 1, (
-        "reviewed early TIC shader admission guard drift")
-    raster = raster.replace(shader_tic_previous, shader_tic_reviewed)
-    raster_path.write_text(raster)
+    # P2.2b generator now reproduces the entire historical QMD owner and
+    # the real native image/sampler descriptor pins. Older archived oracles
+    # still take the exact previous patch chain below. Full-file parity is
+    # checked afterward in both cases: no source bypass or vendor copy.
+    if "native_images.reserve(typed_descriptors->size())" in raster:
+        assert "texture_cache.PinNativeImageView(id)" in raster
+        assert "std::move(pinned_lifetime)" in raster
+    else:
+        qmd_binding_previous = "        scheduler.RequestOutsideRenderPassOperationContext();\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        if (!registry.IsComputeCurrent(kepler_compute, *ticket)) {"
+        qmd_binding_reviewed = "        // The original QMD resource plan was read before shader compilation.\n        // CBUF descriptors are mutable even when both GPU address ranges\n        // remain mapped. Refuse stale/aliased captures before staging Vulkan.\n        const auto before_binding = resource_owner->BuildResourcePlan(*compiled.info);\n        if (!before_binding || !resources->SameBufferBindings(*before_binding) ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket))\n            return false;\n        scheduler.RequestOutsideRenderPassOperationContext();\n        native_recording_started = true;\n        {\n            std::scoped_lock lock{buffer_cache.mutex};\n            if (!pipeline->ConfigureNative(\n                    *resources, *gpu_memory, scheduler, buffer_cache)) return false;\n        }\n        // ConfigureNative may have recorded descriptor closures already.\n        // Validate CBUF bytes one final time after staging; an inconsistent\n        // dispatch must retain its Vulkan owner until those commands retire.\n        bool current_after_staging = false;\n        try {\n            const auto after_binding = resource_owner->BuildResourcePlan(*compiled.info);\n            current_after_staging = after_binding &&\n                resources->SameBufferBindings(*after_binding);\n        } catch (...) {\n            // A guest CBUF may become unmapped while re-reading it. A failed\n            // read is a refused dispatch, never early pipeline destruction.\n        }\n        if (!current_after_staging ||\n            !registry.IsComputeCurrent(kepler_compute, *ticket)) {"
+        assert raster.count(qmd_binding_previous) == 1, "pinned QMD binding path moved"
+        assert expected["vulkan_rasterizer.cpp"].read_text().count(qmd_binding_reviewed) == 1, (
+            "reviewed native QMD mutation protection drifted")
+        raster = raster.replace(qmd_binding_previous, qmd_binding_reviewed)
+        # P2.3: the two real rasterizer owners retain native pipelines after
+        # a rejected/throwing descriptor-stage closure. Mirror only reviewed
+        # changes in the historical generator; final full-file parity stays on.
+        native_pipeline_retirement_deltas = (
+            ("        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};", "        std::shared_ptr<ComputePipeline> pipeline{std::move(owned)};\n        // ConfigureNative and Scheduler::Record can throw AFTER recording\n        // closures that capture ComputePipeline*. A normal return-false or\n        // exception must not release that owner before its GPU timeline.\n        // The scope guard is armed only after descriptor staging can start.\n        bool native_recording_started = false;\n        auto native_compute_retirement = SCOPE_GUARD {\n            if (!native_recording_started || !pipeline) return;\n            try {\n                Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                    scheduler, fence_manager, pipeline);\n            } catch (...) {\n                // The retention helper already waits a submitted tick on\n                // callback-registration failure. Keep this final emergency\n                // drain noexcept while unwinding another exception.\n                try { scheduler.Finish(); } catch (...) {}\n            }\n        };"),
+            ("            // ConfigureNative has already recorded a Vulkan descriptor-bind\n            // closure that captures ComputePipeline*. Even when this QMD is\n            // refused, retain the object until those queued commands retire.\n            Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n            return false;", "            // Scope retirement also handles this rejection; do not release\n            // already recorded Vulkan descriptor-bind closures early.\n            return false;"),
+            ("        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;", "        // Successful submissions already hold their exact timeline owner.\n        // Cancel exception/early-return recovery before normal retirement.\n        native_compute_retirement.Cancel();\n        Shader::Ampere::RetainNativeComputeUntilGpuTick(\n                scheduler, fence_manager, std::move(pipeline));\n        return true;"),
+        )
+        for old, new in native_pipeline_retirement_deltas:
+            assert raster.count(old) == 1, "native pipeline retirement source drift"
+            assert expected["vulkan_rasterizer.cpp"].read_text().count(new) == 1, (
+                "native pipeline retirement reviewed source drift")
+            raster = raster.replace(old, new)
+        # P2.2: the native table-register lifetime check is shared by both
+        # Vulkan owners. Mirror only this audited delta from the pinned source,
+        # preserving the generator's final full-file byte-for-byte comparison.
+        table_register_previous = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // TIC/TSC can be rewritten while the shader is compiled."
+        table_register_reviewed = "                same_cache_channel = texture_cache.NativeChannelMatches(\n                    kepler_compute, *gpu_memory);\n                // The engine epoch can stay valid while guest code rewrites\n                // TIC/TSC base/limit registers. Never authenticate bytes from\n                // an OLD table and bind them as the currently active one.\n                if (same_cache_channel) {\n                    const auto& live_regs = kepler_compute.regs;\n                    same_cache_channel = tables.SameRegisters(\n                        live_regs.tic.Address(), live_regs.tic.limit,\n                        live_regs.tsc.Address(), live_regs.tsc.limit,\n                        launch.linked_tsc);\n                }\n                // TIC/TSC can be rewritten while the shader is compiled."
+        assert raster.count(table_register_previous) == 1, (
+            "generated native TIC/TSC table ownership drift")
+        assert expected["vulkan_rasterizer.cpp"].read_text().count(
+            table_register_reviewed) == 1, "reviewed TIC/TSC register guard drift"
+        raster = raster.replace(table_register_previous, table_register_reviewed)
+        # P2.2: native SPIR-V dimensions must match the same typed TIC
+        # snapshot in both renderer owners before any cache view acquisition.
+        typed_previous = ("            if (!typed_descriptors ||\\n"
+                          "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
+                          "                return false;").replace("\\n", "\n")
+        typed_reviewed = ("            if (!typed_descriptors ||\\n"
+                          "                !Shader::Ampere::NativeQmdTypedImageLayoutMatches(\\n"
+                          "                    *compiled.info, *typed_descriptors) ||\\n"
+                          "                !registry.IsComputeCurrent(kepler_compute, *ticket))\\n"
+                          "                return false;").replace("\\n", "\n")
+        assert raster.count(typed_previous) == 1, "generated native TIC type contract drift"
+        assert expected["vulkan_rasterizer.cpp"].read_text().count(typed_reviewed) == 1, (
+            "reviewed native TIC reflected type contract drift")
+        raster = raster.replace(typed_previous, typed_reviewed)
+        # P2.2: shader translation must reject invalid TIC layout/size/MSAA
+        # using the SAME admission contract as the later typed cache replay.
+        shader_tic_previous = (
+            '        if (static_cast<u32>(entry.header_version.Value()) >\n'
+            '            static_cast<u32>(Tegra::Texture::TICHeaderVersion::BlockLinearColorKey))\n'
+            '            throw std::runtime_error{"unsupported native Compute TIC header"};'
+        )
+        shader_tic_reviewed = (
+            '        // Shader metadata must not be translated from a TIC the later\n'
+            '        // shared TextureCache cannot admit. Reject an invalid format layout,\n'
+            '        // MSAA mode or overflow budget before spending CPU on native SPIR-V.\n'
+            '        if (!Shader::Ampere::NativeQmdTicLayoutSupported(entry))\n'
+            '            throw std::runtime_error{"unsupported native Compute TIC layout"};'
+        )
+        assert raster.count(shader_tic_previous) == 1, "generated TIC translation guard moved"
+        assert expected["vulkan_rasterizer.cpp"].read_text().count(shader_tic_reviewed) == 1, (
+            "reviewed early TIC shader admission guard drift")
+        raster = raster.replace(shader_tic_previous, shader_tic_reviewed)
+        raster_path.write_text(raster)
     # Native GPU hot-path deltas are audited against the pinned generated
     # Vulkan source. Reconstruct exactly; never silently accept another drift.
     pipeline_src = actual['vk_graphics_pipeline_cost.cpp']
