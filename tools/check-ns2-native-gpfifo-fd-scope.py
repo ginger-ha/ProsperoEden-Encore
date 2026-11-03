@@ -56,7 +56,19 @@ required_header = (
     "NvResult SubmitGPFIFOImpl(IoctlSubmitGpfifo& params, Tegra::CommandList&& entries, DeviceFD fd);",
     "bool UsesNativeAbi(DeviceFD fd) const;",
 )
+# Native H:0x1b kickoff pointer lists must be mapped in their exact FD
+# process before any command reads or GPU queue submission.
+kickoff = source.split("NvResult nvhost_gpu::SubmitGPFIFOBase1(", 1)[1].split(
+    "NvResult nvhost_gpu::SubmitGPFIFOBase2(", 1)[0]
+kickoff_preflight = "session->process->GetMemory().IsValidVirtualAddressRange("
+kickoff_read = "this->GetSessionMemory(fd).ReadBlock("
 checks = [
+    (kickoff_preflight in kickoff and kickoff_read in kickoff and
+     kickoff.index(kickoff_preflight) < kickoff.index(kickoff_read) and
+     "UsesNativeAbi(fd) && params.num_entries != 0" in kickoff and
+     "static_cast<std::size_t>(params.num_entries) *" in kickoff and
+     "return NvResult::InvalidSize;" in kickoff,
+     "native kickoff validates every guest GPFIFO header before reading, leaving NS1 unchanged"),
     (all(s in source for s in required_cpp), "native source uses exact caller FD"),
     (all(s in header for s in required_header), "native header exposes caller FD"),
     (all(s in native_puller for s in required_puller),
