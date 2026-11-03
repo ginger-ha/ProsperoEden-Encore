@@ -112,3 +112,75 @@ with tempfile.TemporaryDirectory(prefix="encore-extracted-aoc-") as temporary:
             assert r.returncode == 0 and "EXTRACTED_AOC_REAL_HEADER_PASS" in r.stdout, (
                 compiler, r.stdout, r.stderr)
             print("EXTRACTED_AOC_HOST_PASS", Path(compiler).name, opt)
+
+
+# Compile the actual metadata snapshot owner directly, without linking the
+# PS5 loader. Rescans must not erase the previous published catalogue while
+# they read disk; failed scans must invalidate, never publish partial results.
+start = ui.index("namespace {\nstruct AddOns {")
+end = ui.index("\nvoid eden_scan_addons(", start)
+snapshot_owner = ui[start:end]
+assert "class AddOnScanTransaction" in snapshot_owner
+assert "ScannedAddOns().clear();" not in ui
+assert "if (!UpdatesScanCompleted()) return 0;" in ui
+assert "if (!UpdatesScanCompleted()) return chosen;" in ui
+snapshot_test = r"""
+#include <cassert>
+#include <cstdint>
+#include <map>
+#include <mutex>
+#include <string>
+#include <utility>
+""" + snapshot_owner + r"""
+int main() {
+    assert(!UpdatesScanCompleted());
+    {
+        std::map<uint64_t, AddOns> first;
+        first[1].dlc = 1;
+        AddOnScanTransaction transaction(first);
+        transaction.Commit();
+    }
+    assert(UpdatesScanCompleted());
+    assert(ScannedAddOns().size() == 1 && ScannedAddOns().at(1).dlc == 1);
+    {
+        std::map<uint64_t, AddOns> replacement;
+        replacement[2].dlc = 2;
+        AddOnScanTransaction transaction(replacement);
+        // An in-progress rescan retains the last completed catalogue.
+        assert(UpdatesScanCompleted());
+        assert(ScannedAddOns().at(1).dlc == 1);
+        transaction.Commit();
+    }
+    assert(UpdatesScanCompleted());
+    assert(ScannedAddOns().size() == 1 && ScannedAddOns().at(2).dlc == 2);
+    {
+        std::map<uint64_t, AddOns> failed;
+        failed[3].dlc = 3;
+        AddOnScanTransaction transaction(failed);
+        assert(ScannedAddOns().at(2).dlc == 2);
+        // Early return or exception before Commit invalidates metadata.
+    }
+    assert(!UpdatesScanCompleted());
+    assert(ScannedAddOns().size() == 1 && ScannedAddOns().at(2).dlc == 2);
+    {
+        std::map<uint64_t, AddOns> empty;
+        AddOnScanTransaction transaction(empty);
+        transaction.Commit();
+    }
+    assert(UpdatesScanCompleted() && ScannedAddOns().empty());
+}
+"""
+with tempfile.TemporaryDirectory(prefix="encore-addon-snapshot-") as temp_name:
+    temp = Path(temp_name)
+    source = temp / "snapshot.cpp"
+    source.write_text(snapshot_test)
+    for compiler in compilers:
+        for opt in ("-O0", "-O2"):
+            binary = temp / f"snapshot-{Path(compiler).name}-{opt[1:]}"
+            subprocess.run(
+                [compiler, "-std=c++20", opt, "-Wall", "-Wextra", "-Werror",
+                 "-fsanitize=undefined", "-fno-sanitize-recover=all",
+                 "-pthread", str(source), "-o", str(binary)],
+                check=True, timeout=60)
+            subprocess.run([str(binary)], check=True, timeout=30)
+            print("ADDON_METADATA_TRANSACTION_HOST_PASS", Path(compiler).name, opt)
