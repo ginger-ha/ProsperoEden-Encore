@@ -390,8 +390,30 @@ std::mutex& ScanAddOnsJobMutex() {
     return mutex;
 }
 // Both the map and completion flag are protected by ScannedAddOnsMutex.
-// A scanner builds its snapshot privately, publishing only at completion.
+// A failed scan invalidates its previously published metadata; an in-flight
+// rescan does NOT erase the last complete snapshot visible to launcher readers.
 // Never hold this mutex while reading/decrypting game files.
+class AddOnScanTransaction {
+public:
+    explicit AddOnScanTransaction(std::map<uint64_t, AddOns>& candidate) : candidate_(candidate) {}
+    AddOnScanTransaction(const AddOnScanTransaction&) = delete;
+    AddOnScanTransaction& operator=(const AddOnScanTransaction&) = delete;
+    ~AddOnScanTransaction() {
+        if (!committed_) {
+            const std::lock_guard lock{ScannedAddOnsMutex()};
+            UpdatesScanCompleted() = false;
+        }
+    }
+    void Commit() {
+        const std::lock_guard lock{ScannedAddOnsMutex()};
+        ScannedAddOns().swap(candidate_);
+        UpdatesScanCompleted() = true;
+        committed_ = true;
+    }
+private:
+    std::map<uint64_t, AddOns>& candidate_;
+    bool committed_ = false;
+};
 }
 
 void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char* roms_dir) {
@@ -403,16 +425,9 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
     // the launcher reads metadata is undefined behavior, including crashes.
     // Build off-thread/off-lock and atomically publish a complete snapshot.
     std::map<uint64_t, AddOns> scanned;
-    const auto publish = [&](bool complete) {
-        std::lock_guard lock{ScannedAddOnsMutex()};
-        ScannedAddOns().swap(scanned);
-        UpdatesScanCompleted() = complete;
-    };
-    {
-        std::lock_guard lock{ScannedAddOnsMutex()};
-        ScannedAddOns().clear();
-        UpdatesScanCompleted() = false;
-    }
+    AddOnScanTransaction publication(scanned);
+    // Keep the last valid snapshot visible while this job is collecting a new
+    // one. The transaction invalidates metadata only on actual scan failure.
     if (!updates_dir || !keys_dir) return;
     try {
         Common::FS::SetEdenPath(Common::FS::EdenPath::KeysDir, keys_dir);
@@ -477,7 +492,7 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
             // is missing, not present-but-unreadable.
             std::error_code error;
             const bool global_exists = std::filesystem::exists(updates_dir, error);
-            if (!error && !global_exists) publish(true);
+            if (!error && !global_exists) publication.Commit();
             return;
         }
         const FileSys::ExternalContentProvider provider(std::move(add_on_roots));
@@ -507,7 +522,7 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
         for (const auto& entry : FileSys::ExtractedAoc::Scan(scan_paths))
             if (dlc.insert(entry.title_id).second)
                 ++scanned[FileSys::GetBaseTitleID(entry.title_id)].dlc;
-        publish(true);
+        publication.Commit();
     } catch (const std::exception& error) {
         std::fprintf(stderr, "[ProsperoEden] updates: %s\n", error.what());
         // Fail closed. The incomplete scan never becomes visible to readers.
@@ -563,6 +578,7 @@ int eden_game_language(const char* rom_path, const char* keys_dir, uint64_t titl
     uint32_t supported = 0;
     {
         const std::lock_guard lock{ScannedAddOnsMutex()};
+        if (!UpdatesScanCompleted()) return chosen;
         const auto& scanned = ScannedAddOns();
         if (const auto found = scanned.find(FileSys::GetBaseTitleID(title_id));
             title_id && found != scanned.end() && !found->second.update.empty())
@@ -588,6 +604,7 @@ int eden_game_addons(uint64_t title_id, char* update_version, size_t capacity, u
     AddOns snapshot;
     {
         const std::lock_guard lock{ScannedAddOnsMutex()};
+        if (!UpdatesScanCompleted()) return 0;
         const auto& scanned = ScannedAddOns();
         const auto found = scanned.find(FileSys::GetBaseTitleID(title_id));
         if (!title_id || found == scanned.end()) return 0;
