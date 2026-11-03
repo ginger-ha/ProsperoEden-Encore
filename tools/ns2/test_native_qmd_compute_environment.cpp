@@ -395,6 +395,15 @@ int main() {
         bad.storage_buffers[0].gpu_address += 4;
         assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, bad, 64));
         bad = *gp;
+        bad.storage_buffers[0].is_written = false;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, bad, 64));
+        // A read-only global shader may bind that identical buffer without
+        // write tracking, provided its real shader reflection also says so.
+        auto reads_only = global;
+        reads_only.stores_global_memory = false;
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            reads_only, bad, 64));
+        bad = *gp;
         bad.global_layout_resolved = false;
         assert(!bad.HasResolvedGpuBufferBindings());
         assert(!gp->SameBufferBindings(bad));
