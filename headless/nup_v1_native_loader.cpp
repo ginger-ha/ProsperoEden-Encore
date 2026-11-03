@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_loader.h"
 
+#include <cstddef>
+#include <optional>
 #include <utility>
 
+#include "core/file_sys/control_metadata.h"
 #include "core/file_sys/common_funcs.h"
 #include "core/file_sys/program_metadata.h"
 #include "core/file_sys/vfs/vfs.h"
@@ -40,6 +43,24 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
         if (error) *error = "NUP invalid NPDM program identity";
         return {};
     }
+
+    std::optional<std::uint64_t> aoc_base;
+    if (const auto* metadata = loader->mount_->ApplicationMetadata();
+        metadata && metadata->control_nacp.size() == sizeof(FileSys::RawNACP)) {
+        // Use the exact pinned vendor layout. Avoid decoding a guessed NS2
+        // title-ID offset: NACP is the source of truth for DLC families.
+        constexpr auto offset = offsetof(FileSys::RawNACP, dlc_base_title_id);
+        static_assert(sizeof(FileSys::RawNACP) == 0x4000);
+        static_assert(offset + sizeof(std::uint64_t) <= sizeof(FileSys::RawNACP));
+        std::uint64_t raw_id{};
+        for (std::size_t i = 0; i < sizeof(std::uint64_t); ++i)
+            raw_id |= std::uint64_t(metadata->control_nacp[offset + i]) << (8 * i);
+        if (raw_id != 0) aoc_base = raw_id;
+    }
+    // Recreate the selection only after the actual NPDM establishes the
+    // caller's application identity; an untrusted NACP does not bypass it.
+    loader->content_ = std::make_unique<ContentSet>(
+        loader->mount_, validated_program_id, aoc_base);
 
     // No double patching of the NUP effective ExeFS directory: explicitly
     // disable the deconstructed loader's own update-overlay flag.
@@ -159,6 +180,10 @@ Loader::ResultStatus NupAppLoader::ReadNSOModules(Modules& out_modules) {
     if (status != Loader::ResultStatus::Success) return status;
     return extracted_loader_ ? extracted_loader_->ReadNSOModules(out_modules)
                              : Loader::ResultStatus::ErrorNotInitialized;
+}
+
+const std::vector<AddOnDirectory>& NupAppLoader::SelectedAddOns() const {
+    return content_->AddOns();
 }
 
 } // namespace Eden::NupV1::Native
