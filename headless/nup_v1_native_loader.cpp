@@ -31,6 +31,16 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
         return {};
     }
 
+    // The real extracted loader reads main.npdm *in its constructor*.
+    // Reject an invalid title and oversized untrusted NPDM BEFORE reaching
+    // that constructor (or its metadata, title and icon handling).
+    u64 validated_program_id{};
+    if (loader->ValidateProgramIdentity(validated_program_id) !=
+        Loader::ResultStatus::Success) {
+        if (error) *error = "NUP invalid NPDM program identity";
+        return {};
+    }
+
     // No double patching of the NUP effective ExeFS directory: explicitly
     // disable the deconstructed loader's own update-overlay flag.
     // The main-file constructor initializes title/icon/control metadata,
@@ -49,6 +59,12 @@ Loader::ResultStatus NupAppLoader::ValidateProgramIdentity(u64& program_id) cons
     if (!exefs) return Loader::ResultStatus::ErrorNoExeFS;
     const auto npdm = exefs->GetFile("main.npdm");
     if (!npdm) return Loader::ResultStatus::ErrorMissingNPDM;
+    // The real ProgramMetadata reader allocates arrays based on NPDM fields.
+    // This is an app description, not a full game image: cap its total size
+    // before any vendor parser or extracted-loader constructor touches it.
+    constexpr std::size_t MaxNPDMBytes = 4U * 1024U * 1024U;
+    if (npdm->GetSize() == 0 || npdm->GetSize() > MaxNPDMBytes)
+        return Loader::ResultStatus::ErrorBadNPDMHeader;
 
     FileSys::ProgramMetadata metadata;
     const auto status = metadata.Load(npdm);
