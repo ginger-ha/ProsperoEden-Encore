@@ -27,8 +27,12 @@ class ContentSet final {
 public:
     // Caller title is mandatory when examining an add-on-only archive.
     // Never enumerate add-ons of unknown ownership globally.
+    // A trusted NACP may declare a non-default AddOnContentBaseId (including
+    // NS2 upgrade packs). A custom base requires an explicit caller and must
+    // never be inferred by guessing an offset from the package title ID.
     explicit ContentSet(std::shared_ptr<Mount> mount,
-                        std::optional<std::uint64_t> caller_program_id = std::nullopt);
+                        std::optional<std::uint64_t> caller_program_id = std::nullopt,
+                        std::optional<std::uint64_t> nacp_aoc_base_id = std::nullopt);
     FileSys::VirtualDir ExeFS() const;
     // Read-only RomFS binary via the existing engine's CreateRomFS builder;
     // nullptr when no effective RomFS directory exists.
