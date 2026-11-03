@@ -59,8 +59,13 @@ inline bool Index(std::ifstream& stream, std::vector<Entry>* out) {
     std::vector<unsigned char> tail(size - start);
     if (!Read(stream, start, tail.data(), tail.size())) return false;
     std::size_t pos = tail.size() - 22;
+    // The optional ZIP comment may itself contain the EOCD signature.
+    // A signature inside that comment is not the actual end record unless
+    // its declared comment length ends at the physical end of the archive.
+    // Keep searching backwards instead of rejecting a valid firmware ZIP.
     while (!(tail[pos] == 0x50 && tail[pos+1] == 0x4b &&
-             tail[pos+2] == 0x05 && tail[pos+3] == 0x06)) {
+             tail[pos+2] == 0x05 && tail[pos+3] == 0x06 &&
+             pos + 22u + U16(tail.data() + pos + 20) == tail.size())) {
         if (pos == 0) return false;
         --pos;
     }
