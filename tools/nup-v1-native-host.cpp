@@ -35,10 +35,17 @@ public:
         if (pos > bytes_.size()) return 0;
         const auto n = (std::min)(count, bytes_.size() - pos);
         if (n) std::copy_n(bytes_.data() + pos, n, dst);
+        bytes_read_.fetch_add(n, std::memory_order_relaxed);
         return n;
     }
     std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
     bool Rename(std::string_view) override { return false; }
+    std::uint64_t BytesRead() const {
+        return bytes_read_.load(std::memory_order_relaxed);
+    }
+    void ResetReadCount() const {
+        bytes_read_.store(0, std::memory_order_relaxed);
+    }
     // Read-only API does not imply externally immutable backing bytes.
     void Corrupt(std::string_view old) {
         auto it = std::search(bytes_.begin(), bytes_.end(), old.begin(), old.end());
@@ -47,6 +54,7 @@ public:
     }
 private:
     std::vector<u8> bytes_;
+    mutable std::atomic<std::uint64_t> bytes_read_{};
 };
 
 // Host-only stub: checks that the bridge forwards the correct VFS tree.
@@ -96,7 +104,7 @@ std::unique_ptr<AppLoader> GetLoader(
 } // namespace Loader
 
 int main(int argc, char** argv) {
-    assert(argc == 19);
+    assert(argc == 20);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     // File recognition must be based on the superblock, not .nup extension.
     // This cheap probe does not replace the full archive validation.
@@ -596,5 +604,42 @@ int main(int argc, char** argv) {
     auto huge_icon = Eden::NupV1::Native::NupAppLoader::Open(
         std::make_shared<MemoryFile>(Load(argv[18])), &error);
     assert(!huge_icon && error == "NUP ExeFS icon too large");
+    // A source without an immutability contract must never return bytes
+    // changed after the first full SHA. The raw block index also avoids
+    // rereading an entire 6-MiB member for a tiny later random access.
+    constexpr std::uint64_t MiB = 1ULL << 20;
+    error.clear();
+    auto large_source = std::make_shared<MemoryFile>(Load(argv[19]));
+    const auto large_mount = Eden::NupV1::Native::Mount::Open(
+        large_source, &error);
+    assert(large_mount && error.empty());
+    const auto large_romfs = large_mount->Effective(ContentView::RomFS);
+    assert(large_romfs);
+    const auto large_file = large_romfs->GetFile("large.bin");
+    assert(large_file && large_file->GetSize() == 6 * MiB);
+    large_source->ResetReadCount();
+    std::array<u8, 16> small{};
+    assert(large_file->Read(small.data(), small.size(), 0) == small.size());
+    assert(small[0] == 'A');
+    assert(large_source->BytesRead() >= 6 * MiB); // first full SHA
+    large_source->ResetReadCount();
+    assert(large_file->Read(small.data(), small.size(),
+                            2 * MiB + 128) == small.size());
+    assert(small[0] == 'C');
+    assert(large_source->BytesRead() <= MiB + 1024); // one verified block
+    large_source->ResetReadCount();
+    assert(large_file->Read(small.data(), small.size(),
+                            3 * MiB - 8) == small.size());
+    assert(small[0] == 'C' && small[8] == 'D');
+    assert(large_source->BytesRead() <= 2 * MiB + 1024);
+    large_source->Corrupt("BLOCK-MUTATION-MARKER");
+    small.fill(0x7f);
+    assert(large_file->Read(small.data(), small.size(),
+                            4 * MiB + 128) == 0);
+    assert(std::all_of(small.begin(), small.end(),
+                       [](u8 byte) { return byte == 0; }));
+    assert(large_file->Read(small.data(), small.size(), 0) == small.size());
+    assert(small[0] == 'A'); // unaffected, independently hashed block
+    std::cout << "NUP raw cache: 6 MiB full verification, bounded block reads and post-mount mutation rejection OK\n";
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
