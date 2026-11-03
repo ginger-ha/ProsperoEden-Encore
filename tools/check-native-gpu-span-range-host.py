@@ -208,3 +208,18 @@ with tempfile.TemporaryDirectory(prefix="encore-gmmu-bounds-") as directory:
                             str(binary)], check=True, timeout=45)
             subprocess.run([str(binary)], check=True, timeout=20)
             print("P1_2_NATIVE_GMMU_BOUNDS_HOST_PASS", Path(compiler).name, opt)
+
+
+# Sparse-map teardown is another direct caller of MemoryOperation. Do not
+# let a malicious VA or a wrapping length reach its page-table iterator.
+for signature, walk in (
+    ("void MemoryManager::Unmap(GPUVAddr gpu_addr, std::size_t size) {",
+     "GetSubmappedRangeImpl<false>(gpu_addr, size, page_stash);"),
+    ("MemoryManager::GetSubmappedRange(GPUVAddr gpu_addr, std::size_t size) const {",
+     "GetSubmappedRangeImpl<true>(gpu_addr, size, result);"),
+):
+    assert owner.count(signature) == owner.count(walk) == 1
+    section = owner[owner.index(signature):owner.index(walk)]
+    assert "size == 0 || gpu_addr >= address_space_size" in section
+    assert "size > address_space_size - gpu_addr" in section
+print("P1_2_NATIVE_SPARSE_RANGE_SOURCE_PASS guards_before_unmap=1 guards_before_readwalk=1")
