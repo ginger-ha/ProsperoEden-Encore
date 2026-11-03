@@ -19,7 +19,18 @@ for opt in ("EDEN_SHARED_JIT", "EDEN_JIT_COMPILE_BATCH",
 assert 'export EDEN_PS5_VULKAN=ON EDEN_VULKAN_DRIVER=RADV' in pkg
 assert 'bash tools/build-headless-native.sh --graphics' in pkg
 assert '-DEDEN_FINAL_RELEASE_PROFILE="${EDEN_FINAL_RELEASE_PROFILE:-OFF}"' in build
-section = cm.split("if(EDEN_FINAL_RELEASE_PROFILE)\n")[-1].split("\nendif()", 1)[0]
+# The final release contract has exactly one canonical top-level gate.
+# Do not accidentally start validating an unrelated nested experimental gate.
+final_gate = "if(EDEN_FINAL_RELEASE_PROFILE)\n"
+assert cm.count(final_gate) == 1
+section = cm.split(final_gate, 1)[1].split("\nendif()", 1)[0]
+nup_selector = (root / "headless/nup_v1_runtime.cmake").read_text()
+assert cm.count('include("${CMAKE_CURRENT_LIST_DIR}/nup_v1_runtime.cmake")') == 1
+assert nup_selector.count("option(EDEN_NUP_V1_RUNTIME") == 1
+assert 'route verified NUP containers to shared loader" OFF)' in nup_selector
+assert nup_selector.count("if(EDEN_NUP_V1_RUNTIME)") == 1
+assert "if(EDEN_FINAL_RELEASE_PROFILE)" in nup_selector
+assert "NUP v1 P5 qualification is not yet allowed in a final release" in nup_selector
 for token in ("NOT PS5_NATIVE", "NOT EDEN_PS5_VULKAN", "NOT EDEN_PS5_OPENGL",
               'NOT EDEN_VULKAN_DRIVER STREQUAL "RADV"', "EDEN_SHARED_JIT",
               "EDEN_JIT_COMPILE_BATCH", "EDEN_DEV_PROFILE",
@@ -32,6 +43,8 @@ assert "EDEN_SPARSE_JIT_DEV" not in pkg and "EDEN_SPARSE_JIT_DEV" not in cm
 assert "EDEN_SPARSE_JIT_DEV" not in build
 assert "EDEN_JIT_SPARSE_TRIM" in validator
 assert '"EDEN_FINAL_RELEASE_PROFILE:BOOL": "ON"' in validator
+assert '"EDEN_NUP_V1_RUNTIME:BOOL": "OFF"' in validator
+assert 'EDEN_NS2_.*_EXPERIMENTAL:BOOL' in validator
 assert "target_compile_definitions(eden-headless PRIVATE EDEN_FINAL_RELEASE_PROFILE=1)" in cm
 assert 'experimental_sparse_jit = true;' in main
 assert 'if (!Common::ProbeSparseJitAlias())' in main
