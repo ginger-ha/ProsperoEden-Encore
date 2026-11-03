@@ -99,4 +99,10 @@ Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin
 - Le raccordement manquant consiste à exposer proprement les RomFS de NUP dans les services fichier/AoC communs, avec leur identité programme et leur durée de vie, sans modifier le fonctionnement des DLC NCA. Les commandes `PrepareAddOnContent`/`NotifyMountAddOnContent` du service existant sont elles-mêmes des stubs : ne pas leur attribuer une preuve de montage effectif.
 - Scénarios hôte NUP ajoutés : deux IDs AoC d'une même base, une ancienne/nouvelle version d'un même DLC, et un addon d'un autre titre à exclure. Leur CI propre doit être verte avant fermeture de ce sous-jalon.
 
+### Garde-fou identité des mises à jour
+
+- Au niveau du noyau VFS NUP, `Archive::Parse` refuse désormais qu'un package `update` ait une identité de base différente de celle du package `base` (ou des autres updates autonomes). La comparaison reprend le masque canonique du moteur `FileSys::GetBaseTitleID` et ne porte sur aucun titre de jeu en particulier.
+- Cette vérification précède tout montage d'overlay ExeFS/RomFS : une version NCM plus élevée issue d'un autre titre ne peut donc plus masquer `main`, `main.npdm` ou les données du jeu. Les DLC étrangers sont filtrés séparément au niveau du pont AoC.
+- CI existante du correctif [#41577121610](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41577121610) réussie. Le nouveau scénario négatif à SHA-256/UUID **valides** mais update d'un autre titre est en attente de sa propre CI [#41577179861](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41577179861). Ne pas le marquer validé avant résultat.
+
 **Limite actuelle : NUP n'est PAS lancé par Encore.** Les contrôles ajoutés sont un prérequis sûr, pas un port complet. P2.2/Vulkan continue indépendamment. Ne fermer aucun jalon GPU ou loader sur une simple réussite du préflight.
