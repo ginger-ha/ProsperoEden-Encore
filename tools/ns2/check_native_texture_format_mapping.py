@@ -391,6 +391,17 @@ print("NS2_CACHE_CHANNEL_LEASE_PASS upstream=pristine native=thread_local")
 generic_fence = (vendor / "sources/eden/src/video_core/fence_manager.h").read_text()
 assert "if (!delay_fence) {" in generic_fence
 assert "func();" in generic_fence
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    bridge = (vendor / path).read_text()
+    assert bridge.count("if (!resources->HasResolvedGpuBufferBindings())") == 1, path
+    assert bridge.index("if (!resources->HasResolvedGpuBufferBindings())") < (
+        bridge.index("tables.CaptureAdmissible(")), (
+        "image TIC read before QMD guest buffers were admitted", path
+    )
+    assert "return false; // no unbacked image/sampler descriptor publication" in bridge, path
 assert "HasResolvedGpuBufferBindings() const noexcept" in native_env, (
     "image shader CBUF/SSBO backing policy missing"
 )
