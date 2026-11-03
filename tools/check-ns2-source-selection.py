@@ -1006,11 +1006,11 @@ def main() -> int:
                 (ampere_root / "lower_to_maxwell.h").is_file() and
                 (ampere_root / "register_pressure.h").is_file() and
                 (ampere_root / "lower_bridge.h").is_file() and
-                "LowerReviewedToMaxwell(std::span<const u8> native_code)" in
+                "LowerReviewedToMaxwell(\n    std::span<const u8> native_code" in
                     (ampere_root / "lower_bridge.cpp").read_text() and
                 "ProbeProgram(native_code)" in
                     (ampere_root / "lower_bridge.cpp").read_text() and
-                "LowerToMaxwell(input)" in
+                "LowerToMaxwell(input, {}, false, indirect_dispatch)" in
                     (ampere_root / "lower_bridge.cpp").read_text() and
                 "BridgeMaxInstructions = 4096" in
                     (ampere_root / "lower_bridge.cpp").read_text() and
@@ -1021,7 +1021,7 @@ def main() -> int:
                 "NativeProgramAddress(code, address)" in (ampere_root / "maxwell_image.cpp").read_text() and
                 "ImageSalt =" in (ampere_root / "maxwell_image.cpp").read_text() and
                 "MaxwellSchedulingPeriod = 0x20" in (ampere_root / "maxwell_image.cpp").read_text() and
-                "LowerReviewedToMaxwell(native_code)" in (ampere_root / "maxwell_image.cpp").read_text() and
+                "LowerReviewedToMaxwell(native_code, indirect_dispatch)" in (ampere_root / "maxwell_image.cpp").read_text() and
                 "MaxwellImageStatus::InvalidLayout" in (ampere_root / "maxwell_image.cpp").read_text() and
                 (ROOT / "tools/ns2/test_ampere_maxwell_image.cpp").is_file() and
                 (ROOT / "tools/ns2/test_ampere_gpu_capture.cpp").is_file() and
