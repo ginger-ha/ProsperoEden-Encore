@@ -32,7 +32,7 @@ def main():
             str(ROOT / "headless/nup_v1_native_content.cpp"),
             str(ROOT / "headless/nup_v1_native_loader.cpp"),
             str(ROOT / "tools/nup-v1-native-host.cpp"),
-            "-lcrypto", "-lzstd", "-pthread", "-o", str(binary)
+            "-lcrypto", "-lzstd", "-lz", "-pthread", "-o", str(binary)
         ], check=True)
         addon = temp / "addon.nup"
         addon.write_bytes(fixtures.layered_fixture(addon=True))
@@ -69,12 +69,20 @@ def main():
         corrupt_nacp.write_bytes(content_module.corrupt_extracted_nacp_fixture())
         short_nacp = temp / "nacp-short.nup"
         short_nacp.write_bytes(content_module.short_extracted_nacp_fixture())
+        valid_compressed = temp / "nacp-compressed-valid.nup"
+        valid_compressed.write_bytes(content_module.compressed_nacp_fixture(variant="valid"))
+        overlong_compressed = temp / "nacp-compressed-overlong.nup"
+        overlong_compressed.write_bytes(content_module.compressed_nacp_fixture(variant="overlong"))
+        partial_compressed = temp / "nacp-compressed-partial.nup"
+        partial_compressed.write_bytes(content_module.compressed_nacp_fixture(variant="partial-entry"))
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
                         str(sibling_npdm), str(malformed_meta), str(duplicate_locale),
                         str(addon_only), str(oversized_npdm), str(nacp_aoc),
                         str(nacp_extracted), str(corrupt_nacp),
-                        str(short_nacp)], check=True)
+                        str(short_nacp), str(valid_compressed),
+                        str(overlong_compressed), str(partial_compressed)],
+                       check=True)
 
 if __name__ == "__main__":
     main()

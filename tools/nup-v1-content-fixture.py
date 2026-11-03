@@ -332,3 +332,39 @@ def short_extracted_nacp_fixture() -> bytes:
              "exefs/control.nacp": bytes(0x3FFF),
          }},
     ])
+
+
+def compressed_nacp_fixture(*, variant: str) -> bytes:
+    """Host-only semantic NACP tests, with mock ABI format at 0x3200.
+
+    The native compilation checks the real vendor layout separately.
+    """
+    import zlib
+
+    title = 0x0100123400000000
+    nacp = bytearray(0x4000)
+    struct.pack_into("<Q", nacp, 0x3070, title + 0x3000)
+    nacp[0x3200] = 1  # mock RawNACP::titles_data_format = Compressed
+    if variant == "valid":
+        payload = b"\0" * 0x300  # exact one LanguageEntry
+        compressor = zlib.compressobj(wbits=-15)
+        frame = compressor.compress(payload) + compressor.flush()
+        struct.pack_into("<H", nacp, 0, len(frame))
+        nacp[2:2 + len(frame)] = frame
+    elif variant == "overlong":
+        struct.pack_into("<H", nacp, 0, 0x2FFF)
+    elif variant == "partial-entry":
+        compressor = zlib.compressobj(wbits=-15)
+        frame = compressor.compress(b"x") + compressor.flush()
+        struct.pack_into("<H", nacp, 0, len(frame))
+        nacp[2:2 + len(frame)] = frame
+    else:
+        raise ValueError(variant)
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "metadata": {0x0002: bytes(nacp)},
+         "files": {
+             "exefs/main": b"synthetic-main",
+             "exefs/main.npdm": b"latest-npdm",
+         }},
+    ])

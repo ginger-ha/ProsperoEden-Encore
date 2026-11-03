@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_loader.h"
 
+#include <array>
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <utility>
+#include <zlib.h>
 
 #include "core/file_sys/control_metadata.h"
 #include "core/file_sys/common_funcs.h"
@@ -13,6 +16,45 @@
 #include "core/loader/deconstructed_rom_directory.h"
 
 namespace Eden::NupV1::Native {
+namespace {
+
+// Vendor NACP may contain raw-deflate language records. Its constructor
+// assumes their input length is safe and then copies inflated data to
+// LanguageEntry slots. Validate bounds and the complete frame BEFORE calling
+// that constructor, including through the extracted ExeFS loader.
+bool SafeNacpLanguageData(std::span<const u8> bytes) {
+    if (bytes.size() != sizeof(FileSys::RawNACP)) return false;
+    constexpr auto type_offset = offsetof(FileSys::RawNACP, titles_data_format);
+    static_assert(type_offset < sizeof(FileSys::RawNACP));
+    const auto format = bytes[type_offset];
+    if (format == static_cast<u8>(FileSys::TitleDataFormat::Uncompressed))
+        return true;
+    if (format != static_cast<u8>(FileSys::TitleDataFormat::Compressed))
+        return false;
+
+    constexpr std::size_t MaxCompressedBytes = 0x2ffe;
+    constexpr std::size_t RecordBytes = sizeof(FileSys::LanguageEntry);
+    static_assert(RecordBytes == 0x300);
+    static_assert(sizeof(FileSys::LanguageEntryData) == 0x3000);
+    const std::size_t compressed_size =
+        std::size_t(bytes[0]) | (std::size_t(bytes[1]) << 8);
+    if (!compressed_size || compressed_size > MaxCompressedBytes) return false;
+    std::array<u8, RecordBytes * 32> expanded{};
+    z_stream stream{};
+    stream.next_in = const_cast<Bytef*>(bytes.data() + 2);
+    stream.avail_in = static_cast<uInt>(compressed_size);
+    stream.next_out = expanded.data();
+    stream.avail_out = static_cast<uInt>(expanded.size());
+    if (inflateInit2(&stream, -MAX_WBITS) != Z_OK) return false;
+    const auto status = inflate(&stream, Z_FINISH);
+    inflateEnd(&stream);
+    return status == Z_STREAM_END &&
+           stream.total_in == compressed_size &&
+           stream.total_out > 0 &&
+           stream.total_out % RecordBytes == 0 &&
+           stream.total_out <= expanded.size();
+}
+} // namespace
 
 NupAppLoader::NupAppLoader(FileSys::VirtualFile source)
     : Loader::AppLoader(std::move(source)) {}
@@ -57,26 +99,30 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
         nacp_data = &metadata->control_nacp; // TLV wins over extracted tree
     }
     std::vector<std::uint8_t> extracted_nacp;
-    if (!nacp_data) {
-        // Extracted base/update content is also a legitimate NUP source.
-        // Use the effective ExeFS control.nacp when the optional TLV is absent.
-        const auto exefs = loader->content_->ExeFS();
-        const auto control = exefs ? exefs->GetFile("control.nacp") : nullptr;
-        if (control) {
-            // If an advertised NACP is malformed or fails a hash-verified
-            // read, do not silently fall back to a different DLC family.
-            if (control->GetSize() != sizeof(FileSys::RawNACP)) {
-                if (error) *error = "NUP control.nacp has invalid size";
-                return {};
-            }
-            extracted_nacp.resize(sizeof(FileSys::RawNACP));
-            if (control->Read(extracted_nacp.data(), extracted_nacp.size(), 0) !=
-                extracted_nacp.size()) {
-                if (error) *error = "NUP control.nacp integrity failure";
-                return {};
-            }
-            nacp_data = &extracted_nacp;
+    // Validate the ExeFS NACP even when a TLV overrides it. The *vendor*
+    // extracted-loader constructor also reads that file automatically.
+    const auto exefs = loader->content_->ExeFS();
+    const auto control = exefs ? exefs->GetFile("control.nacp") : nullptr;
+    if (control) {
+        if (control->GetSize() != sizeof(FileSys::RawNACP)) {
+            if (error) *error = "NUP control.nacp has invalid size";
+            return {};
         }
+        extracted_nacp.resize(sizeof(FileSys::RawNACP));
+        if (control->Read(extracted_nacp.data(), extracted_nacp.size(), 0) !=
+            extracted_nacp.size()) {
+            if (error) *error = "NUP control.nacp integrity failure";
+            return {};
+        }
+        if (!SafeNacpLanguageData(extracted_nacp)) {
+            if (error) *error = "NUP unsafe control.nacp language metadata";
+            return {};
+        }
+        if (!nacp_data) nacp_data = &extracted_nacp;
+    }
+    if (nacp_data && !SafeNacpLanguageData(*nacp_data)) {
+        if (error) *error = "NUP unsafe control.nacp language metadata";
+        return {};
     }
     if (nacp_data) {
         std::uint64_t raw_id{};
@@ -201,6 +247,8 @@ Loader::ResultStatus NupAppLoader::ReadControlData(FileSys::NACP& out_control) {
         if (nacp->Read(bytes.data(), bytes.size(), 0) != bytes.size())
             return Loader::ResultStatus::ErrorIntegrityVerificationFailed;
     }
+    if (!SafeNacpLanguageData(bytes))
+        return Loader::ResultStatus::ErrorNoControl;
     // The native NACP constructor fills compressed or plain language tables
     // as well as raw fields. Do not assign only RawNACP and leave it partial.
     out_control = FileSys::NACP(

@@ -81,7 +81,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 15);
+    assert(argc == 18);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -440,5 +440,28 @@ int main(int argc, char** argv) {
     auto short_nacp_loader = Eden::NupV1::Native::NupAppLoader::Open(
         short_nacp_source, &error);
     assert(!short_nacp_loader && error == "NUP control.nacp has invalid size");
+    // Compressed language tables are preflighted before the real vendor NACP
+    // constructor reads them. A valid raw-deflate LanguageEntry is accepted.
+    error.clear();
+    auto compressed_ok = Eden::NupV1::Native::NupAppLoader::Open(
+        std::make_shared<MemoryFile>(Load(argv[15])), &error);
+    assert(compressed_ok && error.empty());
+    FileSys::NACP compressed_control;
+    assert(compressed_ok->ReadControlData(compressed_control) ==
+           Loader::ResultStatus::Success);
+    assert(compressed_control.IsValidForHostTest());
+    // Beyond the NACP inline compressed buffer is always rejected.
+    error.clear();
+    auto compressed_oversize = Eden::NupV1::Native::NupAppLoader::Open(
+        std::make_shared<MemoryFile>(Load(argv[16])), &error);
+    assert(!compressed_oversize &&
+           error == "NUP unsafe control.nacp language metadata");
+    // The vendor copies decompressed content into LanguageEntry slots;
+    // incomplete records are not safe to pass to that constructor.
+    error.clear();
+    auto compressed_partial = Eden::NupV1::Native::NupAppLoader::Open(
+        std::make_shared<MemoryFile>(Load(argv[17])), &error);
+    assert(!compressed_partial &&
+           error == "NUP unsafe control.nacp language metadata");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
