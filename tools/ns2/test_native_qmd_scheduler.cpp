@@ -212,6 +212,10 @@ int main() {
             const Address address = 0x100000ULL + (i << 8);
             assert(f.signal(address, 0).empty());
             assert(f.signal(address, 1).empty());
+            // Invalid method codes are rejected before they can insert
+            // an empty per-address state or consume the cache quota.
+            assert(f.signal(address, 4) == "unsupported PCAS action");
+            assert(f.signal(address, 15) == "unsupported PCAS action");
         }
         auto valid = EmptyGrid();
         SetRelease(valid, 24, 0x8000, 7);
