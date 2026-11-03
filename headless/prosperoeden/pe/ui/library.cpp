@@ -202,8 +202,18 @@ void flat_back_fallback(Canvas& c, const Game& game, const Rect& r)
     // A SINGLE opaque paper sheet is drawn by draw_composed_case_face().
     // Scenes are independent of the front's full-bleed hero/icon. Never
     // paste game.cover on the back as a square or panel.
-    const auto* front = case_media::FrontPaper(
+    const float front_bucket = std::max(r.w, r.h);
+    const std::string* front = case_media::FrontPaper(
         game.hero, game.cover, game.screenshots);
+    // Match the actual front's confirmed-missing fallback. Otherwise a
+    // failed Hero may cause the same screenshot to appear on BOTH papers.
+    if (front && c.textures.cover(*front, front_bucket).missing) {
+        front = case_media::FrontPaperAvailable(
+            game.hero, game.cover, game.screenshots,
+            [&](const std::string& path) {
+                return !c.textures.cover(path, front_bucket).missing;
+            });
+    }
     const auto shots = case_media::BackScenes(
         front ? *front : game.cover, game.cover, game.screenshots);
     const std::string* first = shots[0];
