@@ -233,7 +233,7 @@ int main(int argc, char** argv) {
     assert(app->Load(process, system).first == Loader::ResultStatus::Success);
     assert(app->ReadNSOModules(modules) == Loader::ResultStatus::Success);
     assert(modules.at(0) == "main");
-    assert(app->Load(process, system).first == Loader::ResultStatus::Success);
+    assert(app->Load(process, system).first == Loader::ResultStatus::ErrorAlreadyLoaded);
     app.reset();
     assert(Read(romfs_result) == "state.bin=latest-v3\n");
 
