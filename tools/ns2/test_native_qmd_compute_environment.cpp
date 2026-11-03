@@ -414,6 +414,18 @@ int main() {
         // An absent CBUF is not a source of authentic global target VA
         // and size; shader IR must not read an undefined uniform pointer.
         assert(!env.BuildResourcePlan(unbound_bank));
+        // Shader reflection can mark a global SSBO slot that has no
+        // corresponding CBUF record. The native Vulkan binder only walks
+        // the descriptor vector, so never acknowledge that missing slot.
+        auto stray_used_slot = global;
+        stray_used_slot.nvn_buffer_used.set(1);
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            stray_used_slot, *gp, 64));
+        stray_used_slot = global;
+        stray_used_slot.nvn_buffer_used.set(15);
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            stray_used_slot, *gp, 64));
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 64));
         auto no_use = global;
         no_use.nvn_buffer_used.reset();
         assert(!env.BuildResourcePlan(no_use));
