@@ -36,16 +36,48 @@ active_mutation = re.compile(
     r'|string\s*\(\s*REPLACE\b'
     r'|write_derived\s*\('
     r'|execute_process\s*\()', re.I | re.M)
+# The P5-only NUP gate tokenizes two audited source-owner names, not C++
+# source text. Permit that ONE exact list-parsing invocation only. Do not
+# exempt the module, a generic string(REPLACE), or future source transforms.
+nup_gate_path = ROOT/"headless/nup_v1_runtime.cmake"
+nup_pair_split = 'string(REPLACE "|" ";" eden_nup_parts "${eden_nup_pair}")'
+assert nup_gate_path.read_text(encoding="utf-8").count(nup_pair_split) == 1
+
+def permitted_source_owner_split(path: Path, source: str, match: re.Match) -> bool:
+    return (path == nup_gate_path and
+            source[match.start():].splitlines()[0].strip() == nup_pair_split)
+
+# A newly introduced CMake string replacement in this very module must still
+# fail, including one that creates a .cpp output or changes the selected list.
+assert permitted_source_owner_split(
+    nup_gate_path, nup_pair_split, active_mutation.search(nup_pair_split))
+assert not permitted_source_owner_split(
+    ROOT/"headless/other.cmake", nup_pair_split,
+    active_mutation.search(nup_pair_split))
+for negative in (
+    'string(REPLACE "old" "new" cpp_text "${source}")',
+    'string(REPLACE "|" ";" eden_nup_parts "${other}")',
+):
+    assert not permitted_source_owner_split(
+        nup_gate_path, negative, active_mutation.search(negative))
+
 checked = 0
+approved_splits = 0
 for path in sorted(module_paths):
     assert path.is_file(), path
     text = path.read_text(encoding="utf-8")
-    violations = [(text.count("\n", 0, m.start()) + 1, m.group(0).strip())
-                  for m in active_mutation.finditer(text)]
+    violations = []
+    for match in active_mutation.finditer(text):
+        if permitted_source_owner_split(path, text, match):
+            approved_splits += 1
+            continue
+        violations.append((text.count("\n", 0, match.start()) + 1,
+                           match.group(0).strip()))
     assert not violations, (
         f"Active CMake module must not generate or rewrite C++: "
         f"{path.relative_to(ROOT)} {violations}")
     checked += 1
+assert approved_splits == 1, approved_splits
 
 native_build = (ROOT/"tools/build-headless-native.sh").read_text()
 vulkan = (ROOT/"headless/vulkan.cmake").read_text()
@@ -58,4 +90,4 @@ for path, code in (("native build", native_build),
 assert 'shutil.copyfile(maintained, tmp)' in (
     ROOT/"tools/install-active-core-backports.py").read_text()
 print(f"ENCORE_ACTIVE_CMAKE_SOURCE_BOUNDARY_PASS modules={checked} "
-      "cpp_generators=0 resource_generators=1")
+      "cpp_generators=0 resource_generators=1 nup_source_pair_split=1")
