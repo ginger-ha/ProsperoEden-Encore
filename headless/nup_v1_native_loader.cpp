@@ -33,9 +33,13 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
 
     // No double patching of the NUP effective ExeFS directory: explicitly
     // disable the deconstructed loader's own update-overlay flag.
+    // The main-file constructor initializes title/icon/control metadata,
+    // unlike the directory-only overload in the pinned extracted loader.
+    // Our NativeFile retains its containing ExeFS directory across reads.
+    const auto main_file = loader->content_->ExeFS()->GetFile("main");
     loader->extracted_loader_ =
         std::make_unique<Loader::AppLoader_DeconstructedRomDirectory>(
-            loader->content_->ExeFS(), false);
+            main_file, false);
     return loader;
 }
 
