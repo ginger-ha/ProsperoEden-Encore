@@ -17,6 +17,7 @@ FILES = (
     "common/common_funcs.h",
     "common/common_types.h",
     "core/file_sys/fs_filesystem.h",
+    "core/file_sys/common_funcs.h",
     "core/file_sys/romfs.h",
     "core/file_sys/vfs/vfs.h",
     "core/file_sys/vfs/vfs_types.h",
