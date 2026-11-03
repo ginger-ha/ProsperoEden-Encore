@@ -6,11 +6,19 @@ on:
     paths:
       - tools/check-nup-v1-host.py
       - tools/check-nup-v1-payload-host.py
+      - tools/check-nup-v1-vfs-host.py
+      - tools/nup-v1-vfs-host.cpp
+      - headless/nup_v1_vfs.h
+      - headless/nup_v1_vfs.cpp
       - .github/workflows/nup-v1-host.yml
   pull_request:
     paths:
       - tools/check-nup-v1-host.py
       - tools/check-nup-v1-payload-host.py
+      - tools/check-nup-v1-vfs-host.py
+      - tools/nup-v1-vfs-host.cpp
+      - headless/nup_v1_vfs.h
+      - headless/nup_v1_vfs.cpp
       - .github/workflows/nup-v1-host.yml
   workflow_dispatch:
 
@@ -30,3 +38,5 @@ jobs:
         run: python3 tools/check-nup-v1-host.py --self-test
       - name: Stream raw and zstd payloads and reject bad hashes / frames
         run: python3 tools/check-nup-v1-payload-host.py --self-test
+      - name: Compile and exercise isolated NUP C++ VFS (host only)
+        run: python3 tools/check-nup-v1-vfs-host.py
