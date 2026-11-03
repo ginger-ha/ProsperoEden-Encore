@@ -234,6 +234,7 @@ int main(int argc,char** argv) {
     Tegra::NativeQmdScheduler::Descriptor native_qmd{};
     native_qmd[8]=0x80;
     native_qmd[12]=3; native_qmd[13]=4; native_qmd[14]=5;
+    native_qmd[17]=16U; // STS-backed LDC fixture needs real workgroup memory
     native_qmd[18]=0x30U | (2U<<16);
     native_qmd[19]=4U | (8U<<16);
     native_qmd[20]=1U; // Enabled CBUF0.
@@ -276,6 +277,8 @@ int main(int argc,char** argv) {
         Emit(ldc_code, pred | 0x918);
         Emit(ldc_code, pred | 0xb82 | (1U << 16) | (255U << 24),
              bank << 22, 4U << 9); // LDC.U32 R1, c[bank][RZ+0]
+        Emit(ldc_code, pred | 0x388 | (255U << 24),
+             1U, 4U << 9); // STS.U32 [RZ+0], R1: keep LDC observable
         Emit(ldc_code, pred | 0x918);
         Emit(ldc_code, pred | 0x918);
         Emit(ldc_code, pred | 0x94d, 0, exit_true);
@@ -317,6 +320,14 @@ int main(int argc,char** argv) {
                 plan->uniform_buffers[0].gpu_address == cbuf_guest.address &&
                 plan->uniform_buffers[0].bytes == 16,
                 "native LDC QMD3 bank and reflected descriptor differ");
+        // Validate the actual live LDC path with spirv-val, not just the
+        // header-only Compute fixture which has no CBUF instructions.
+        const auto output=std::string(argv[1])+"-cbuf"+std::to_string(bank)+".spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write native LDC SPIR-V");
+        file.write(reinterpret_cast<const char*>(compiled.words.data()),
+                   static_cast<std::streamsize>(compiled.words.size()*sizeof(u32)));
+        Require(bool(file),"native LDC SPIR-V export failed");
     };
     verify_native_ldc(0, 0x01U, true);
     verify_native_ldc(7, 0x80U, true);

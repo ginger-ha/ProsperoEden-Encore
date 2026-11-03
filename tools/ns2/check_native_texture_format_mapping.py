@@ -411,8 +411,10 @@ for path in (
     assert bridge.index("ValidateGpuBufferMappings(") < bridge.index(
         "tables.CaptureAdmissible("), path
     assert "if (native_images.size() != typed_descriptors->size())" in bridge, path
-assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
-    "null QMD CBUF address must fail before any GPU mapping callback"
+assert native_env.count(
+    "if (!cbuf.gpu_address || !cbuf.bytes || cbuf.bytes > 0x10000U ||"
+) == 2 and native_env.count("cbuf.qmd_index >= 8 ||") >= 2, (
+    "null, oversized or non-QMD CBUF must fail before GPU mapping or layout"
 )
 assert "kNativeQmdMaxContiguousBytes = 256ULL * 1024 * 1024" in native_env
 assert "NativeQmdWithinByteBudget(" in native_env
