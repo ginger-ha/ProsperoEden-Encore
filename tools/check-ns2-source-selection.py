@@ -428,6 +428,8 @@ def main() -> int:
                     ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text() and
                 "BRX expected native PC must agree" in (
                     ROOT / "tools/ns2/test_ampere_lower_bridge.cpp").read_text() and
+                "MakeNativeIndirectBranchPlans" in native_branch_tables and
+                "dispatch_plans=MakeNativeIndirectBranchPlans" in native_capture_fixture and
                 "ResolveCaptureIndirectBranchesChecked" in native_branch_tables and
                 "snapshot_reads>16" in native_capture_fixture and
                 "unexpected_brx" in native_capture_fixture,

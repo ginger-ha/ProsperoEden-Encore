@@ -294,6 +294,27 @@ int main() {
             extended->tables[0].targets[1]==8 &&
             extended_source.size()==10,
             "BRX capture extends beyond earlier EXIT through final verified target");
+    const auto dispatch_plans=MakeNativeIndirectBranchPlans(
+        *extended,extended_source);
+    Require(dispatch_plans && dispatch_plans->size()==1 &&
+            dispatch_plans->front().branch_instruction_index==3 &&
+            dispatch_plans->front().raw_pc_base==0x80U &&
+            dispatch_plans->front().targets.size()==16 &&
+            dispatch_plans->front().targets[0].native_value==0x80U &&
+            dispatch_plans->front().targets[1].native_instruction_index==8,
+            "verified BRX CBUF snapshot produces exact compiler dispatch plan");
+    auto malformed_capture=*extended;
+    malformed_capture.tables[0].cbuf_index=18;
+    Require(!MakeNativeIndirectBranchPlans(malformed_capture,extended_source),
+            "BRX plan cannot bind a different CBUF bank than captured shader");
+    malformed_capture=*extended;
+    malformed_capture.tables[0].values[1]=0x91U;
+    Require(!MakeNativeIndirectBranchPlans(malformed_capture,extended_source),
+            "BRX plan rejects non-16-byte native target alignment");
+    auto mutated_source=extended_source;
+    mutated_source[3].words[0]=pred_true|0x958U;
+    Require(!MakeNativeIndirectBranchPlans(*extended,mutated_source),
+            "BRX plan must reject a newly replaced BRXU opcode");
     guest_targets[1]=0x81U;
     auto bad_source=source_motif;
     auto bad_state=initial_capture;
