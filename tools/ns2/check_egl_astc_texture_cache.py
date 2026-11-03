@@ -48,11 +48,11 @@ def native_block(text: str, following: str) -> str:
     tail = text.split(gate, 1)[1]
     assert tail.count(following) == 1, "N60 native ABI footer drift"
     result = gate + tail.split(following, 1)[0]
-    assert result.endswith("#endif\\n"), "N60 native ABI block not closed"
+    assert result.endswith("#endif\n"), "N60 native ABI block not closed"
     return result
 
 base_owned = (OWNER / "texture_cache_base.h").read_text()
-base_footer = "\\n    /// Fill image_view_ids"
+base_footer = "\n    /// Fill image_view_ids"
 base_native = native_block(base_owned, base_footer)
 assert base_native == native_block(
     (VULKAN / "texture_cache_base.h").read_text(), base_footer
@@ -66,19 +66,19 @@ owner_marker = """// Host ABI witness: when the ASTC profile is selected, the ac
 
 """
 assert base_owned.count(owner_marker) == 1, "N60 ASTC owner provenance drift"
-assert base_owned.count("#include <memory>\\n") == 1
+assert base_owned.count("#include <memory>\n") == 1
 legacy_base = base_owned.replace(owner_marker, "", 1).replace(
-    "#include <memory>\\n", "", 1
-).replace("\\n" + base_native, "", 1)
+    "#include <memory>\n", "", 1
+).replace("\n" + base_native, "", 1)
 assert legacy_base == base, "N60 patched CacheBase owner drift after native ABI isolation"
 
 tex = (OWNER / "texture_cache.h").read_text()
-impl_footer = "\\ntemplate <class P>\\nImageViewId TextureCache<P>::VisitImageView"
+impl_footer = "\ntemplate <class P>\nImageViewId TextureCache<P>::VisitImageView"
 impl_native = native_block(tex, impl_footer)
 assert impl_native == native_block(
     (VULKAN / "texture_cache.h").read_text(), impl_footer
 ), "N60 ASTC native implementation ABI diverged from shared Vulkan owner"
-legacy_tex = tex.replace(impl_native + "\\n", "", 1)
+legacy_tex = tex.replace(impl_native + "\n", "", 1)
 legacy_sha = subprocess.run(
     ["git", "hash-object", "--stdin"], input=legacy_tex,
     text=True, check=True, capture_output=True
