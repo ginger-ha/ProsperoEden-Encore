@@ -48,6 +48,13 @@ def main() -> None:
 
     aoc_old = originals[FILES[0][0]]
     aoc = patched[FILES[0][1]]
+    # The default NS1/NS2 shared service must own the same guest output
+    # boundary and provider-null fix even with NUP runtime OFF.
+    for source in (aoc_old, aoc):
+        assert "const std::size_t capacity = out_addons.size() / sizeof(u32);" in source
+        assert "out.size() - offset, static_cast<std::size_t>(count), capacity" in source
+        assert "if (*out_count)" in source
+        assert "return !entry || entry->GetStatus() != Loader::ResultStatus::Success;" in source
     # Construction, existing NCA/extracted enumeration and event services
     # are intentionally unmodified. Only Count/List/Base/Prepare are bridged.
     for first, last in (
