@@ -48,7 +48,13 @@ ContentSet::ContentSet(std::shared_ptr<Mount> mount,
     // A non-default NACP-declared AoC family is only meaningful when bound to
     // a known caller. Do not grant blanket visibility from an unscoped mount.
     if (nacp_aoc_base_id && !caller_program_id) return;
-    if (*active_base > std::numeric_limits<std::uint64_t>::max() - FileSys::AOC_TITLE_ID_OFFSET) return;
+    // The AoC base must identify the start of an 0x800-title range.
+    // Reject a malformed NACP base instead of registering a shifted range
+    // or falling back to unrelated conventional DLC.
+    if (nacp_aoc_base_id && (*nacp_aoc_base_id & FileSys::AOC_TITLE_ID_MASK))
+        return;
+    if (*active_base > std::numeric_limits<std::uint64_t>::max() - FileSys::AOC_TITLE_ID_OFFSET)
+        return;
     const auto aoc_base = nacp_aoc_base_id.value_or(
         *active_base + FileSys::AOC_TITLE_ID_OFFSET);
 
