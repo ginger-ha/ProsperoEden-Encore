@@ -309,3 +309,26 @@ def nacp_aoc_fixture(*, extracted: bool = False) -> bytes:
         {"title_id": title + 0x1000, "version": 3, "kind": 2,
          "files": {"romfs/addon.dat": b"default-family-not-selected"}},
     ])
+
+
+def corrupt_extracted_nacp_fixture() -> bytes:
+    """Correct TOC/UUID, but the SHA-256 of extracted control.nacp fails."""
+    blob = bytearray(nacp_aoc_fixture(extracted=True))
+    signature = struct.pack("<Q", 0x0100123400003000)
+    where = blob.find(signature, 0x80)
+    assert where != -1
+    blob[where] ^= 1
+    return bytes(blob)
+
+
+def short_extracted_nacp_fixture() -> bytes:
+    """An advertised, hashed control.nacp must have the real NACP length."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "files": {
+             "exefs/main": b"synthetic-main",
+             "exefs/main.npdm": b"latest-npdm",
+             "exefs/control.nacp": bytes(0x3FFF),
+         }},
+    ])
