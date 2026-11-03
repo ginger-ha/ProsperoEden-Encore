@@ -225,11 +225,13 @@ void Archive::Parse() {
     }
 
     std::vector<unsigned> incoming(nd);
+    std::vector<std::uint8_t> slot_owners(children_.size());
     for (const auto& dir : dirs_) {
         Check(dir.first <= children_.size() &&
               dir.count <= children_.size() - dir.first, "bad directory child span");
         std::optional<std::string> previous;
         for (std::uint32_t k = 0; k < dir.count; ++k) {
+            Check(slot_owners[dir.first + k]++ == 0, "child slot has multiple owners");
             const auto id = children_[dir.first + k];
             const auto& name = id < nd ? dirs_[id].name : files_[id - nd].name;
             Check(!previous || NameLess(*previous, name), "unsorted/duplicate child");
@@ -240,6 +242,11 @@ void Archive::Parse() {
             }
         }
     }
+    Check(std::all_of(slot_owners.begin(), slot_owners.end(),
+                      [](std::uint8_t uses) { return uses == 1; }),
+          "unowned directory child slot");
+    for (std::size_t i = 0; i < dirs_.size(); ++i)
+        if (incoming[i]) Check(!dirs_[i].name.empty(), "empty nested directory name");
     auto deps = incoming;
     std::deque<std::size_t> queue;
     for (std::size_t i = 0; i < deps.size(); ++i)
