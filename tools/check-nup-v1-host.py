@@ -170,6 +170,12 @@ def check(path: Path) -> dict:
                          "kind": ("base", "update", "addon")[kind],
                          "standalone_update": bool(pkg_flags)})
     require(base_packages <= 1, "multiple base packages")
+    # Base-less update-only packages require explicit standalone markers;
+    # a normal base+update must not incorrectly claim to be standalone.
+    for package in packages:
+        if package["kind"] == "update":
+            require(package["standalone_update"] == (base_packages == 0),
+                    "inconsistent standalone-update flag")
     require(hashlib.sha256(signature).digest()[:16] == header[0x50:0x60],
             "content UUID mismatch")
     return {"packages": packages, "directories": dirs_count, "files": files_count,
@@ -220,7 +226,25 @@ def self_test() -> None:
             pass
         else:
             raise AssertionError("cyclic directory tree accepted")
-    print("NUP v1 host preflight: valid fixture + 6 corruption/cycle cases passed")
+        update_toc = bytearray(valid[0x80:])
+        update_toc[0x48] = 1  # package kind: update
+        update_toc[0x49] = 1  # standalone update, no base
+        update_header = bytearray(valid[:0x80])
+        update_header[0x18:0x38] = hashlib.sha256(update_toc).digest()
+        update_header[0x50:0x60] = hashlib.sha256(
+            struct.pack("<QIB", 0x1000000000000000, 1, 1)).digest()[:16]
+        path.write_bytes(update_header + update_toc)
+        assert check(path)["packages"][0]["standalone_update"]
+        update_toc[0x49] = 0  # same valid TOC, but forbidden base-less marker
+        update_header[0x18:0x38] = hashlib.sha256(update_toc).digest()
+        path.write_bytes(update_header + update_toc)
+        try:
+            check(path)
+        except InvalidNup:
+            pass
+        else:
+            raise AssertionError("base-less update without standalone marker accepted")
+    print("NUP v1 host preflight: valid base/update fixtures + 7 corruption/cycle cases passed")
 
 
 def main() -> int:
