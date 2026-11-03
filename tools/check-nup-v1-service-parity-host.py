@@ -6,7 +6,9 @@ Only the two intended services are changed when EDEN_NUP_V1_RUNTIME=ON.
 """
 from __future__ import annotations
 from pathlib import Path
+import shutil
 import subprocess
+import tempfile
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -95,6 +97,64 @@ def main() -> None:
     game_files = (ROOT / "headless/game_files.h").read_text()
     assert '#ifdef EDEN_NUP_V1_RUNTIME' in game_files
     assert 'IsNupFile(name)' in game_files
+    # Execute the production byte-bound copy expression as C++20, including
+    # unaligned, zero-byte and short HIPC output spans. This is a host
+    # contract test, not a PS5 service dispatch or guest IPC proof.
+    begin = aoc.index("    const std::size_t capacity = out_addons.size() / sizeof(u32);")
+    end = aoc.index("\\n\\n    R_SUCCEED();", begin)
+    ipc_policy = aoc[begin:end]
+    assert "std::memcpy(out_addons.data(), out.data() + offset," in ipc_policy
+    assert "if (*out_count)" in ipc_policy
+    test_cpp = r"""
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <cstring>
+#include <span>
+#include <vector>
+using u32 = std::uint32_t;
+u32 copy_ids(std::vector<u32> out, u32 offset, u32 count,
+             std::span<std::uint8_t> out_addons) {
+    u32 written = 0;
+    u32* out_count = &written;
+""" + ipc_policy + r"""
+    return written;
+}
+int main() {
+    for (const std::size_t capacity : {0u, 1u, 3u, 4u, 7u, 8u, 11u, 12u, 16u}) {
+        std::array<std::uint8_t, 64> destination{};
+        destination.fill(0xA5);
+        const u32 count = copy_ids({11, 22, 33, 44}, 1, 4,
+            std::span<std::uint8_t>(destination.data() + 3, capacity));
+        assert(count == std::min<std::size_t>(3, capacity / sizeof(u32)));
+        for (std::size_t n = 0; n < count; ++n) {
+            u32 value{};
+            std::memcpy(&value, destination.data() + 3 + n*sizeof(u32), sizeof(u32));
+            assert(value == 22 + n * 11);
+        }
+        for (std::size_t n = 3 + count * sizeof(u32); n < destination.size(); ++n)
+            assert(destination[n] == 0xA5);
+        assert(destination[0] == 0xA5 && destination[2] == 0xA5);
+    }
+    assert(copy_ids({11,22,33}, 3, 9, {}) == 0);
+}
+"""
+    compilers = list(dict.fromkeys(filter(None, (
+        shutil.which("clang++"), shutil.which("g++")))))
+    assert compilers, "P1.3 host C++ compiler unavailable"
+    with tempfile.TemporaryDirectory(prefix="encore-aoc-ipc-") as tmp:
+        source = Path(tmp) / "ipc.cpp"
+        source.write_text(test_cpp)
+        for compiler in compilers:
+            for optimization in ("-O0", "-O2"):
+                executable = Path(tmp) / (Path(compiler).name + optimization)
+                subprocess.run(
+                    [compiler, "-std=c++20", optimization,
+                     "-Wall", "-Wextra", "-Werror",
+                     str(source), "-o", str(executable)], check=True, timeout=40)
+                subprocess.run([str(executable)], check=True, timeout=15)
+
     print(f"NUP service source parity {pinned[:12]}: maintained NCA/extracted paths retained, P5-only hooks present")
 
 if __name__ == "__main__":
