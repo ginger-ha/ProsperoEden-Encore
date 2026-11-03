@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <vector>
 #include "shader_recompiler/frontend/ampere/capture.h"
 #include "shader_recompiler/stage.h"
@@ -17,10 +18,15 @@ struct MappedMemory {
     std::size_t mapped_bytes{};
     u32 reads{};
     bool reject_batch{};
+    bool throw_on_batch{};
+    u64 throw_at_address{};
 };
 static bool Read(void* opaque, u64 address, void* destination, std::size_t size) {
     auto& mem = *static_cast<MappedMemory*>(opaque);
     ++mem.reads;
+    if ((mem.throw_at_address && address == mem.throw_at_address) ||
+        (mem.throw_on_batch && size > 16))
+        throw std::runtime_error("guest mapping changed during shader capture");
     if (!destination || !size || address < mem.base || (mem.reject_batch && size > 16))
         return false;
     const u64 offset = address - mem.base;
@@ -88,6 +94,20 @@ int main() {
             compute_fault.image.code.empty(),
             "compute second instruction unmapped rejects with code-relative offset");
     mem.mapped_bytes=mem.data.size();
+    // Exception in the guest reader must become the same fail-closed
+    // Unmapped result as an ordinary GMMU read failure, with exact offsets.
+    mem.throw_at_address=mem.base;
+    const auto throwing_header=CaptureNativeGraphicsShader(mem.base,4,Read,&mem);
+    Require(throwing_header.status==NativeCaptureStatus::Unmapped &&
+            throwing_header.image.code.empty(),
+            "throwing graphics header reader fails closed");
+    mem.throw_at_address=mem.base+0x90;
+    const auto throwing_compute=CaptureNativeComputeShader(mem.base+0x80,Read,&mem);
+    Require(throwing_compute.status==NativeCaptureStatus::Unmapped &&
+            throwing_compute.first_error_offset==16 &&
+            throwing_compute.image.code.empty(),
+            "throwing compute second-instruction read preserves failure offset");
+    mem.throw_at_address=0;
     const auto reads_before_invalid_stage=mem.reads;
     Require(CaptureNativeGraphicsShader(
                 mem.base,static_cast<u32>(Shader::Stage::Compute),Read,&mem).status==
@@ -182,6 +202,20 @@ int main() {
                 long_result.image.diagnostic_cache_key &&
             long_shader.reads >= 513,
             "failed page prefetch falls back to exact mapped instruction reads");
+    // A speculative 4-KiB batch reader may throw while an exact
+    // 16-byte instruction reader remains valid. Retry the exact reads
+    // rather than converting a valid shader into a false GPU mapping fault.
+    long_shader.reject_batch=false;
+    long_shader.throw_on_batch=true;
+    long_shader.reads=0;
+    const auto throwing_batch=CaptureNativeComputeShader(
+        long_shader.base+0x80,Read,&long_shader);
+    Require(throwing_batch.Ready() &&
+            throwing_batch.image.diagnostic_cache_key==
+                long_result.image.diagnostic_cache_key &&
+            long_shader.reads>=513,
+            "throwing prefetch falls back to exact per-instruction reads");
+    long_shader.throw_on_batch=false;
     // Last instruction missing: the status and byte-accurate fault offset
     // must match the historical per-instruction implementation.
     long_shader.reject_batch=false;

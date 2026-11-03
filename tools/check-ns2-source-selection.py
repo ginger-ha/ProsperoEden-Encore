@@ -401,6 +401,21 @@ def main() -> int:
                 "channel_generation" in engine_registry,
                 "Native 3D rendering requires per-channel authenticated class identity")
         native_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text()
+        native_capture_core = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/capture.cpp").read_text()
+        native_capture_fixture = (ROOT / "tools/ns2/test_ampere_gpu_capture.cpp").read_text()
+        require("const auto checked_read = " in native_capture_core and
+                "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and
+                "checked_read(addr, page.data(), aligned_batch)" in native_capture_core and
+                "checked_read(addr, bytes.data(), bytes.size())" in native_capture_core and
+                "catch (const std::exception&)" in native_capture_core and
+                "result.status = NativeCaptureStatus::TranslationFailed;" in native_capture_core and
+                "throwing_header.status==NativeCaptureStatus::Unmapped" in native_capture_fixture and
+                "throwing_compute.first_error_offset==16" in native_capture_fixture and
+                "throwing_batch.Ready()" in native_capture_fixture and
+                "failed.status = Shader::Ampere::NativeCaptureStatus::TranslationFailed;" in native_capture and
+                "return Shader::Ampere::NativeMaxwellEnvironment::CreateOwned(" in native_capture and
+                "catch (const std::exception&)" in native_capture,
+                "Native Ampere guest GMMU reads, lowering, capture must fail closed on exceptions")
         require("if (!memory->IsFullyMappedRange(address, size))" in native_capture and
                 "memory->ReadBlock(address, dest, size);" in native_capture and
                 "catch (const std::exception&)" in native_capture and
