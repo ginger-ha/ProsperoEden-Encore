@@ -57,6 +57,7 @@ def main() -> None:
             "-I", str(ROOT / "headless"),
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
             str(ROOT / "headless/nup_v1_native_content.cpp"),
+            str(ROOT / "headless/nup_v1_native_aoc.cpp"),
             str(ROOT / "headless/nup_v1_native_loader.cpp"),
         ], check=True)
     print(f"NUP native adapter compiles against pinned vendor VFS headers {pinned[:12]}")
