@@ -25,6 +25,12 @@ public:
 
 enum class ContentView : std::uint8_t { ExeFS, RomFS };
 
+struct DirEntry {
+    std::string name;
+    bool directory{};
+    std::optional<std::size_t> file_index; // set only for files
+};
+
 struct Package {
     std::uint64_t title_id{};
     std::uint32_t version{};
@@ -59,6 +65,13 @@ public:
     // Add-ons remain separate and are addressed by FindPackageMember.
     std::optional<std::size_t> FindEffectiveMember(ContentView view,
                                                    std::string_view relative_path) const;
+    // Enumerate immediate children; nullopt means the directory is absent.
+    // Enables a later FileSys::VirtualDir adapter without unpacking the NUP.
+    std::optional<std::vector<DirEntry>> ListPackageDirectory(
+        std::size_t package_index, ContentView view,
+        std::string_view relative_path = {}) const;
+    std::optional<std::vector<DirEntry>> ListEffectiveDirectory(
+        ContentView view, std::string_view relative_path = {}) const;
     // Reads exactly dst.size() bytes, never past member bounds; checks the
     // SHA-256 of the ENTIRE member before reporting success, including a
     // zstd member decoded without retaining full output in memory.
@@ -72,6 +85,11 @@ private:
     void Parse();
     std::optional<std::size_t> FindFromDir(std::uint32_t dir,
                                            std::string_view relative_path) const;
+    std::optional<std::uint32_t> WalkDirectory(std::uint32_t root,
+                                               std::string_view relative_path) const;
+    bool ShadowsPath(std::uint32_t root, std::string_view relative_path) const;
+    std::optional<std::vector<DirEntry>> ListFromDir(std::uint32_t root,
+                                                     std::string_view relative_path) const;
 
     struct Directory {
         std::string name;
