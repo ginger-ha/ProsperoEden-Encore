@@ -480,6 +480,12 @@ int main(int argc, char** argv) {
     assert(nacp_loader->SelectedAddOns()[0].title_id ==
            0x0100123400003001ULL);
     const auto* registered_nacp_loader = nacp_loader.get();
+    // Metadata browsing must not publish DLC before guest Load succeeds.
+    assert(!Eden::NupV1::Native::ActiveAddOnsForLoader(registered_nacp_loader));
+    Kernel::KProcess active_process;
+    Core::System active_system;
+    assert(nacp_loader->Load(active_process, active_system).first ==
+           Loader::ResultStatus::Success);
     auto published_nacp =
         Eden::NupV1::Native::ActiveAddOnsForLoader(registered_nacp_loader);
     assert(published_nacp);
@@ -501,6 +507,11 @@ int main(int argc, char** argv) {
         std::make_shared<MemoryFile>(Load(argv[11])), &error);
     assert(temporary && error.empty());
     const auto* old_loader_address = temporary.get();
+    assert(!Eden::NupV1::Native::ActiveAddOnsForLoader(old_loader_address));
+    Kernel::KProcess temp_process;
+    Core::System temp_system;
+    assert(temporary->Load(temp_process, temp_system).first ==
+           Loader::ResultStatus::Success);
     auto keep_alive = Eden::NupV1::Native::ActiveAddOnsForLoader(
         old_loader_address);
     assert(keep_alive);
