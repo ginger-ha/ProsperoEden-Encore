@@ -140,9 +140,12 @@ namespace FileSys {
 VirtualFile PatchIPS(const VirtualFile&, const VirtualFile&); // host stub is inline
 VirtualFile CreateRomFS(VirtualDir dir, VirtualDir ext) {
     if (!dir || ext) return {};
+    // Keep the directory name before transferring ownership to the
+    // builder; dereferencing dir after std::move is a host-test bug.
+    auto name = dir->GetName();
     RomFSBuildContext builder(std::move(dir), nullptr);
     return ConcatenatedVfsFile::MakeConcatenatedFile(
-        0, dir->GetName(), builder.Build());
+        0, std::move(name), builder.Build());
 }
 } // namespace FileSys
 
