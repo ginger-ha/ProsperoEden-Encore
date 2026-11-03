@@ -203,6 +203,31 @@ int main() {
         assert((std::get<2>(f.released[2])&(1u<<26))!=0);
         assert(f.dispatched==0); // zero grid; no fake compute shader launch
     }
+    // Native PCAS action 0/1 is a protocol no-op, not a QMD registration.
+    // More than 4096 unique no-op addresses must not exhaust the
+    // process-scoped scheduler and block a valid first Compute QMD.
+    {
+        Fixture f;
+        for (Address i = 0; i < 5000; ++i) {
+            const Address address = 0x100000ULL + (i << 8);
+            assert(f.signal(address, 0).empty());
+            assert(f.signal(address, 1).empty());
+        }
+        auto valid = EmptyGrid();
+        SetRelease(valid, 24, 0x8000, 7);
+        f.descriptors[0x80000] = valid;
+        assert(f.signal(0x80000, 3).empty());
+        assert(f.dispatched == 0 && f.released.size() == 1);
+        assert(std::get<0>(f.released[0]) == 0x8000);
+        // A valid dependency update must still create and retain state.
+        auto waiting = EmptyGrid(1);
+        SetRelease(waiting, 24, 0x8100, 9);
+        f.descriptors[0x81000] = waiting;
+        assert(f.signal(0x81000, 3).empty());
+        assert(f.released.size() == 1);
+        assert(f.signal(0x81000, 7).empty());
+        assert(f.released.size() == 2);
+    }
     // A compute queue may decrement another channel's QMD after its launch
     // record arrives. An early decrement must be retained for the same title.
     {
