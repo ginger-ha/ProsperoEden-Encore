@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_content.h"
 
+#include <map>
+#include <optional>
 #include <utility>
 
+#include "core/file_sys/common_funcs.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs.h"
 
@@ -11,12 +14,49 @@ namespace Eden::NupV1::Native {
 ContentSet::ContentSet(std::shared_ptr<Mount> mount) : mount_(std::move(mount)) {
     if (!mount_) return;
     const auto& packages = mount_->Packages();
+
+    // Mirror the existing aoc:u service's GetBaseTitleID contract. This
+    // prevents packages belonging to unrelated games from appearing as DLC.
+    std::optional<std::uint64_t> active_base;
+    for (const auto& package : packages) {
+        if (package.kind == 0) {
+            active_base = FileSys::GetBaseTitleID(package.title_id);
+            break;
+        }
+    }
+    if (!active_base) {
+        const Package* newest = nullptr;
+        for (const auto& package : packages) {
+            if (package.kind == 1 && (!newest || package.version > newest->version))
+                newest = &package;
+        }
+        if (newest) active_base = FileSys::GetBaseTitleID(newest->title_id);
+    }
+
+    // AOC title IDs are base + 0x1000 + an 11-bit index. Two revisions of
+    // one DLC must not be registered twice: use the highest NCM version.
+    std::map<std::uint64_t, std::size_t> selected;
     for (std::size_t i = 0; i < packages.size(); ++i) {
-        if (packages[i].kind != 2) continue;
-        const auto directory = mount_->PackageView(i, ContentView::RomFS);
+        const auto& package = packages[i];
+        if (package.kind != 2) continue;
+        const auto base = FileSys::GetBaseTitleID(package.title_id);
+        if (active_base && base != *active_base) continue;
+        const auto offset = package.title_id - base;
+        if (offset < FileSys::AOC_TITLE_ID_OFFSET ||
+            offset > FileSys::AOC_TITLE_ID_OFFSET + FileSys::AOC_TITLE_ID_MASK)
+            continue;
+        const auto it = selected.find(package.title_id);
+        if (it == selected.end() ||
+            package.version > packages[it->second].version) {
+            selected.insert_or_assign(package.title_id, i);
+        }
+    }
+
+    for (const auto& [title_id, index] : selected) {
+        const auto directory = mount_->PackageView(index, ContentView::RomFS);
         if (!directory) continue;
         addons_.push_back(AddOnDirectory{
-            i, packages[i].title_id, packages[i].version, std::move(directory)});
+            index, title_id, packages[index].version, directory});
     }
 }
 
