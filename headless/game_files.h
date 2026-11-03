@@ -93,7 +93,7 @@ inline bool IsDeconstructedGameSelection(std::string_view name) {
         if (slash == std::string_view::npos) break;
         name.remove_prefix(slash + 1);
     }
-    return segments == 1 || (segments >= 2 && last == "exefs");
+    return segments == 1 || (segments >= 2 && last.size() == 5 && EndsWithNoCase(last, "exefs"));
 }
 
 // Symlink-free detection avoids treating arbitrary ROM directories or
@@ -137,7 +137,8 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
     const auto search = [&](const auto& self, const fs::path& dir,
                             const std::string& relative, unsigned depth) -> std::string {
         if (depth > 6 || ++visited > 128) return {};
-        if (dir.filename() == "exefs" && IsDeconstructedGameDirectory(dir))
+        if (const auto leaf = dir.filename().string();
+            leaf.size() == 5 && EndsWithNoCase(leaf, "exefs") && IsDeconstructedGameDirectory(dir))
             return relative + "/main";
         std::error_code error;
         std::vector<fs::path> subdirs;
@@ -155,7 +156,8 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
         std::sort(subdirs.begin(), subdirs.end(), [](const fs::path& a, const fs::path& b) {
             const auto rank = [](const fs::path& p) {
                 const auto name = p.filename().string();
-                return name == "base" ? 0 : name == "exefs" ? 1 : 2;
+                return name.size() == 4 && EndsWithNoCase(name, "base") ? 0 :
+                       name.size() == 5 && EndsWithNoCase(name, "exefs") ? 1 : 2;
             };
             if (rank(a) != rank(b)) return rank(a) < rank(b);
             return a.filename().string() < b.filename().string();
