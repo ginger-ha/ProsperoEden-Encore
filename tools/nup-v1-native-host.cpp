@@ -367,6 +367,11 @@ int main(int argc, char** argv) {
     Eden::NupV1::Native::ContentSet unscoped_nacp(
         addon_mount, std::nullopt, 0x0100123400003000ULL);
     assert(unscoped_nacp.AddOns().empty());
+    // Misaligned NACP AoC base (not an 0x800-title boundary) is rejected
+    // rather than shifted onto adjacent add-on IDs.
+    Eden::NupV1::Native::ContentSet misaligned_nacp(
+        addon_mount, 0x0100123400000000ULL, 0x0100123400003001ULL);
+    assert(misaligned_nacp.AddOns().empty());
     auto base_mounted_again = Eden::NupV1::Native::Mount::Open(
         executable_input, &error);
     assert(base_mounted_again);
