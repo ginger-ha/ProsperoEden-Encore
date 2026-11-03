@@ -11,7 +11,9 @@
 
 namespace Eden::NupV1::Native {
 
-ContentSet::ContentSet(std::shared_ptr<Mount> mount) : mount_(std::move(mount)) {
+ContentSet::ContentSet(std::shared_ptr<Mount> mount,
+                       std::optional<std::uint64_t> caller_program_id)
+    : mount_(std::move(mount)) {
     if (!mount_) return;
     const auto& packages = mount_->Packages();
 
@@ -32,6 +34,15 @@ ContentSet::ContentSet(std::shared_ptr<Mount> mount) : mount_(std::move(mount)) 
         }
         if (newest) active_base = FileSys::GetBaseTitleID(newest->title_id);
     }
+
+    if (caller_program_id) {
+        const auto requested = FileSys::GetBaseTitleID(*caller_program_id);
+        if (active_base && *active_base != requested) return;
+        active_base = requested;
+    }
+    // Add-on-only archives carry no owning executable title: callers must
+    // supply the program identity instead of seeing cross-title content.
+    if (!active_base) return;
 
     // AOC title IDs are base + 0x1000 + an 11-bit index. Two revisions of
     // one DLC must not be registered twice: use the highest NCM version.
