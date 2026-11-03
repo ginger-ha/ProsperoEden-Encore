@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 5);
+    assert(argc == 6);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -246,5 +246,19 @@ int main(int argc, char** argv) {
     error.clear();
     auto cross_title = Eden::NupV1::Native::Mount::Open(cross_title_input, &error);
     assert(!cross_title && error == "unrelated base/update title ID");
+    // A correctly checksummed NUP can still carry an NPDM for another
+    // program. Never report that ID nor attempt a guest process launch.
+    auto forged_input = std::make_shared<MemoryFile>(Load(argv[5]));
+    error.clear();
+    auto forged = Eden::NupV1::Native::NupAppLoader::Open(forged_input, &error);
+    assert(forged && error.empty()); // mount checks layout, not identity
+    u64 exposed_program_id = 0x123456ULL;
+    assert(forged->ReadProgramId(exposed_program_id) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(exposed_program_id == 0x123456ULL);
+    Kernel::KProcess blocked_process;
+    Core::System blocked_system;
+    assert(forged->Load(blocked_process, blocked_system).first ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
