@@ -138,6 +138,32 @@ jobs:
               -Iheadless \
               tools/ns2/test_native_vulkan_texture_binding_header.cpp
           done
+      - name: P2.2b compile ASTC-first Vulkan texture owner ABI (Clang/GCC)
+        shell: bash
+        run: |
+          # Regression: the real ASTC owner must expose the same native cache
+          # acquisition and GPU pin ABI, even when its headers shadow Vulkan.
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            "$cxx" -std=c++20 -fsyntax-only -Wno-unused-parameter \
+              -DPS5_NATIVE=1 -DEDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL=1 -DEDEN_NS2_ASTC_CACHE_BRIDGE=1 \
+              -Ibuild-ns2-a64/fmt/include \
+              -Ibuild-ns2-a64/vulkan-headers/include \
+              -Ibuild-ns2-a64/vma/include \
+              -Ivendor/encore-active/ns2-astc/include \
+              -Ivendor/encore-active/eden-vulkan/vulkan-cache \
+              -Ivendor/encore-active/eden-vulkan/include \
+              -Ivendor/encore-active/eden-vulkan \
+              -Ivendor/encore-active/ns2-runtime/ampere \
+              -Ivendor/encore-active/ns2-runtime/gpu_dispatch \
+              -Ivendor/encore-active/ns2-runtime/nvdrv_gpu \
+              -Ivendor/encore-active/ns2-runtime/hle \
+              -Ivendor/encore-active/eden-header-hygiene/include \
+              -Ivendor/sources/eden/src/dynarmic/src \
+              -Ivendor/sources/eden/src \
+              -Iheadless \
+              tools/ns2/test_native_vulkan_texture_binding_header.cpp
+          done
       - name: P2.2b retire image/sampler owners after GPU fence (Clang/GCC)
         shell: bash
         run: |
