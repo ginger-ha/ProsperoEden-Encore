@@ -419,7 +419,10 @@ def main() -> int:
                 "TranslateCaptureIndirectTargets" in native_branch_tables and
                 "prior.native_code_offset != native_offset" in native_branch_tables and
                 "mapped_header_table->front().entries" in native_capture_fixture and
-                "aliased_image.ValidForCompiler()" in native_capture_fixture,
+                "aliased_image.ValidForCompiler()" in native_capture_fixture and
+                "ResolveCaptureIndirectBranchesChecked" in native_branch_tables and
+                "snapshot_reads>16" in native_capture_fixture and
+                "unexpected_brx" in native_capture_fixture,
                 "Native BRX/BRXU must never publish unresolved targets or probe CBUF past 64 KiB")
         require("const auto checked_read = " in native_capture_core and
                 "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and

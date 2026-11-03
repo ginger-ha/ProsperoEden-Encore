@@ -2,10 +2,12 @@
 // Synthetic mapped-memory fixture for the actual Ampere GPU shader capture.
 // Does not execute GPU code or require access to copyrighted game images.
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <vector>
 #include "shader_recompiler/frontend/ampere/capture.h"
@@ -256,6 +258,93 @@ int main() {
     Require(!TranslateCaptureIndirectTargets(
                 captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
             "duplicate BRX index must not publish competing target tables");
+
+    // Extend a recognized BRX source capture beyond its first EXIT using
+    // explicit CBUF origin, immutable snapshot verification and bounded
+    // per-instruction reads. Neither this test nor the helper executes BRX.
+    auto source_motif=motif;
+    source_motif[2].words[1]=(7U<<22)|(0xffc0U<<6);
+    source_motif.push_back(Instruction{{pred_true|0x94d,0,exit_true,0}});
+    ProgramCaptureState initial_capture;
+    for (u32 i=0; i<source_motif.size(); ++i)
+        initial_capture.Observe(source_motif[i],i);
+    std::array<u32,16> guest_targets{};
+    for (u32 i=0;i<guest_targets.size();++i)
+        guest_targets[i]=i&1U ? 0x100U : 0x80U;
+    const auto cbuf_reader=[&](u32 bank,u32 offset)->std::optional<u32> {
+        if (bank!=7 || offset<0xffc0U || offset>=0x10000U || offset&3U)
+            return {};
+        return guest_targets[(offset-0xffc0U)/4];
+    };
+    const auto tail_reader=[&](u32 index)->std::optional<Instruction> {
+        if (index<5 || index>9) return {};
+        if (index==9) return Instruction{{pred_true|0x94d,0,exit_true,0}};
+        return Instruction{{pred_true|0x918,0,0,0}};
+    };
+    auto extended_source=source_motif;
+    auto extended_state=initial_capture;
+    const auto extended=ResolveCaptureIndirectBranchesChecked(
+        extended_source,extended_state,
+        CaptureIndirectValueOrigin::GraphicsHeader,tail_reader,cbuf_reader);
+    Require(extended && extended->extended && extended->base==0x80U &&
+            extended->tables.size()==1 && extended->tables[0].branch==3 &&
+            extended->tables[0].values.size()==16 &&
+            extended->tables[0].targets.size()==2 &&
+            extended->tables[0].targets[0]==0 &&
+            extended->tables[0].targets[1]==8 &&
+            extended_source.size()==10,
+            "BRX capture extends beyond earlier EXIT through final verified target");
+    guest_targets[1]=0x81U;
+    auto bad_source=source_motif;
+    auto bad_state=initial_capture;
+    Require(!ResolveCaptureIndirectBranchesChecked(
+                bad_source,bad_state,CaptureIndirectValueOrigin::GraphicsHeader,
+                tail_reader,cbuf_reader) && bad_source.size()==source_motif.size(),
+            "misaligned BRX CBUF target rejects without mutating source");
+    guest_targets[1]=0x100U;
+    bad_source=source_motif;
+    bad_state=initial_capture;
+    const auto faulting_tail=[&](u32 index)->std::optional<Instruction> {
+        return index>=8 ? std::nullopt : tail_reader(index);
+    };
+    Require(!ResolveCaptureIndirectBranchesChecked(
+                bad_source,bad_state,CaptureIndirectValueOrigin::GraphicsHeader,
+                faulting_tail,cbuf_reader) && bad_source.size()==source_motif.size(),
+            "BRX GMMU fault while extending shader rolls back all appended instructions");
+    bad_source=source_motif;
+    bad_state=initial_capture;
+    const auto unexpected_brx=[&](u32 index)->std::optional<Instruction> {
+        if (index==6) return Instruction{{pred_true|0x958,0,0,0}};
+        return tail_reader(index);
+    };
+    Require(!ResolveCaptureIndirectBranchesChecked(
+                bad_source,bad_state,CaptureIndirectValueOrigin::GraphicsHeader,
+                unexpected_brx,cbuf_reader) && bad_source.size()==source_motif.size(),
+            "BRX extended tail must reject newly discovered untracked BRXU");
+    bad_source=source_motif;
+    bad_state=initial_capture;
+    u32 snapshot_reads{};
+    const auto changing_table=[&](u32 bank,u32 offset)->std::optional<u32> {
+        ++snapshot_reads;
+        const auto value=cbuf_reader(bank,offset);
+        if (!value) return {};
+        return snapshot_reads>16 && offset==0xffc0U
+            ? std::optional<u32>{0x100U} : value;
+    };
+    Require(!ResolveCaptureIndirectBranchesChecked(
+                bad_source,bad_state,CaptureIndirectValueOrigin::GraphicsHeader,
+                tail_reader,changing_table) && bad_source.size()==source_motif.size(),
+            "BRX changed guest CBUF between read and capture must roll back");
+    bad_source=source_motif;
+    bad_state=initial_capture;
+    const auto throwing_table=[&](u32,u32)->std::optional<u32> {
+        throw std::runtime_error("guest CBUF mapping changed");
+    };
+    Require(!ResolveCaptureIndirectBranchesChecked(
+                bad_source,bad_state,CaptureIndirectValueOrigin::GraphicsHeader,
+                tail_reader,throwing_table) && bad_source.size()==source_motif.size(),
+            "BRX throwing CBUF reader must roll back without publishing a shader");
+
 
     mem.data.resize(0x80);
     Push(mem.data,pred_true|0xfff);
