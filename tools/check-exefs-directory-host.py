@@ -243,7 +243,10 @@ int main() {
     std::ofstream(only_addons / "UPDATE.nsp") << "patch";
     std::ofstream(only_addons / "AOC_extra.xci") << "addon";
     assert(Eden::FindGameFolderInput(only_addons).empty());
-    assert(Eden::FindNestedGamePackage(root / "AOC").empty());
+    const auto only_aoc_root = root / "AOC";
+    fs::create_directory(only_aoc_root);
+    std::ofstream(only_aoc_root / "game.xci") << "addon";
+    assert(Eden::FindNestedGamePackage(only_aoc_root).empty());
     // Any wrapper name works; content metadata will establish Update/AOC.
     const auto arbitrary = root / "Arbitrary Folders";
     fs::create_directories(arbitrary / "base");
