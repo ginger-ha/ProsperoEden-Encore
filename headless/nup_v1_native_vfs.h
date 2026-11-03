@@ -12,6 +12,11 @@
 #include "core/file_sys/vfs/vfs_types.h"
 
 namespace Eden::NupV1::Native {
+
+// Cheap signature/length probe for the future loader factory. A positive
+// result is NOT proof of integrity: Mount::Open still validates TOC/UUID.
+bool HasNupV1Header(const FileSys::VirtualFile& source);
+
 namespace Detail {
 struct State;
 }
