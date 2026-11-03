@@ -23,6 +23,7 @@ assert "else if (params.num_entries > commands.size())" in method
 assert method.index("else if (params.num_entries > commands.size())") < method.index(
     "Tegra::CommandList entries(params.num_entries)")
 assert "GetSessionMemory(fd).ReadBlock(params.address" in method
+assert "if (params.num_entries != 0) {" in method
 assert "const auto it = sessions.find(fd);" in method
 assert "if (!session || !session->process)" in method
 assert "std::memcpy(entries.command_lists.data(), commands.data()" in method
@@ -127,6 +128,18 @@ int main() {
     assert(gpu.SubmitGPFIFOBase1(stale_fd, {}, 42, true)
            == NvResult::InvalidState);
     assert(gpu.memory.reads == 1 && gpu.submissions == 2);
+    gpu.core.session.process = &gpu.core.process;
+    // Fence-only submissions can legitimately have no GPFIFO entries.
+    // Neither the pointer-backed nor inline path may read a null buffer.
+    IoctlSubmitGpfifo empty{0,0};
+    assert(gpu.SubmitGPFIFOBase1(empty, {}, 42, true)
+           == NvResult::Success);
+    assert(gpu.captured.empty() && gpu.memory.reads == 1 &&
+           gpu.submissions == 3);
+    assert(gpu.SubmitGPFIFOBase1(empty, {}, 42, false)
+           == NvResult::Success);
+    assert(gpu.captured.empty() && gpu.memory.reads == 1 &&
+           gpu.submissions == 4);
 }
 """
 compilers = list(dict.fromkeys(p for name in ("clang++", "g++")
