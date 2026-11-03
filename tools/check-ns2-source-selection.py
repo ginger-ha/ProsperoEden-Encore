@@ -216,6 +216,12 @@ def main() -> int:
                 'Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;' in native_graphics_cache and
                 'NativeGraphicsStageMaskSupported(configured_stages)' in native_graphics_cache and
                 'NativeGraphicsStageMaskSupported(keyed_stages)' in native_graphics_cache and
+                'const auto native_session_current = [&]()' in native_graphics_cache and
+                native_graphics_cache.count('if (!native_session_current())') == 3 and
+                'GraphicsPipeline* selected = CurrentGraphicsPipelineSlowPath();' in native_graphics_cache and
+                'return selected;' in native_graphics_cache and
+                'IsGraphicsCurrent(&graphics_engine,*active_engine)' in
+                    (ROOT / "tools/ns2/test_native_ampere_channel.cpp").read_text() and
                 'catch (const std::exception& exception) {' in native_graphics_cache and
                 'if (!Shader::Ampere::NativeSpirvCbufBoundsActive())' in native_graphics_cache and
                 'LOG_WARNING(Render_Vulkan, "NS2 native graphics shader rejected:' in native_graphics_cache and
