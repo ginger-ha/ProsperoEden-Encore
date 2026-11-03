@@ -57,10 +57,12 @@ def main():
         malformed_meta.write_bytes(content_module.bad_metadata_fixture())
         duplicate_locale = temp / "duplicate-locale.nup"
         duplicate_locale.write_bytes(content_module.duplicate_locale_fixture())
+        addon_only = temp / "addon-only.nup"
+        addon_only.write_bytes(content_module.add_on_only_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
-                        str(sibling_npdm), str(malformed_meta), str(duplicate_locale)],
-                       check=True)
+                        str(sibling_npdm), str(malformed_meta), str(duplicate_locale),
+                        str(addon_only)], check=True)
 
 if __name__ == "__main__":
     main()
