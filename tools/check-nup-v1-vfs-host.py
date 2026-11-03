@@ -140,6 +140,18 @@ def main() -> None:
                 "@effective/romfs/state.bin", b"latest-v3")
         execute(layered_fixture(standalone=True, broken_standalone=True),
                 "@effective/romfs/state.bin", None)
+
+        # Reject an empty nested name even though empty package roots are valid.
+        malformed = bytearray(layered)
+        struct.pack_into("<I", malformed, 0x80 + 0xF0 + 0x18 + 4, 0)
+        malformed[0x18:0x38] = hashlib.sha256(malformed[0x80:0x320]).digest()
+        execute(bytes(malformed), "@effective/romfs/state.bin", None)
+
+        # Two directory records may not claim the same child-array slot.
+        malformed = bytearray(layered)
+        struct.pack_into("<I", malformed, 0x80 + 0xF0 + 2 * 0x18 + 8, 0)
+        malformed[0x18:0x38] = hashlib.sha256(malformed[0x80:0x320]).digest()
+        execute(bytes(malformed), "@effective/romfs/state.bin", None)
         print(f"NUP C++ read-only VFS: {valid} valid / {rejected} malformed cases passed")
 
 
