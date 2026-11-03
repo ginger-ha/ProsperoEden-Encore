@@ -284,3 +284,24 @@ def oversized_npdm_fixture() -> bytes:
              "exefs/main.npdm": b"P" * (4 * 1024 * 1024 + 1),
          }},
     ])
+
+
+def nacp_aoc_fixture() -> bytes:
+    """An NACP-declared nonstandard AoC family, no game-specific heuristic."""
+    title = 0x0100123400000000
+    nacp = bytearray(0x4000)
+    # ABI offset from the pinned vendor's FileSys::RawNACP.
+    struct.pack_into("<Q", nacp, 0x3070, title + 0x3000)
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "metadata": {0x0002: bytes(nacp), 0x0005: b"NACP-AoC"},
+         "files": {
+             "exefs/main": b"synthetic-main",
+             "exefs/main.npdm": b"latest-npdm",
+             "romfs/state.bin": b"base",
+         }},
+        {"title_id": title + 0x3001, "version": 2, "kind": 2,
+         "files": {"romfs/addon.dat": b"nacp-declared"}},
+        {"title_id": title + 0x1000, "version": 3, "kind": 2,
+         "files": {"romfs/addon.dat": b"default-family-not-selected"}},
+    ])
