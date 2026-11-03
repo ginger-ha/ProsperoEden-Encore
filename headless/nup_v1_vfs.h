@@ -45,6 +45,15 @@ struct Package {
     std::uint32_t romfs_dir{};
 };
 
+// Optional NUP metadata. Never trusted as the program identity; NPDM is
+// authoritative and is parsed separately by FileSys::ProgramMetadata.
+struct PackageMetadata {
+    std::string title;
+    std::string publisher;
+    std::string display_version;
+    std::vector<std::uint8_t> default_icon;
+};
+
 class Archive final {
 public:
     // Mount checks all structure, TOC SHA-256, UUID, paths, DAG/cycles and
@@ -55,6 +64,9 @@ public:
     Archive& operator=(const Archive&) = delete;
 
     const std::vector<Package>& Packages() const { return packages_; }
+    const PackageMetadata* MetadataOf(std::size_t index) const;
+    // Prefer application base metadata, otherwise first standalone update.
+    const PackageMetadata* ApplicationMetadata() const;
     std::size_t FileCount() const { return files_.size(); }
 
     // Paths are package-root-relative, with '/' separators. No traversal.
@@ -114,6 +126,7 @@ private:
     mutable std::mutex verified_mutex_;
     mutable std::vector<std::uint8_t> member_verified_; // valid only for immutable Sources
     std::vector<Package> packages_;
+    std::vector<PackageMetadata> package_metadata_;
     std::vector<Directory> dirs_;
     std::vector<File> files_;
     std::vector<std::uint32_t> children_;
