@@ -207,6 +207,8 @@ def main() -> int:
                 'list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_DIRECT_SPIRV}")' in CMAKE and
                 'const Id safe_offset{ctx.OpSelect' in native_direct_cbuf and
                 'ctx.Const(0x10000U / element_size)' in native_direct_cbuf and
+                'if (offset.U32() >= 0x10000U)' in native_direct_cbuf and
+                'return ctx.ConstantNull(result_type);' in native_direct_cbuf and
                 'ctx.OpAccessChain(uniform_type, cbuf, ctx.u32_zero_value,' in native_direct_cbuf and
                 'if (offset.IsImmediate() || !ctx.profile.has_broken_robust)' in pristine_direct_cbuf and
                 'std::span{buf_labels}.first(bank_count)' in qmd_spirv and
