@@ -136,6 +136,10 @@ int main() {
         std::span<const NativeIndirectBranchPlan>{&plan,1});
     const auto unresolved_image=BuildMaxwellShaderImage(
         synthetic_header,computed_bytes,4);
+    check(!unresolved_image.Ready() &&
+          LowerReviewedToMaxwell(computed_bytes).status==
+              LowerBridgeStatus::UnsupportedSemantics,
+          "raw native BRX cannot enter Maxwell CFG without checked CBUF plan");
     check(resolved_image.ValidForCompiler() &&
           resolved_image.consumed_native_bytes==computed_bytes.size() &&
           resolved_image.TranslateNativeAddress(0).has_value() &&

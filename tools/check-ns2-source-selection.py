@@ -424,6 +424,10 @@ def main() -> int:
                     ROOT / "tools/ns2/test_ampere_lower_bridge.cpp").read_text() and
                 "native indirect branch through barrier scope" in (
                     ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text() and
+                "native indirect control flow requires checked CBUF plan" in (
+                    ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text() and
+                "raw native BRX cannot enter Maxwell CFG" in (
+                    ROOT / "tools/ns2/test_ampere_lower_bridge.cpp").read_text() and
                 "native indirect target PC mismatch" in (
                     ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/lower_to_maxwell.h").read_text() and
                 "BRX expected native PC must agree" in (
