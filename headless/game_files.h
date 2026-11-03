@@ -31,6 +31,16 @@ inline bool IsPackageFile(std::string_view name) {
 inline bool IsCardImageFile(std::string_view name) {
     return EndsWithNoCase(name, ".xci") || EndsWithNoCase(name, ".xcz");
 }
+inline bool IsNupFile(std::string_view name) {
+#ifdef EDEN_NUP_V1_RUNTIME
+    // Only a P5-qualified runtime may offer NUP to the game picker.
+    // The core's signature probe still decides whether it can be loaded.
+    return EndsWithNoCase(name, ".nup");
+#else
+    (void)name;
+    return false;
+#endif
+}
 // Eden also has dedicated NRO, NSO, NCA, NAX and KIP loaders. These may be
 // standalone homebrew, program partitions or system components, not necessarily
 // complete game containers. Keep them selectable; let the native core loader
@@ -41,7 +51,8 @@ inline bool IsDirectLoaderFile(std::string_view name) {
            EndsWithNoCase(name, ".kip");
 }
 inline bool IsGameFile(std::string_view name) {
-    return IsPackageFile(name) || IsCardImageFile(name) || IsDirectLoaderFile(name);
+    return IsPackageFile(name) || IsCardImageFile(name) ||
+           IsDirectLoaderFile(name) || IsNupFile(name);
 }
 inline bool IsAddOnContainerName(std::string_view name) {
     std::string lower{name};
@@ -191,7 +202,8 @@ inline bool IsSafeDeconstructedGamePath(const std::filesystem::path& roms_root,
 // updates/DLC and unsafe path components. Content type still needs metadata.
 inline bool IsNestedGameFileSelection(std::string_view selection) {
     if (selection.empty() || selection.size() > 255) return false;
-    if (!IsPackageFile(selection) && !IsCardImageFile(selection)) return false;
+    if (!IsPackageFile(selection) && !IsCardImageFile(selection) &&
+        !IsNupFile(selection)) return false;
     const auto last_slash = selection.find_last_of('/');
     if (last_slash == std::string_view::npos || last_slash == 0 ||
         last_slash == selection.size() - 1) return false;
@@ -243,7 +255,8 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             const auto status = fs::symlink_status(path, error);
             if (error) { error.clear(); continue; }
             if (!fs::is_regular_file(status) ||
-                (!IsPackageFile(name) && !IsCardImageFile(name))) continue;
+                (!IsPackageFile(name) && !IsCardImageFile(name) &&
+                 !IsNupFile(name))) continue;
             std::string stem = path.stem().string();
             std::transform(stem.begin(), stem.end(), stem.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
