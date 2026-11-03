@@ -394,8 +394,11 @@ inline bool IsSafeNestedGameFilePath(const std::filesystem::path& roms_root,
 // ExternalContentProvider classifies packages by Nintendo title metadata.
 // Keep traversal bounded and do not inspect extracted ExeFS/RomFS payloads.
 inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
-    const std::filesystem::path& title_root) {
+    const std::filesystem::path& title_root, bool* scan_complete = nullptr) {
     namespace fs = std::filesystem;
+    // Distinguish a genuinely empty add-on directory from an incomplete
+    // traversal. The metadata scanner must never publish a partial snapshot.
+    if (scan_complete) *scan_complete = false;
     std::vector<fs::path> found;
     if (!IsSafeExtractedDirectory(title_root)) return found;
     // The base may be extracted or packaged in an arbitrary wrapper. Its
@@ -509,6 +512,7 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
         }
         if (!covered) minimal.push_back(child);
     }
+    if (scan_complete) *scan_complete = true;
     return minimal;
 }
 } // namespace Eden
