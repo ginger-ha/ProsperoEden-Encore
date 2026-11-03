@@ -53,11 +53,11 @@ VirtualFile CreateRomFS(VirtualDir directory, VirtualDir extension) {
     if (!directory || extension) return {};
     std::string serialized;
     for (const auto& f : directory->GetFiles()) {
-        std::string data(f->GetSize(), '\\0');
+        std::string data(f->GetSize(), '\0');
         if (!data.empty() &&
             f->Read(reinterpret_cast<u8*>(data.data()), data.size(), 0) != data.size())
             return {};
-        serialized += f->GetName() + "=" + data + "\\n";
+        serialized += f->GetName() + "=" + data + "\n";
     }
     return std::make_shared<MemoryFile>(
         std::vector<u8>(serialized.begin(), serialized.end()));
@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
     assert(content.AddOns().front().romfs);
     assert(content.AddOns().front().romfs->GetFile("state.bin"));
     // Test serializer is a sentinel: verifies selected VFS contents only.
-    assert(Read(content.CreateRomFS()) == "state.bin=latest-v3\\n");
+    assert(Read(content.CreateRomFS()) == "state.bin=latest-v3\n");
     using Eden::NupV1::ContentView;
     assert(!mount->Effective(ContentView::ExeFS));
     assert(!mount->PackageView(100, ContentView::RomFS));
