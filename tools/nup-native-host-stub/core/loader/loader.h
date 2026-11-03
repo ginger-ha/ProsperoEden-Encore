@@ -15,7 +15,7 @@ namespace Loader {
 enum class FileType { Error, Unknown, DeconstructedRomDirectory };
 enum class ResultStatus {
     Success, ErrorNoExeFS, ErrorNoRomFS, ErrorNoIcon, ErrorNoControl,
-    ErrorNotInitialized, ErrorMissingNPDM,
+    ErrorNotInitialized, ErrorMissingNPDM, ErrorBadNPDMHeader, ErrorAlreadyLoaded,
 };
 class AppLoader {
 public:
