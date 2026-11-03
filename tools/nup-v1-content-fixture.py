@@ -272,3 +272,15 @@ def add_on_only_fixture() -> bytes:
         {"title_id": title + 0x3001, "version": 2, "kind": 2,
          "files": {"romfs/addon.dat": b"family-two"}},
     ])
+
+
+def oversized_npdm_fixture() -> bytes:
+    """A structurally valid but oversized NPDM must never reach the vendor parser."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "files": {
+             "exefs/main": b"synthetic-main",
+             "exefs/main.npdm": b"P" * (4 * 1024 * 1024 + 1),
+         }},
+    ])
