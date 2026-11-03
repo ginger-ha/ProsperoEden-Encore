@@ -65,13 +65,17 @@ def main() -> None:
             # is the explicit null guard against stale provider entries.
             previous = """                return rcu.GetEntry(tid, FileSys::ContentRecordType::Data)->GetStatus() !=
                        Loader::ResultStatus::Success;"""
-            corrected = """                // Content inventories may outlive a removed or unreadable
-                // NCA. Do not dereference a missing entry while creating aoc:u.
+            corrected = """                // A registered content ID can become unavailable before
+                // aoc:u is constructed. Never dereference a missing NCA.
                 const auto entry = rcu.GetEntry(tid, FileSys::ContentRecordType::Data);
                 return !entry || entry->GetStatus() != Loader::ResultStatus::Success;"""
-            assert previous in upstream_region
+            # The older vendor may still require the narrow patch; the
+            # current pinned vendor already owns this exact shared guard.
             assert corrected in patched_region
-            upstream_region = upstream_region.replace(previous, corrected)
+            if previous in upstream_region:
+                upstream_region = upstream_region.replace(previous, corrected)
+            else:
+                assert corrected in upstream_region
         assert upstream_region == patched_region, (
             f"upstream aoc:u owner drift: {first}")
     for marker in (
