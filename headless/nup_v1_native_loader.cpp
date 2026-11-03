@@ -89,6 +89,7 @@ NupAppLoader::LoadResult NupAppLoader::Load(Kernel::KProcess& process,
 Loader::ResultStatus NupAppLoader::ReadRomFS(FileSys::VirtualFile& out_file) {
     out_file.reset();
     if (!content_) return Loader::ResultStatus::ErrorNoRomFS;
+    std::scoped_lock guard(romfs_mutex_);
     if (!effective_romfs_) effective_romfs_ = content_->CreateRomFS();
     if (!effective_romfs_) return Loader::ResultStatus::ErrorNoRomFS;
     out_file = effective_romfs_;
