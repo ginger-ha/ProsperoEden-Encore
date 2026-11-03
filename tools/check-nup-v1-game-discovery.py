@@ -56,6 +56,20 @@ int main(int argc, char** argv) {
     assert(!Eden::IsSafeNestedGameFilePath(game.parent_path(), "Game/linked-base/game.nsp"));
     const auto addon_roots = Eden::FindAddOnContentDirectories(game);
     assert(addon_roots.size() == 1 && addon_roots.front() == game / "dlc");
+    // Traversing five wrapper levels is still allowed, and should discover
+    // a nested DLC rather than treating it as a separate base game.
+    const fs::path bounded = fs::path(argv[1]) / "Bounded";
+    const auto allowed = bounded / "a" / "b" / "c" / "d" / "e" / "dlc";
+    fs::create_directories(allowed);
+    const auto accepted = Eden::FindAddOnContentDirectories(bounded);
+    assert(accepted.size() == 1 && accepted.front() == allowed);
+    // A deeper opaque branch cannot be treated as an empty add-on branch:
+    // a partial inventory may hide updates, so fail the entire discovery.
+    const fs::path deep = fs::path(argv[1]) / "Deep";
+    fs::create_directories(deep / "dlc");
+    std::ofstream(deep / "dlc" / "update.nsp").put('u');
+    fs::create_directories(deep / "a" / "b" / "c" / "d" / "e" / "f");
+    assert(Eden::FindAddOnContentDirectories(deep).empty());
     return 0;
 }
 """
