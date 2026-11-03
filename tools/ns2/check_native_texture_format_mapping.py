@@ -396,11 +396,17 @@ for path in (
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
 ):
     bridge = (vendor / path).read_text()
-    assert bridge.count("if (!resources->HasResolvedGpuBufferBindings())") == 1, path
-    assert bridge.index("if (!resources->HasResolvedGpuBufferBindings())") < (
+    assert bridge.count("if (!resources->ValidateGpuBufferMappings(") == 1, path
+    assert "gpu_memory->IsFullyMappedRange(address, bytes)" in bridge, path
+    assert bridge.index("if (!resources->ValidateGpuBufferMappings(") < (
         bridge.index("tables.CaptureAdmissible(")), (
-        "image TIC read before QMD guest buffers were admitted", path
+        "image TIC read before QMD guest buffer mapping verification", path
     )
+    # The CBUF and SSBO spans can be virtually continuous without sharing
+    # one physical CPU allocation. Never use the stricter texture-only
+    # NativeQmdContiguousGpuSpan admission for ordinary guest buffers.
+    assert bridge.index("ValidateGpuBufferMappings(") < bridge.index(
+        "NativeQmdContiguousGpuSpan("), path
     assert "return false; // no unbacked image/sampler descriptor publication" in bridge, path
 assert "HasResolvedGpuBufferBindings() const noexcept" in native_env, (
     "image shader CBUF/SSBO backing policy missing"

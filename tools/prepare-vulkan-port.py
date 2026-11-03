@@ -6481,3 +6481,12 @@ apply_reviewed_delta(
     "        if (resources->requires_tic_tsc) {\n            const auto& regs = kepler_compute.regs;",
     "        if (resources->requires_tic_tsc) {\n            // A reflected TIC/TSC does not waive the real CBUF/SSBO ABI.\n            // Reject unknown bounds and missing guest storage BEFORE any\n            // image-table snapshot. Vulkan image descriptor publication is\n            // still gated on the shared texture-cache GPU lifetime owner.\n            if (!resources->HasResolvedGpuBufferBindings())\n                return false;\n            const auto& regs = kepler_compute.regs;",
     "NS2 image shader backed CBUF/SSBO admission before TIC table capture")
+
+# A structural CBUF/SSBO admission is not a complete GMMU mapping proof.
+# Before any TIC read, require every guest page to be mapped; sparse CBUF
+# virtual spans are legal and must not be forced physically contiguous.
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "            if (!resources->HasResolvedGpuBufferBindings())\n                return false;\n            const auto& regs = kepler_compute.regs;",
+    "            if (!resources->ValidateGpuBufferMappings(\n                    [this](u64 address, u32 bytes) {\n                        return gpu_memory->IsFullyMappedRange(address, bytes);\n                    }))\n                return false;\n            const auto& regs = kepler_compute.regs;",
+    "NS2 image shader CBUF and SSBO full GMMU mapped-range admission")
