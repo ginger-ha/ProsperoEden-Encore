@@ -307,6 +307,10 @@ void Archive::Parse() {
 
     Digest uuid_hash;
     unsigned base_count = 0;
+    // Retain metadata only up to a fixed total budget. Large numbers of
+    // package icons must not multiply guest-controlled memory consumption.
+    constexpr std::size_t MaxCachedIcons = 16U * 1024 * 1024;
+    std::size_t cached_icon_bytes = 0;
     std::vector<std::pair<std::uint64_t, std::uint64_t>> metadata_regions;
     for (std::uint32_t i = 0; i < count; ++i) {
         const auto at = static_cast<std::size_t>(0x30 + i * 0x40);
@@ -353,8 +357,11 @@ void Archive::Parse() {
                     // Icons can be large but the UI never needs an unbounded
                     // blob. Ignore unknown encodings instead of mislabeling.
                     Check(length <= 4 * 1024 * 1024, "NUP icon metadata too large");
-                    if (ImageSignature(payload))
+                    if (ImageSignature(payload) &&
+                        length <= MaxCachedIcons - cached_icon_bytes) {
                         package_meta.default_icon.assign(payload.begin(), payload.end());
+                        cached_icon_bytes += length;
+                    }
                 } else if (kind == 0x0004 || kind == 0x0005 || kind == 0x0006) {
                     const auto text = std::string_view(
                         reinterpret_cast<const char*>(payload.data()), payload.size());
