@@ -656,6 +656,29 @@ int main() {
     assert(!plan->StageVulkanBufferBindings(
         [](u64,std::size_t){return false;},uniform,storage,rollback));
     assert(uniform_binds==1 && storage_binds==1 && rollback_count==0);
+    // A guest GMMU reader may throw while preflighting residency. The
+    // renderer has not staged any Vulkan descriptors at this boundary;
+    // both ordinary and image-fence-owned paths must fail closed with no
+    // rollback and no partial CBUF/SSBO publication.
+    for (const bool image_owned : {false, true}) {
+        const unsigned uniform_before = uniform_binds;
+        const unsigned storage_before = storage_binds;
+        const unsigned rollback_before = rollback_count;
+        unsigned preflight_reads{};
+        assert(!plan->StageVulkanBufferBindings(
+            [&](u64, std::size_t) -> bool {
+                ++preflight_reads;
+                if (preflight_reads == 1) return true;
+                throw std::runtime_error{"guest GMMU reservation invalidated"};
+            }, uniform, storage, rollback, image_owned));
+        assert(preflight_reads == 2 && uniform_binds == uniform_before &&
+               storage_binds == storage_before &&
+               rollback_count == rollback_before);
+    }
+    assert(!plan->StageVulkanBufferBindings(
+        [](u64, std::size_t) -> bool { throw std::bad_alloc{}; },
+        uniform, storage, rollback));
+    assert(uniform_binds == 1 && storage_binds == 1 && rollback_count == 0);
     assert(!plan->StageVulkanBufferBindings(
         mapped_all,
         [&](u32,u32,u64,u32){++uniform_binds; return false;},
