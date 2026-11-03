@@ -67,6 +67,9 @@ if(EDEN_NUP_V1_RUNTIME)
     endif()
     target_include_directories(core PRIVATE
         "${EDEN_PORT_DIR}" "${eden_nup_extracted_aoc_headers}")
+    # Only the explicit P5 selection enables NUP library discovery.
+    target_compile_definitions(eden-headless PRIVATE EDEN_NUP_V1_RUNTIME=1)
+    target_compile_definitions(eden-metadata PRIVATE EDEN_NUP_V1_RUNTIME=1)
     if(NOT TARGET libzstd_static OR NOT TARGET ZLIB::ZLIB)
         message(FATAL_ERROR "NUP requires existing pinned zstd and zlib targets")
     endif()
