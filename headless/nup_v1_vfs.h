@@ -16,13 +16,15 @@
 namespace Eden::NupV1 {
 
 // Source lifetime must exceed Archive lifetime. ReadAt must return exactly the
-// requested bytes or false. Its bytes MUST remain immutable for the entire
-// Archive lifetime; verified-member memoization relies on this invariant.
+// requested bytes or false. Immutable sources may cache successful SHA-256 checks;
+// mutable sources MUST opt out, so each read is fully reverified.
 class Source {
 public:
     virtual ~Source() = default;
     virtual std::uint64_t Size() const = 0;
     virtual bool ReadAt(std::uint64_t offset, std::span<std::uint8_t> dst) const = 0;
+    // Set false for externally mutable VFS files; invalidates cached integrity.
+    virtual bool AllowsVerifiedMemberCache() const { return true; }
 };
 
 enum class ContentView : std::uint8_t { ExeFS, RomFS };
