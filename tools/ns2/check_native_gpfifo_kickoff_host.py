@@ -23,6 +23,8 @@ assert "else if (params.num_entries > commands.size())" in method
 assert method.index("else if (params.num_entries > commands.size())") < method.index(
     "Tegra::CommandList entries(params.num_entries)")
 assert "GetSessionMemory(fd).ReadBlock(params.address" in method
+assert "const auto it = sessions.find(fd);" in method
+assert "if (!session || !session->process)" in method
 assert "std::memcpy(entries.command_lists.data(), commands.data()" in method
 
 cpp = r"""
@@ -32,6 +34,7 @@ cpp = r"""
 #include <cstdint>
 #include <cstring>
 #include <span>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 using u32 = std::uint32_t;
@@ -43,7 +46,7 @@ struct CommandList {
     std::vector<CommandListHeader> command_lists;
 };
 }
-enum class NvResult { Success, InvalidSize };
+enum class NvResult { Success, InvalidSize, InvalidState };
 struct IoctlSubmitGpfifo {
     std::uint64_t address{};
     u32 num_entries{};
@@ -59,9 +62,18 @@ struct GuestRam {
         std::memcpy(out,src.data(),bytes);
     }
 };
+struct StubProcess {};
+struct StubSession { StubProcess* process{}; };
+struct StubCore {
+    StubProcess process;
+    StubSession session{&process};
+    StubSession* GetSession(int id) { return id == 1 ? &session : nullptr; }
+};
 class nvhost_gpu {
 public:
     GuestRam memory;
+    StubCore core;
+    std::unordered_map<DeviceFD,int> sessions{{42,1}};
     std::vector<Tegra::CommandListHeader> captured;
     unsigned submissions{};
     GuestRam& GetSessionMemory(DeviceFD) { return memory; }
@@ -101,6 +113,19 @@ int main() {
     IoctlSubmitGpfifo no_pointer{0,1};
     assert(gpu.SubmitGPFIFOBase1(no_pointer, {}, 42, true)
            == NvResult::InvalidSize);
+    assert(gpu.memory.reads == 1 && gpu.submissions == 2);
+    // An unknown FD or retired process must never fall back to an
+    // unrelated application's address space for a native kickoff.
+    IoctlSubmitGpfifo stale_fd{0x1000,3};
+    assert(gpu.SubmitGPFIFOBase1(stale_fd, {}, 99, true)
+           == NvResult::InvalidState);
+    gpu.sessions[42]=77;
+    assert(gpu.SubmitGPFIFOBase1(stale_fd, {}, 42, true)
+           == NvResult::InvalidState);
+    gpu.sessions[42]=1;
+    gpu.core.session.process=nullptr;
+    assert(gpu.SubmitGPFIFOBase1(stale_fd, {}, 42, true)
+           == NvResult::InvalidState);
     assert(gpu.memory.reads == 1 && gpu.submissions == 2);
 }
 """
