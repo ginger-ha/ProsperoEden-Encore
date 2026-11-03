@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
+| `headless/game_files.h` | `34335ce9b32f19a6a84f35cc9ab35b2197b3ec05` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -104,3 +104,7 @@ Le blob `headless/game_files.h` `d292275239472a9df01205ceabbcd96a2e6a2877` appli
 ### Revue supplémentaire du 3 novembre 2026 — parcours ExeFS borné
 
 Nouvel objet `headless/game_files.h` : `fe8bc387c8d539ea8c909c6e0ae9a1c6c497844e`. La recherche de l'ExeFS extrait accepte les chemins canoniques `base/Base/BASE` × `exefs/ExeFS/EXEFS` seulement après vérification de chaque composant sans symlink et des fichiers `main`/`main.npdm`. Les dossiers non canoniques restent pris en charge par la recherche récursive existante, désormais bornée à **512 entrées examinées par dossier et 128 sous-dossiers**, refusant un résultat partiel plutôt que d'exposer un candidat dépendant de l'ordre des entrées. Le test hôte `tools/check-exefs-directory-host.py` crée de véritables dossiers contenant plus de 512 fichiers pour vérifier le maintien du chemin standard et le refus du parcours partiel. Aucun changement au moteur Vulkan/JIT, aux formats NUP P5, ni aux workflows PS5.
+
+### Révision du 3 novembre 2026 — scan des packages complet et borné
+
+Nouvel objet Git `headless/game_files.h` : `34335ce9b32f19a6a84f35cc9ab35b2197b3ec05`. `FindNestedGamePackage` refuse un résultat si le parcours a été interrompu par erreur ou après **512 entrées** examinées dans un répertoire ; le compteur global de 128 répertoires et celui de 64 packages sont également fail-closed. Le précédent arrêt après 128 entrées pouvait retenir une liste **partielle** et masquer un deuxième candidat selon l'ordre des fichiers. Les nouveaux tests hôte vérifient la découverte d'un `base.xci` parmi 140 ressources et le refus de sélection parmi 516 ressources lorsque le parcours ne peut être exhaustif. Le chemin ExeFS, les protections de symlinks, la séparation updates/DLC, le moteur NS1 et le garde NUP P5 restent inchangés.

@@ -273,15 +273,26 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
         return {};
     std::vector<std::string> candidates;
     std::size_t visited = 0;
+    bool incomplete = false;
     const auto scan = [&](const auto& self, const fs::path& directory,
                           const std::string& relative, unsigned depth) -> void {
-        if (depth > 6 || ++visited > 128 || candidates.size() > 64) return;
+        if (incomplete || depth > 6) return;
+        if (++visited > 128 || candidates.size() > 64) {
+            incomplete = true;
+            return;
+        }
         std::error_code error;
         std::vector<fs::path> subdirs;
         std::size_t examined = 0;
         for (fs::directory_iterator it{directory, fs::directory_options::skip_permission_denied, error},
                                     end;
-             !error && it != end && examined++ < 128; it.increment(error)) {
+             !error && it != end; it.increment(error)) {
+            // Never select a base from a truncated, iteration-order-dependent
+            // subset that may hide a competing package or an update.
+            if (++examined > 512) {
+                incomplete = true;
+                return;
+            }
             const auto path = it->path();
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.' || IsAddOnContainerName(name) ||
@@ -303,6 +314,10 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             const auto selection = title.filename().string() + "/" + candidate;
             if (IsNestedGameFileSelection(selection)) candidates.push_back(candidate);
         }
+        if (error) {
+            incomplete = true;
+            return;
+        }
         std::sort(subdirs.begin(), subdirs.end(), [](const fs::path& a, const fs::path& b) {
             const auto a_name = a.filename().string();
             const auto b_name = b.filename().string();
@@ -311,13 +326,17 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             return a_name < b_name;
         });
         for (const auto& path : subdirs) {
-            if (visited >= 128 || candidates.size() > 64) break;
+            if (incomplete) return;
+            if (visited >= 128 || candidates.size() > 64) {
+                incomplete = true;
+                return;
+            }
             const auto name = path.filename().string();
             self(self, path, relative.empty() ? name : relative + "/" + name, depth + 1);
         }
     };
     scan(scan, title, "", 0);
-    if (candidates.empty() || candidates.size() > 64) return {};
+    if (incomplete || candidates.empty() || candidates.size() > 64) return {};
     std::sort(candidates.begin(), candidates.end());
     std::vector<std::string> named_base;
     for (const auto& candidate : candidates) {

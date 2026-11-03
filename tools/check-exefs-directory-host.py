@@ -266,6 +266,24 @@ int main() {
     fs::create_directory(only_aoc_root);
     std::ofstream(only_aoc_root / "game.xci") << "addon";
     assert(Eden::FindNestedGamePackage(only_aoc_root).empty());
+    // A packed base remains discoverable beyond the old 128-entry cutoff.
+    // Scan order must never determine which title the launcher reports.
+    const auto moderately_crowded = root / "Crowded Packages";
+    fs::create_directory(moderately_crowded);
+    for (int i = 0; i < 140; ++i)
+        std::ofstream(moderately_crowded /
+                      ("asset_" + std::to_string(i) + ".bin")) << "resource";
+    std::ofstream(moderately_crowded / "base.xci") << "base";
+    assert(Eden::FindNestedGamePackage(moderately_crowded) == "base.xci");
+    // If the hard entry cap is reached, refuse an incomplete candidate
+    // list instead of hiding another possible base or update.
+    const auto incomplete_packages = root / "Incomplete Packages";
+    fs::create_directory(incomplete_packages);
+    for (int i = 0; i < 516; ++i)
+        std::ofstream(incomplete_packages /
+                      ("asset_" + std::to_string(i) + ".bin")) << "resource";
+    std::ofstream(incomplete_packages / "base.xci") << "base";
+    assert(Eden::FindNestedGamePackage(incomplete_packages).empty());
     // Any wrapper name works; content metadata will establish Update/AOC.
     const auto arbitrary = root / "Arbitrary Folders";
     fs::create_directories(arbitrary / "base");
