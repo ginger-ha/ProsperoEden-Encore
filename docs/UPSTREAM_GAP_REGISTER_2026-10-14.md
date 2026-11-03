@@ -76,13 +76,13 @@ The native build previously inherited a boilerplate `param.json` without the opt
 <!-- BEGIN AUTO-UPSTREAM-COMPARISON -->
 ### Automated comparison (daily + manual)
 
-Checked in UTC: **2026-11-02 13:31 UTC**. Changes are commits relative to pins, not proven missing fixes.
+Checked in UTC: **2026-11-03 12:49 UTC**. Changes are commits relative to pins, not proven missing fixes.
 This workflow never imports source patches, modifies dependencies, or reads console data.
 
 | Dependency | Source | Pinned revision | Ahead / behind | Status |
 |---|---|---|---:|---|
-| eden | [eden-emulator/mirror](https://github.com/eden-emulator/mirror) | 5f142c7926d0 | +129 / -0 | upstream ahead |
-| ffmpeg | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | c7b5f1537d9c | +5353 / -0 | upstream ahead |
+| eden | [eden-emulator/mirror](https://github.com/eden-emulator/mirror) | 5f142c7926d0 | +133 / -0 | upstream ahead |
+| ffmpeg | [FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) | c7b5f1537d9c | +5410 / -0 | upstream ahead |
 | fmt | [fmtlib/fmt](https://github.com/fmtlib/fmt) | 12.1.0 | +379 / -0 | upstream ahead |
 | zbic | [kinnay/zbic](https://github.com/kinnay/zbic) | 11b08f271226 | +0 / -0 | identical |
 | compiler-rt | frozen archive / binary | — | — | not comparable |
@@ -90,7 +90,7 @@ This workflow never imports source patches, modifies dependencies, or reads cons
 | opengl-source | [blackbearreloaded/ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl) | ad2807d41cef | — | repository unavailable |
 | harfbuzz | frozen archive / binary | — | — | not comparable |
 | boilerplate | [blackbearreloaded/ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | dd44bbdc7543 | — | repository unavailable |
-| ps5-vulkan-tools | [mihawk-99/PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan) | 3f3ee6960701 | +74 / -0 | upstream ahead |
+| ps5-vulkan-tools | [mihawk-99/PS5_Vulkan](https://github.com/mihawk-99/PS5_Vulkan) | 3f3ee6960701 | +80 / -0 | upstream ahead |
 | ps5-mesa | [mihawk-99/PS5_Mesa](https://github.com/mihawk-99/PS5_Mesa) | 0b2d6d1a61d9 | +125 / -103 | diverged |
 | ps5-payload-sdk-fork | [mihawk-99/PS5_PayloadSDK](https://github.com/mihawk-99/PS5_PayloadSDK) | 95c08f27386f | +105 / -48 | diverged |
 | encore-overrides | [niakw/encore-overrides](https://github.com/niakw/encore-overrides) | 4fdb329e732a | +0 / -0 | identical |
@@ -98,7 +98,7 @@ This workflow never imports source patches, modifies dependencies, or reads cons
 | opengl-opengnm | [PS4-OpenGNM/opengnm](https://github.com/PS4-OpenGNM/opengnm) | 4b295ca54c82 | +0 / -0 | identical |
 | opengl-spirv-headers | [KhronosGroup/SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) | 0d25db97cb9b | +12 / -0 | upstream ahead |
 | opengl-vulkan-headers | [KhronosGroup/Vulkan-Headers](https://github.com/KhronosGroup/Vulkan-Headers) | b51f6b865c18 | +10 / -0 | upstream ahead |
-| opengl-imgui | [ocornut/imgui](https://github.com/ocornut/imgui) | f5befd2d29e6 | +1540 / -0 | upstream ahead |
+| opengl-imgui | [ocornut/imgui](https://github.com/ocornut/imgui) | f5befd2d29e6 | +1544 / -0 | upstream ahead |
 | opengl-nanovg | [memononen/nanovg](https://github.com/memononen/nanovg) | ce3bf745eb2d | +0 / -0 | identical |
 | opengl-sokol | [floooh/sokol](https://github.com/floooh/sokol) | 48c85905aeaa | +341 / -0 | upstream ahead |
 | opengl-native-boilerplate | [blackbearreloaded/ps5-native-app-boilerplate](https://github.com/blackbearreloaded/ps5-native-app-boilerplate) | 4f531c4b517f | — | repository unavailable |
@@ -176,14 +176,14 @@ These are upstream commit titles, not validated Encore integrations.
 - [2eda43e9be17](https://github.com/fmtlib/fmt/commit/2eda43e9be17) — Add FMT_USE_FLOCKFILE macro to force has_flockfile trait to false (#4666)
 
 **ps5-vulkan-tools**
-- [8cc2e4dc9eea](https://github.com/mihawk-99/PS5_Vulkan/commit/8cc2e4dc9eea) — gpu-broker: an application's panel over every frame, the frame passed through outside it
-- [6224e4cb925d](https://github.com/mihawk-99/PS5_Vulkan/commit/6224e4cb925d) — gpu-broker: a capture asked for while the panel is shown over a waiting game is of the frame shown again
-- [47b3fc84acc6](https://github.com/mihawk-99/PS5_Vulkan/commit/47b3fc84acc6) — gpu-broker: say how long the panel waits for the display and how long its re-show takes
-- [98bf667e7743](https://github.com/mihawk-99/PS5_Vulkan/commit/98bf667e7743) — gpu-broker: a panel's re-show streams the frame from a cached shadow, not a read-back of the display
-- [8bbd74419ee0](https://github.com/mihawk-99/PS5_Vulkan/commit/8bbd74419ee0) — gpu-broker: a see-through panel blended over the frame blurred under it, with bubbles rising in its margins
-- [64e105099d09](https://github.com/mihawk-99/PS5_Vulkan/commit/64e105099d09) — gpu-broker: say what the see-through panel costs, every 120 composes
 - [a62b05d9fe7f](https://github.com/mihawk-99/PS5_Vulkan/commit/a62b05d9fe7f) — gpu-broker: a panel change over a waiting game is shown at once, not at the bubbles' next re-show
 - [66dad9f1670e](https://github.com/mihawk-99/PS5_Vulkan/commit/66dad9f1670e) — gpu-broker: the panel's blur made every second frame, and a rare glass sweep (1 s after it opens, then at most ever
+- [75805096e518](https://github.com/mihawk-99/PS5_Vulkan/commit/75805096e518) — gpu-broker: FIFO holds the presenting thread to the display, and a fast-copy capture is copied out whole
+- [12a39c51d3ed](https://github.com/mihawk-99/PS5_Vulkan/commit/12a39c51d3ed) — gpu-broker: with the fast copy a frame of another size is scaled into rows, then line-copied
+- [1717280afb49](https://github.com/mihawk-99/PS5_Vulkan/commit/1717280afb49) — gpu-broker: WINE_PS5_FIFO_SHOWN=0 keeps FIFO a queue, not MAILBOX
+- [1c828fc7fcc4](https://github.com/mihawk-99/PS5_Vulkan/commit/1c828fc7fcc4) — gpu-broker: a second small panel over every frame (the title's statistics HUD), and the GPU's busy time for it
+- [ebc931d1c2d2](https://github.com/mihawk-99/PS5_Vulkan/commit/ebc931d1c2d2) — gpu-broker: a panel's bubbles rise in its own margins
+- [ace98a99460c](https://github.com/mihawk-99/PS5_Vulkan/commit/ace98a99460c) — gpu-broker: the open panel keeps to the 120 Hz budget: its blend cached, its blur made a band a frame
 
 **ps5-mesa** (history excerpt; some commits omitted)
 - [ff437af31b9b](https://github.com/mihawk-99/PS5_Mesa/commit/ff437af31b9b) — radv/ps5: mesh workgroups in parts run once and publish their outputs
