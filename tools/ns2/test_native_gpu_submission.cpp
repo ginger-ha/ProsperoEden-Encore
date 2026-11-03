@@ -65,5 +65,36 @@ int main() {
     const auto noFence = N::PlanNativeSubmission(0, 0, true);
     require(noFence && noFence->increment_total == 0,
             "empty native submission does not fabricate a fence");
+    // P2.7: this exact helper is invoked by the real native H:0x1b
+    // kickoff owner before ReadBlock or any GPU queue submission.
+    // Fence-only submission must never dereference a guest pointer.
+    unsigned range_checks = 0;
+    const auto mapped = [&](std::uint64_t address, std::size_t bytes) {
+        ++range_checks;
+        return address == 0x1000 && bytes == 16;
+    };
+    require(N::NativeGpfifoGuestHeadersReadable(0, 0, 8, mapped) &&
+            range_checks == 0,
+            "zero-entry fence-only submission does not access guest RAM");
+    require(N::NativeGpfifoGuestHeadersReadable(0x1000, 2, 8, mapped) &&
+            range_checks == 1,
+            "full two-header guest span admitted in the owning process");
+    require(!N::NativeGpfifoGuestHeadersReadable(0x1000, 1, 8, mapped) &&
+            range_checks == 2,
+            "partial mapping is not enough to acknowledge a native submit");
+    require(!N::NativeGpfifoGuestHeadersReadable(0, 1, 8, mapped) &&
+            range_checks == 2,
+            "missing guest pointer rejected before map lookup");
+    require(!N::NativeGpfifoGuestHeadersReadable(
+                std::numeric_limits<std::uint64_t>::max() - 7, 2, 8, mapped) &&
+            range_checks == 2,
+            "guest start plus command bytes cannot overflow 64-bit VA");
+    require(!N::NativeGpfifoGuestHeadersReadable(
+                0x1000, 2, std::numeric_limits<std::size_t>::max(), mapped) &&
+            range_checks == 2,
+            "count multiplied by command width cannot overflow size_t");
+    require(!N::NativeGpfifoGuestHeadersReadable(0x1000, 1, 0, mapped) &&
+            range_checks == 2,
+            "zero-sized command headers rejected");
     std::puts("NS2 process-scoped native GPFIFO preflight: PASS");
 }
