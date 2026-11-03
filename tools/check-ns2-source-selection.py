@@ -416,6 +416,18 @@ def main() -> int:
                 "min_ssbo_alignment" in global_emit and
                 "global_layout_resolved" in qmd_environment.read_text(),
                 "Native global memory requires genuine SPIR-V SSBO lookup and authenticated QMD backing")
+        native_spirv_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
+        native_compute_spirv = native_spirv_bridge.split(
+            "NativeSpirvResult CompileReviewedNativeComputeSpirv(", 1)[1].split(
+            "NativeSpirvResult CompileReviewedNativeVertexSpirv(", 1)[0]
+        require("if (ir.info.uses_global_memory)" in native_compute_spirv and
+                "!profile.support_int64 || !profile.support_descriptor_aliasing" in native_compute_spirv and
+                "storage.cbuf_index - cbuf.index < cbuf.count" in native_compute_spirv and
+                "ir.info.used_constant_buffer_types |=" in native_compute_spirv and
+                "Shader::IR::Type::U32 | Shader::IR::Type::U32x2" in native_compute_spirv and
+                native_compute_spirv.index("ir.info.used_constant_buffer_types |=") <
+                    native_compute_spirv.index("Shader::Backend::SPIRV::EmitSPIRV("),
+                "P2.3 native global memory must declare real U32/U32x2 CBUF aliases before SPIR-V emission")
         # Native Vulkan must use the authenticated Ampere SPIR-V shader and
         # QMD buffer resources, never the legacy Maxwell launch descriptor.
         native_vk_rasterizer = (ROOT / "vendor/encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
