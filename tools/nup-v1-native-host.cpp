@@ -1,0 +1,108 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Exercise native adapter WITHOUT linking a PS5 renderer/loader.
+#include "nup_v1_native_vfs.h"
+#include "core/file_sys/vfs/vfs.h"
+
+#include <algorithm>
+#include <cassert>
+#include <cstdint>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+class MemoryFile final : public FileSys::VfsFile {
+public:
+    explicit MemoryFile(std::vector<u8> bytes) : bytes_(std::move(bytes)) {}
+    std::string GetName() const override { return "fixture.nup"; }
+    std::size_t GetSize() const override { return bytes_.size(); }
+    bool Resize(std::size_t) override { return false; }
+    FileSys::VirtualDir GetContainingDirectory() const override { return {}; }
+    bool IsWritable() const override { return false; }
+    bool IsReadable() const override { return true; }
+    std::size_t Read(u8* dst, std::size_t count, std::size_t pos) const override {
+        if (pos > bytes_.size()) return 0;
+        const auto n = (std::min)(count, bytes_.size() - pos);
+        if (n) std::copy_n(bytes_.data() + pos, n, dst);
+        return n;
+    }
+    std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
+    bool Rename(std::string_view) override { return false; }
+    // Read-only API does not imply externally immutable backing bytes.
+    void Corrupt(std::string_view old) {
+        auto it = std::search(bytes_.begin(), bytes_.end(), old.begin(), old.end());
+        assert(it != bytes_.end());
+        *it ^= 1;
+    }
+private:
+    std::vector<u8> bytes_;
+};
+
+std::vector<u8> Load(const char* path) {
+    std::ifstream input(path, std::ios::binary);
+    assert(input);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+std::string Read(const FileSys::VirtualFile& file) {
+    assert(file && file->IsReadable() && !file->IsWritable());
+    std::string bytes(file->GetSize(), '\0');
+    if (!bytes.empty())
+        assert(file->Read(reinterpret_cast<u8*>(bytes.data()), bytes.size(), 0) == bytes.size());
+    return bytes;
+}
+
+int main(int argc, char** argv) {
+    assert(argc == 3);
+    auto input = std::make_shared<MemoryFile>(Load(argv[1]));
+    std::string error;
+    auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
+    assert(mount && error.empty());
+    assert(mount->Packages().size() == 3);
+    using Eden::NupV1::ContentView;
+    assert(!mount->Effective(ContentView::ExeFS));
+    assert(!mount->PackageView(100, ContentView::RomFS));
+
+    auto effective = mount->Effective(ContentView::RomFS);
+    assert(effective && effective->IsReadable() && !effective->IsWritable());
+    assert(effective->GetName() == "romfs");
+    assert(effective->GetFiles().size() == 1);
+    assert(effective->GetSubdirectories().empty());
+    auto newest = effective->GetFile("state.bin");
+    assert(newest && newest->GetContainingDirectory() == effective);
+    assert(Read(newest) == "latest-v3");
+    assert(!newest->Resize(1) && !newest->Rename("changed"));
+    assert(newest->Write(reinterpret_cast<const u8*>("bad"), 3, 0) == 0);
+    u8 out{};
+    assert(newest->Read(&out, 1, newest->GetSize()) == 0);
+
+    auto base = mount->PackageView(0, ContentView::RomFS);
+    assert(base && Read(base->GetFile("state.bin")) == "base-v1");
+    auto addon = mount->PackageView(2, ContentView::RomFS);
+    assert(addon && Read(addon->GetFile("state.bin")) == "addon-aoc");
+    // NativeFile pins State even if both Mount and directory handles disappear.
+    mount.reset();
+    effective.reset();
+    base.reset();
+    addon.reset();
+    assert(Read(newest) == "latest-v3");
+    // First successful read MUST NOT memoize integrity on mutable VfsFile.
+    input->Corrupt("latest-v3");
+    u8 scratch[16]{};
+    assert(newest->Read(scratch, 9, 0) == 0);
+
+    auto standalone_input = std::make_shared<MemoryFile>(Load(argv[2]));
+    auto standalone = Eden::NupV1::Native::Mount::Open(standalone_input, &error);
+    assert(standalone);
+    assert(Read(standalone->Effective(ContentView::RomFS)->GetFile("state.bin")) == "latest-v3");
+
+    auto invalid = Load(argv[2]);
+    invalid[0] ^= 1;
+    auto rejected = Eden::NupV1::Native::Mount::Open(
+        std::make_shared<MemoryFile>(std::move(invalid)), &error);
+    assert(!rejected && !error.empty());
+    std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
+}
