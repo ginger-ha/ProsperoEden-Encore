@@ -346,6 +346,19 @@ void Archive::Parse() {
         Check(update_versions.insert(p.version).second,
               "duplicate update version");
     }
+    // NUP is a single application's base/update bundle. A malicious update
+    // claiming an unrelated base title must never shadow that game's ExeFS
+    // or RomFS simply because its NCM version is larger. This is the same
+    // title-base mask used by the common FileSys::GetBaseTitleID API.
+    constexpr std::uint64_t BaseTitleMask = 0xFFFFFFFFFFFFE000ULL;
+    std::optional<std::uint64_t> application_base;
+    for (const auto& p : packages_) {
+        if (p.kind == 2) continue; // Addons are isolated by the native AoC view.
+        const auto base = p.title_id & BaseTitleMask;
+        if (!application_base) application_base = base;
+        Check(*application_base == base, "unrelated base/update title ID");
+    }
+
     const auto uuid = uuid_hash.End();
     Check(std::equal(uuid.begin(), uuid.begin() + 16, head.begin() + 0x50),
           "NUP content UUID mismatch");
