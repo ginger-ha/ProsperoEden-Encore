@@ -59,7 +59,9 @@ bool SafeNacpLanguageData(std::span<const u8> bytes) {
 
 NupAppLoader::NupAppLoader(FileSys::VirtualFile source)
     : Loader::AppLoader(std::move(source)) {}
-NupAppLoader::~NupAppLoader() = default;
+NupAppLoader::~NupAppLoader() {
+    ForgetActiveAddOns(this);
+}
 
 std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
                                                  std::string* error) {
@@ -167,6 +169,12 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     loader->extracted_loader_ =
         std::make_unique<Loader::AppLoader_DeconstructedRomDirectory>(
             main_file, false);
+    // Only publish a fully validated native loader. Its destructor revokes
+    // visibility before source buffers can be released at game teardown.
+    PublishActiveAddOns(
+        loader.get(),
+        std::make_shared<AddOnIndex>(
+            loader->mount_, validated_program_id, aoc_base));
     return loader;
 }
 
