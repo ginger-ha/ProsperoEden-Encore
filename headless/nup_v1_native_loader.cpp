@@ -51,6 +51,7 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
         // title-ID offset: NACP is the source of truth for DLC families.
         constexpr auto offset = offsetof(FileSys::RawNACP, dlc_base_title_id);
         static_assert(sizeof(FileSys::RawNACP) == 0x4000);
+        static_assert(offset == 0x3070, "vendor RawNACP AoC base field ABI drift");
         static_assert(offset + sizeof(std::uint64_t) <= sizeof(FileSys::RawNACP));
         std::uint64_t raw_id{};
         for (std::size_t i = 0; i < sizeof(std::uint64_t); ++i)
