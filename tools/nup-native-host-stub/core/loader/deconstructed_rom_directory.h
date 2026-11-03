@@ -11,6 +11,7 @@ public:
         directory_(std::move(directory)), override_update_(override_update) {}
     FileType GetFileType() const override { return FileType::DeconstructedRomDirectory; }
     LoadResult Load(Kernel::KProcess&, Core::System&) override {
+        if (loaded_) return {ResultStatus::ErrorAlreadyLoaded, {}};
         if (override_update_ || !directory_ || !directory_->GetFile("main"))
             return {ResultStatus::ErrorNoExeFS, {}};
         if (!directory_->GetFile("main.npdm"))
