@@ -61,10 +61,13 @@ def main():
         addon_only.write_bytes(content_module.add_on_only_fixture())
         oversized_npdm = temp / "oversized-npdm.nup"
         oversized_npdm.write_bytes(content_module.oversized_npdm_fixture())
+        nacp_aoc = temp / "nacp-aoc.nup"
+        nacp_aoc.write_bytes(content_module.nacp_aoc_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
                         str(sibling_npdm), str(malformed_meta), str(duplicate_locale),
-                        str(addon_only), str(oversized_npdm)], check=True)
+                        str(addon_only), str(oversized_npdm), str(nacp_aoc)],
+                       check=True)
 
 if __name__ == "__main__":
     main()
