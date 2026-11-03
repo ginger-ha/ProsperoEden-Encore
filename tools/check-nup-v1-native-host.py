@@ -37,7 +37,17 @@ def main():
         addon.write_bytes(fixtures.layered_fixture(addon=True))
         standalone = temp / "standalone.nup"
         standalone.write_bytes(fixtures.layered_fixture(standalone=True))
-        subprocess.run([str(binary), str(addon), str(standalone)], check=True)
+        # A second, independently generated fixture has two addons, real
+        # ExeFS/main + main.npdm and merged nested RomFS directories.
+        path = ROOT / "tools/nup-v1-content-fixture.py"
+        spec = importlib.util.spec_from_file_location("nup_content_fixture", path)
+        assert spec and spec.loader
+        content_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(content_module)
+        executable = temp / "executable.nup"
+        executable.write_bytes(content_module.executable_fixture())
+        subprocess.run([str(binary), str(addon), str(standalone),
+                        str(executable)], check=True)
 
 if __name__ == "__main__":
     main()
