@@ -284,6 +284,12 @@ def main() -> int:
                 "if (method == 0xae || method == 0xaf || method == 0xb0)" in puller and
                 "ProcessNativeComputeQmd(pusher, reg, value, subchannel)" in puller,
                 "NS2 compute MME must emit native PCAS into QMD3 without Maxwell launch")
+        require("bool invalid_compute_register_read = false;" in puller and
+                "if (index >= Tegra::Engines::KeplerCompute::Regs::NUM_REGS)" in puller and
+                "if (invalid_compute_register_read ||" in puller and
+                "if (!result.success || invalid_compute_register_read)" in puller and
+                'fail("compute MME interpreter or register access rejected");' in puller,
+                "Untrusted Ampere MME register reads must fail closed before QMD publication")
         require("BindGraphicsEngine(" in puller and
                 "UnbindGraphicsSubchannel(" in puller and
                 "CaptureGraphicsTicket(" in engine_registry and
