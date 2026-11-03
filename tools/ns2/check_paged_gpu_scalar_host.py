@@ -27,6 +27,9 @@ assert "std::memcpy(page_pointer, &data, sizeof(T));" not in write
 assert HEADER.count("const auto* second = tail_bytes ?") == 1
 assert HEADER.count("auto* second = tail_bytes ?") == 2
 assert "if (!first || !second)" in HEADER
+# One-byte accesses cannot cross a page; GCC O2 must not instantiate
+# a memcpy from bytes + first_bytes on a 1-byte stack source.
+assert HEADER.count("if constexpr (sizeof(T) > 1)") == 2
 
 # Large native GPU transfers retain their efficient contiguous memcpy, but
 # only when the ACTUAL device-memory continuity owner approves the full span.
@@ -85,6 +88,19 @@ int main() {
     assert(Write(base + 1, uint8_t{0x91}, mapped));
     uint8_t c = 0;
     assert(Read(base + 1, c, mapped) && c == 0x91);
+    // The very last byte of a physical page is still one scalar byte.
+    // Translation must happen ONCE, never touch the next page or create
+    // an impossible fortified source overread in the optimized compiler.
+    unsigned u8_translations = 0;
+    auto final_byte = [&](uint64_t address) -> uint8_t* {
+        ++u8_translations;
+        return address == base + page - 1 ? &left.back() : nullptr;
+    };
+    right.front() = 0x5a;
+    assert(Write(base + page - 1, uint8_t{0xe3}, final_byte));
+    uint8_t last_byte = 0;
+    assert(Read(base + page - 1, last_byte, final_byte) && last_byte == 0xe3);
+    assert(u8_translations == 2 && right.front() == 0x5a);
     assert(Write(base + page - 1, uint16_t{0xabcd}, mapped));
     uint16_t s = 0;
     assert(Read(base + page - 1, s, mapped) && s == 0xabcd);
