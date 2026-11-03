@@ -98,6 +98,23 @@ jobs:
           set -euo pipefail
           git clone --depth 1 --branch 12.1.0 https://github.com/fmtlib/fmt.git build-ns2-a64/fmt
           test "$(git -C build-ns2-a64/fmt rev-parse HEAD)" = "407c905e45ad75fc29bf0f9bb7c5c2fd3475976f"
+      - name: P2.2b retire image/sampler owners after GPU fence (Clang/GCC)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for cxx in clang++ g++; do
+            for optimization in 0 2; do
+              output="build-ns2-a64/native-texture-owners-${cxx//+/}-O${optimization}"
+              "$cxx" -std=c++20 "-O${optimization}" -Wall -Wextra -Werror \\
+                -fsanitize=undefined -fno-sanitize-recover=all \\
+                -Ibuild-ns2-a64/fmt/include \\
+                -Ivendor/encore-active/ns2-runtime/ampere \\
+                -Ivendor/encore-active/ns2-runtime/gpu_dispatch \\
+                -Ivendor/sources/eden/src \\
+                tools/ns2/test_native_texture_gpu_owners.cpp -o "$output"
+              UBSAN_OPTIONS=halt_on_error=1 "$output"
+            done
+          done
       - name: Copy selected experimental A64 sources like native CMake
         shell: bash
         run: |
