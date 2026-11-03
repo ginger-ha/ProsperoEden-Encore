@@ -435,19 +435,32 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
             // a game's extracted base RomFS just to find update packages.
             std::error_code error;
             std::size_t scanned_titles = 0;
+            bool exceeded_limit = false;
             for (std::filesystem::directory_iterator it{
-                     roms_dir, std::filesystem::directory_options::skip_permission_denied, error},
+                     roms_dir, std::filesystem::directory_options::none, error},
                  end;
-                 !error && it != end && scanned_titles++ < 2048; it.increment(error)) {
+                 !error && it != end; it.increment(error)) {
+                // 2049th title must NOT turn a partial update/DLC catalogue
+                // into a successful snapshot. This was previously silent.
+                if (++scanned_titles > 2048) {
+                    exceeded_limit = true;
+                    break;
+                }
                 const auto path = it->path();
                 if (!Eden::IsSafeExtractedDirectory(path)) continue;
                 if (Eden::IsAddOnContainerName(path.filename().string())) {
                     append_root(path); // /roms/updates or /roms/dlc
                     continue;
                 }
-                for (const auto& directory : Eden::FindAddOnContentDirectories(path))
+                bool complete = false;
+                const auto roots = Eden::FindAddOnContentDirectories(path, &complete);
+                if (!complete) return;
+                for (const auto& directory : roots)
                     append_root(directory);
             }
+            // No publish on permission errors or bounded traversal. Readers
+            // may retry; never misrepresent unscanned DLC as absent.
+            if (error || exceeded_limit) return;
         }
         if (add_on_roots.empty()) {
             // No add-ons is a complete scan only if the old global directory
