@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_loader.h"
+#include "nup_v1_native_aoc.h"
 
 #include <array>
 #include <cstddef>
@@ -132,6 +133,7 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     }
     // Recreate the selection only after the actual NPDM establishes the
     // caller's application identity; an untrusted NACP does not bypass it.
+    loader->nacp_aoc_base_id_ = aoc_base;
     loader->content_ = std::make_unique<ContentSet>(
         loader->mount_, validated_program_id, aoc_base);
 
@@ -307,6 +309,17 @@ Loader::ResultStatus NupAppLoader::ReadNSOModules(Modules& out_modules) {
 
 const std::vector<AddOnDirectory>& NupAppLoader::SelectedAddOns() const {
     return content_->AddOns();
+}
+
+std::unique_ptr<AddOnIndex> NupAppLoader::MakeAddOnIndex() const {
+    // Do not expose a cached DLC snapshot if underlying VFS bytes were
+    // modified after opening. Resolve the NPDM identity again first.
+    u64 program_id{};
+    if (ValidateProgramIdentity(program_id) !=
+        Loader::ResultStatus::Success)
+        return {};
+    return std::make_unique<AddOnIndex>(
+        mount_, program_id, nacp_aoc_base_id_);
 }
 
 } // namespace Eden::NupV1::Native
