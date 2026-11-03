@@ -26,6 +26,7 @@ constexpr std::uint64_t MaxToc = 64ULL * 1024 * 1024;
 constexpr std::uint64_t MaxMeta = 32ULL * 1024 * 1024;
 constexpr std::uint64_t MaxNodes = 2000000;
 constexpr std::size_t BlockSize = 1 << 20;
+constexpr std::size_t MaxMutableRawDigestCacheBytes = 16 << 20;
 
 void Check(bool condition, const char* reason) {
     if (!condition) throw std::runtime_error(reason);
@@ -767,6 +768,45 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
                   "verified raw extent short read");
             return true;
         }
+        std::shared_ptr<const std::vector<std::array<std::uint8_t, 32>>> raw_blocks;
+        if (!allow_cache && f.codec == 0) {
+            std::lock_guard guard(verified_mutex_);
+            const auto found = raw_block_digests_.find(index);
+            if (found != raw_block_digests_.end()) raw_blocks = found->second;
+        }
+        if (raw_blocks) {
+            // The member's full SHA was already checked when these digests
+            // were recorded. Rehash each touched raw block against that
+            // immutable verified reference, even if VfsFile is mutable.
+            if (dst.empty()) return true;
+            const auto start_block = offset / BlockSize;
+            const auto last_block = (offset + dst.size() - 1) / BlockSize;
+            for (auto block = start_block; block <= last_block; ++block) {
+                Check(block < raw_blocks->size(), "verified raw block outside index");
+                const auto block_offset = block * BlockSize;
+                const auto bytes = static_cast<std::size_t>(
+                    std::min<std::uint64_t>(BlockSize, f.size - block_offset));
+                const auto chunk = ReadChunk(source_, f.offset + block_offset, bytes);
+                Check(Hash(chunk) == (*raw_blocks)[static_cast<std::size_t>(block)],
+                      "raw member block SHA-256 mismatch");
+                const auto first = std::max<std::uint64_t>(offset, block_offset);
+                const auto last = std::min<std::uint64_t>(
+                    offset + dst.size(), block_offset + bytes);
+                if (first < last)
+                    std::memcpy(dst.data() + (first - offset),
+                                chunk.data() + (first - block_offset), last - first);
+            }
+            return true;
+        }
+        // A member too large for the bounded digest cache keeps the original
+        // full SHA validation on every read instead of trusting old content.
+        std::vector<std::array<std::uint8_t, 32>> pending_raw_blocks;
+        if (!allow_cache && f.codec == 0 && f.size > 0) {
+            const auto blocks = 1 + (f.size - 1) / BlockSize;
+            if (blocks <= MaxMutableRawDigestCacheBytes / 32) {
+                pending_raw_blocks.reserve(static_cast<std::size_t>(blocks));
+            }
+        }
         Digest digest;
         std::uint64_t produced = 0;
         const auto record = [&](std::span<const std::uint8_t> chunk) {
@@ -785,6 +825,8 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
                 const auto count = static_cast<std::size_t>(
                     std::min<std::uint64_t>(BlockSize, f.stored - cursor));
                 const auto chunk = ReadChunk(source_, f.offset + cursor, count);
+                if (pending_raw_blocks.capacity() != 0)
+                    pending_raw_blocks.push_back(Hash(chunk));
                 record(chunk);
                 cursor += count;
             }
@@ -835,6 +877,17 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
             if (allow_cache) {
                 std::lock_guard guard(verified_mutex_);
                 member_verified_[index] = 1;
+            } else if (!pending_raw_blocks.empty()) {
+                const auto bytes = pending_raw_blocks.size() *
+                                   sizeof(pending_raw_blocks.front());
+                std::lock_guard guard(verified_mutex_);
+                if (!raw_block_digests_.contains(index) &&
+                    bytes <= MaxMutableRawDigestCacheBytes - raw_digest_cache_bytes_) {
+                    raw_block_digests_.emplace(index,
+                        std::make_shared<const std::vector<std::array<std::uint8_t, 32>>>(
+                            std::move(pending_raw_blocks)));
+                    raw_digest_cache_bytes_ += bytes;
+                }
             }
         } else {
             Check(produced >= offset + dst.size(), "short decoded member range");
