@@ -26,6 +26,15 @@ with tempfile.TemporaryDirectory(prefix="encore-firmware-auto-") as temp:
     with zipfile.ZipFile(fixture) as z:
         info=z.getinfo(first_member)
     original=fixture.read_bytes()
+    # A legitimate ZIP comment may contain the four-byte EOCD marker.
+    # The importer must continue to the real end record, not stop at the
+    # decoy signature and reject the user's firmware archive.
+    commented=root/"comment-with-eocd-marker.zip"
+    commented.write_bytes(original)
+    with zipfile.ZipFile(commented,"a") as z:
+        z.comment=b"Firmware notes PK\\x05\\x06" + b"padding-"*8
+    with zipfile.ZipFile(commented) as z:
+        assert z.testzip() is None
     local=info.header_offset
     assert original[local:local+4] == b"PK\x03\x04"
     name_offset=local+30
@@ -92,5 +101,9 @@ int main(int argc,char**argv) {
     subprocess.run([str(output),str(fixture),str(bad),
                     str(local_name),str(local_crc),str(oversized),
                     str(root/"store/firmware/ns2/encore-imported-firmware")],
+                   check=True,timeout=20)
+    subprocess.run([str(output),str(commented),str(bad),
+                    str(local_name),str(local_crc),str(oversized),
+                    str(root/"store-commented/firmware/ns2/encore-imported-firmware")],
                    check=True,timeout=20)
 print("ENCORE_FIRMWARE_ZIP_NATIVE_HOST_PASS deflate=1 dir_entries=1 crc=1 symlink_guard=1 overwrite=0 traversal=0")
