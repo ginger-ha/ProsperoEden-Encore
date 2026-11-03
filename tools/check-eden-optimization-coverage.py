@@ -207,6 +207,8 @@ post_f07_nup_vfs_owners = {
     "headless/nup_v1_native_aoc.h",
     "headless/nup_v1_native_aoc.cpp",
     "headless/nup_v1_loader_route.cpp",
+    "headless/nup_v1_romfs_factory.cpp",
+    "headless/nup_v1_aoc_service.cpp",
 }
 assert post_f07_nup_vfs_owners <= all_owners, sorted(
     post_f07_nup_vfs_owners - all_owners)
@@ -239,6 +241,19 @@ for selected in (
     source_ref = '"${EDEN_PORT_DIR}/' + selected + '"'
     assert nup_gate.count(source_ref) == 1
     assert release_cmake.count(source_ref) == 0
+# P5's two maintained-owner replacements are also post-F07, and must stay
+# inside the same explicit gate. Replacing original source without a unique
+# match fails at configure time; never treat the replacements as shipped.
+for original, replacement in (
+    ("file_sys/romfs_factory.cpp", "nup_v1_romfs_factory.cpp"),
+    ("hle/service/aoc/addon_content_manager.cpp", "nup_v1_aoc_service.cpp"),
+):
+    pair = '"' + original + "|" + replacement + '"'
+    assert nup_gate.count(pair) == 1
+    assert replacement not in release_cmake
+assert 'list(LENGTH eden_nup_matches eden_nup_match_count)' in nup_gate
+assert 'if(NOT eden_nup_match_count EQUAL 1)' in nup_gate
+assert 'set_property(TARGET core PROPERTY SOURCES "${eden_nup_runtime_sources}")' in nup_gate
 assert (ROOT / "tools/check-nup-v1-runtime-cmake.py").is_file()
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
