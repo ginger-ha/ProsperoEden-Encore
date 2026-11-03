@@ -35,6 +35,24 @@ static std::array<W,3> Insn(W method, W value, bool fifo, bool end, bool emit=tr
 static void Append(std::vector<W>& dst,const std::array<W,3>& insn){
     dst.insert(dst.end(),insn.begin(),insn.end());
 }
+// TU104 DRAM opcodes: ALU0 reads/writes the channel-owned 0xc00-word
+// scratch bank. MME_DWRITE then a failing output must roll back that bank.
+static std::array<W,3> DataRamInsn(W opcode,W address,W payload,
+                                    bool end,bool emit) {
+    std::array<W,3> bits{};
+    const auto set=[&](unsigned low,unsigned width,W data) {
+        for(unsigned bit=0;bit<width;++bit)
+            if(data & (1u<<bit))
+                bits[(low+bit)/32] |= W{1}<<((low+bit)%32);
+    };
+    set(10,5,opcode);
+    set(15,5,24); set(20,5,25); set(25,5,26);
+    set(30,16,address); set(66,16,payload);
+    set(51,5,24); set(56,5,24); set(61,5,24);
+    if(emit) {set(82,3,6);set(85,4,1);}
+    if(end) set(0,1,1);
+    return {bits[2],bits[1],bits[0]};
+}
 static std::array<W,3> RegisterReadInsn(W index) {
     std::array<W,3> bits{};
     const auto set=[&](unsigned low,unsigned width,W data){
@@ -140,6 +158,30 @@ int main(){
         [&]{return !bad_native_read;});
     assert(!result.success && bad_native_read && committed.empty());
 
+    // The native 0xc00-word MME data RAM is also a transaction: an error
+    // after DWRITE must not corrupt a later, valid macro from this channel.
+    Tegra::NativeAmpereMacroState ram_state;
+    code.clear(); committed.clear();
+    Append(code,DataRamInsn(31,0x27,0x42,false,false));
+    Append(code,Insn(0x10,0,false,true));
+    Append(code,Insn(0,0,false,false,false));
+    assert(ram_state.SetCodePointer(0));
+    for(W w:code) assert(ram_state.PushCode(w));
+    assert(ram_state.SetPositionPointer(0) && ram_state.BindPosition(0));
+    result=ram_state.ExecuteStaged(
+        0xe00,std::span<const W>{},read,allowed,commit,valid);
+    assert(!result.success && committed.empty());
+    code.clear();
+    Append(code,DataRamInsn(30,0x27,0x230,true,true));
+    Append(code,Insn(0,0,false,false,false));
+    assert(ram_state.SetCodePointer(3));
+    for(W w:code) assert(ram_state.PushCode(w));
+    assert(ram_state.SetPositionPointer(1) && ram_state.BindPosition(3));
+    result=ram_state.ExecuteStaged(
+        0xe02,std::span<const W>{},read,allowed,commit,valid);
+    assert(result.success && committed.size()==1 &&
+           committed[0]==std::pair<W,W>(0x230,0));
+    committed.clear();
     std::vector<W> oversized(Tegra::NativeAmpereMacroState::MaxFifo+1,3);
     auto too_many=state.Execute(0xe00,std::span<const W>{oversized},read,emit);
     assert(!too_many.success &&
