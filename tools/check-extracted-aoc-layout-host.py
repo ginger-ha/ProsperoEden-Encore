@@ -42,7 +42,7 @@ assert "if (!complete) return;" in scan
 assert "if (!append_root(updates_dir)) return;" in scan
 assert "if (!append_root(directory)) return;" in scan
 assert "if (status_error) return false;" in scan
-assert scan.index("if (error || exceeded_limit) return;") < scan.index("publish(true);")
+assert scan.index("if (error || exceeded_limit) return;") < scan.rindex("publication.Commit();")
 boot = (root / "headless/main.cpp").read_text()
 assert "IsSafeExtractedDirectory(title_root)" in boot
 assert "FindAddOnContentDirectories(" in boot
