@@ -423,6 +423,36 @@ int main() {
             "BRX throwing CBUF reader must roll back without publishing a shader");
 
 
+    // GMMU 49-bit admission applies to every real source/CBUF read, not
+    // just host-u64 overflow. A mock reader may claim that out-of-range
+    // synthetic bytes are mapped; the capture must still refuse them.
+    constexpr u64 GmmuLimit49=u64{1}<<49;
+    Require(NativeGpuRange49(GmmuLimit49-16,16) &&
+            !NativeGpuRange49(GmmuLimit49-16,17) &&
+            !NativeGpuRange49(GmmuLimit49,1) &&
+            !NativeGpuRange49(1,0) &&
+            !NativeGpuRange49(~u64{0},16),
+            "native shader GMMU reads enforce complete 49-bit range");
+    MappedMemory high_shader{};
+    high_shader.base=GmmuLimit49-0xa0U;
+    high_shader.data.resize(0x80U);
+    high_shader.data[0]=0x38;
+    Push(high_shader.data,pred_true|0x918U);
+    Push(high_shader.data,pred_true|0x94dU,0,exit_true);
+    high_shader.mapped_bytes=high_shader.data.size();
+    const auto valid_edge_shader=CaptureNativeGraphicsShader(
+        high_shader.base,4,Read,&high_shader);
+    Require(valid_edge_shader.Ready() &&
+            valid_edge_shader.captured_native_bytes==2*sizeof(Instruction),
+            "short native shader ending at top of 49-bit VA stays supported");
+    high_shader.base=GmmuLimit49-0x90U;
+    const auto over_edge_shader=CaptureNativeGraphicsShader(
+        high_shader.base,4,Read,&high_shader);
+    Require(over_edge_shader.status==NativeCaptureStatus::Unmapped &&
+            over_edge_shader.first_error_offset==0x90U &&
+            over_edge_shader.image.code.empty(),
+            "native shader rejects second instruction beyond 49-bit VA even if mock maps it");
+
     // Exercise the real checked capture/lowerer handoff. The native shader
     // has a tracked BRX at instruction 3, a first EXIT at 4, and a target
     // after that EXIT. The executing CBUF value remains an original guest PC.

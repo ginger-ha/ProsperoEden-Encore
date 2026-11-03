@@ -441,6 +441,10 @@ def main() -> int:
                 "code_relative_brx.Ready()" in native_capture_fixture and
                 "ambiguous_brx.image.code.empty()" in native_capture_fixture and
                 "bool(header_table) == bool(code_table)" in native_capture_core and
+                "NativeGpuRange49(address,bytes)" in native_capture_core and
+                "native shader rejects second instruction beyond 49-bit VA" in native_capture_fixture and
+                "NativeGpuRange49(address, size)" in native_capture and
+                "NativeGpuRange49(address, sizeof(u32))" in native_capture and
                 "current->words != native[native_index].words" in native_capture_core and
                 "if (live_header != header)" in native_capture_core and
                 "cbuf->stage_index != required_bank" in native_capture and
