@@ -71,9 +71,9 @@ def main() -> None:
             synthetic.write_text("int temporary_" + str(len(relative)) +
                                  "() { return 0; }\n", encoding="utf-8")
         (root / "mock-headless.cpp").write_text(
-            "int main() { return 0; }\\n", encoding="utf-8")
+            "int main() { return 0; }\n", encoding="utf-8")
         (root / "mock-metadata.cpp").write_text(
-            "int metadata() { return 0; }\\n", encoding="utf-8")
+            "int metadata() { return 0; }\n", encoding="utf-8")
         maintained = root / "vendor/encore-active/eden-core/src/core/file_sys"
         maintained.mkdir(parents=True)
         (maintained / "extracted_aoc.h").write_text("#pragma once\n", encoding="utf-8")
