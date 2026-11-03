@@ -273,6 +273,22 @@ int main(int argc, char** argv) {
     Core::System blocked_system;
     assert(forged->Load(blocked_process, blocked_system).first ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
+    FileSys::VirtualFile forbidden_romfs;
+    assert(forged->ReadRomFS(forbidden_romfs) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(!forbidden_romfs);
+    std::string forbidden_title = "unchanged";
+    assert(forged->ReadTitle(forbidden_title) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(forbidden_title == "unchanged");
+    std::vector<u8> forbidden_icon{1, 2, 3};
+    assert(forged->ReadIcon(forbidden_icon) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(forbidden_icon == std::vector<u8>({1, 2, 3}));
+    Loader::AppLoader::Modules forbidden_modules;
+    assert(forged->ReadNSOModules(forbidden_modules) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(forbidden_modules.empty());
     auto sibling_input = std::make_shared<MemoryFile>(Load(argv[6]));
     auto sibling = Eden::NupV1::Native::NupAppLoader::Open(sibling_input, &error);
     assert(sibling);
@@ -282,5 +298,8 @@ int main(int argc, char** argv) {
     assert(sibling_id == 0xABCDEFULL);
     assert(sibling->Load(blocked_process, blocked_system).first ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(sibling->ReadRomFS(forbidden_romfs) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(!forbidden_romfs);
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
