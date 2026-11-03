@@ -49,13 +49,15 @@ Déjà livré sans risque d'interférence :
 - `tools/check-nup-v1-payload-host.py` : vérification hôte du hash des **membres** raw/zstd, lecture par blocs de 1 Mio, fenêtre zstd bornée (64 Mio), refus des frames surnuméraires, extents chevauchants, incohérences de déduplication et TLV hors limites. Les extents parfaitement partagés sont vérifiés une seule fois.
 - Contrôles structurels additionnels : refus des cycles de répertoires et des flags incohérents pour les mises à jour autonomes. Les arbres mal formés ne peuvent pas être considérés comme valides pour un futur montage VFS.
 - CI hôte avec structure **et** intégrité des payloads validée le 3 novembre : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41557420412 (une CI plus récente couvre les cas de déduplication).
-- `.github/workflows/nup-v1-host.yml` : exécute `--self-test` sur hôte. Run **réussi** : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41555437627
+- `.github/workflows/nup-v1-host.yml` : vérifie structure, payload et compilation/exécution du VFS C++ hôte. CI validée pour multi-update/AoC et standalone : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41559489576
 - Commits : https://github.com/niakw/ProsperoEden-Encore/commit/4cab01fa96f9cd960d3ba6bde1c22e9ce4c399f6 et https://github.com/niakw/ProsperoEden-Encore/commit/a07225c4ce3e7b0caaeab059916e000022699e7e
 
 Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin incomplet :
 
 1. Un VFS NUP v1 avec validation intégrale TOC/régions/noeuds/chemins/TLV, lecture raw et zstd paresseuse et bornée, hash par fichier et protections contre décompression excessive.
-   - Le préflight hôte de ces invariants est avancé, mais **aucun VFS C++ n'est intégré** au moteur et aucune image PS5 n'a été qualifiée pour NUP.
+   - Un **module VFS C++ read-only autonome** est désormais présent dans `headless/nup_v1_vfs.{h,cpp}` : montage vérifiant superbloc/TOC/UUID/arbres/extents/TLV, recherche de chemins, raw et zstd paresseux par blocs, SHA-256 intégral avant succès de lecture, protections anti-cycle, superposition de la mise à jour NCM la plus récente et vue des DLC séparée.
+   - `tools/nup-v1-vfs-host.cpp` et `tools/check-nup-v1-vfs-host.py` exercent ces invariants sans exécuter le système invité. Les tests couvrent base, multi-updates désordonnées, update autonome, addon isolé, fichier vide, partage d'extent, SHA/fichiers corrompus, frames supplémentaires, noms imbriqués et slots malformés.
+   - **Limite structurante : le module C++ est seulement validé sur hôte**. Il n'est pas raccordé à `FileSys::VirtualFile`/`VirtualDir`, au `AppLoader` natif, aux providers AoC, ni au catalogue PS5. Les dépendances crypto/zstd doivent être résolues pour le build natif avant tout raccordement.
 2. Un chargeur commun NS1/NS2 qui expose ExeFS + RomFS et overlays base/mise à jour de manière déterministe; gestion de plusieurs updates et des index de DLC via le mécanisme AoC déjà maintenu, sans double application des patches.
 3. Détection par **signature** avant tout fallback d'extension, reconnaissance catalogue uniquement lorsque le chargeur accepte réellement le format; ne pas annoncer NUP jouable sur le frontend prématurément.
 4. Wiring dans le CMake réel, dans tous les sélecteurs de source NS1/NS2 et la table `FileType`/erreurs, en conservant NSP/XCI/NSZ/XCZ/extracted et le loader NSO PS5 16 KiB.
