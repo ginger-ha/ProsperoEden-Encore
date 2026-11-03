@@ -54,6 +54,22 @@ int main(int argc, char** argv) {
             return 1;
         }
         const std::string_view name(argv[2]);
+        constexpr std::string_view list_effective = "@list-effective/romfs/";
+        if (name.starts_with(list_effective)) {
+            const auto entries = archive->ListEffectiveDirectory(
+                Eden::NupV1::ContentView::RomFS, name.substr(list_effective.size()));
+            if (!entries) {
+                std::cerr << "Effective directory not found\n";
+                return 1;
+            }
+            for (const auto& entry : *entries) {
+                std::cout << entry.name << ':'
+                          << (entry.directory ? "D" : "F") << ':';
+                if (entry.file_index) std::cout << *entry.file_index;
+                std::cout << '\n';
+            }
+            return 0;
+        }
         std::optional<std::size_t> file;
         constexpr std::string_view effective = "@effective/romfs/";
         constexpr std::string_view base = "@base/romfs/";
