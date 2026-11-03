@@ -353,8 +353,11 @@ int main(int argc, char** argv) {
     assert(second_scoped.AddOns().front().package_index == 1);
     assert(Read(second_scoped.CreateAddOnRomFS(1)) == "addon.dat=family-two\n");
     assert(!second_scoped.CreateAddOnRomFS(0));
+    auto base_mounted_again = Eden::NupV1::Native::Mount::Open(
+        executable_input, &error);
+    assert(base_mounted_again);
     Eden::NupV1::Native::ContentSet wrong_program(
-        playable_mount, 0x0100123400002000ULL);
+        base_mounted_again, 0x0100123400002000ULL);
     assert(wrong_program.AddOns().empty());
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
