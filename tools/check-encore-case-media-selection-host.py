@@ -37,6 +37,12 @@ assert 'scene(game.cover,' not in renderer
 assert 'glClearColor' not in renderer
 assert 'const auto shots = case_media::BackScenes(' in renderer
 assert 'case_media::FrontPaperAvailable(' in renderer
+back_owner = renderer.split("void flat_back_fallback(", 1)[1].split(
+    "// Static sleeve used by the Library", 1)[0]
+assert "case_media::FrontPaperAvailable(" in back_owner
+assert "c.textures.cover(*front, front_bucket).missing" in back_owner
+assert back_owner.index("case_media::FrontPaperAvailable(") < back_owner.index(
+    "case_media::BackScenes("), "rear must exclude the actual selected front"
 assert 'textures.cover(*front, 704.0f).missing' in renderer
 assert 'constexpr std::array<std::string_view, 3> kSceneMarkers{' in header.read_text()
 assert 'const std::string marker =' not in header.read_text()
@@ -122,6 +128,18 @@ int main() {
     assert(!indexed_no_hero[2]);
     const auto only_front = BackScenes(empty, icon, {"only-front.tga"});
     assert(!only_front[0] && !only_front[1] && !only_front[2]);
+    // A valid Hero filename can still fail decoding. The actual front
+    // falls back to another cached scene, which the back must exclude.
+    const std::vector<std::string> failed_hero{
+        "failed-hero.tga", "decoded-front.tga", "rear-only.tga"};
+    const auto active_front = FrontPaperAvailable(
+        failed_hero[0], icon, failed_hero,
+        [](const std::string& path) { return path != "failed-hero.tga"; });
+    assert(active_front == &failed_hero[1]);
+    const auto actual_back = BackScenes(*active_front, icon, failed_hero);
+    assert(actual_back[0] == &failed_hero[0]); // source still present but unavailable
+    assert(actual_back[1] == &failed_hero[2]);
+    assert(*actual_back[1] != *active_front);
     assert(FrontAlternate(hero, empty, {"hero.tga"}) == nullptr);
 
     // When a game only has a front icon/poster, the back stays plain ink.
