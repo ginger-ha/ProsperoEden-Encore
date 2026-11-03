@@ -59,7 +59,7 @@ def main() -> None:
         root = Path(temp)
         owner = root / "core/loader/loader.cpp"
         owner.parent.mkdir(parents=True)
-        owner.write_text("int noop() { return 0; }\\n", encoding="utf-8")
+        owner.write_text("int noop() { return 0; }\n", encoding="utf-8")
         for relative in (
             "core/file_sys/romfs_factory.cpp",
             "core/hle/service/aoc/addon_content_manager.cpp",
@@ -67,10 +67,10 @@ def main() -> None:
             synthetic = root / relative
             synthetic.parent.mkdir(parents=True, exist_ok=True)
             synthetic.write_text("int temporary_" + str(len(relative)) +
-                                 "() { return 0; }\\n", encoding="utf-8")
+                                 "() { return 0; }\n", encoding="utf-8")
         maintained = root / "vendor/encore-active/eden-core/src/core/file_sys"
         maintained.mkdir(parents=True)
-        (maintained / "extracted_aoc.h").write_text("#pragma once\\n", encoding="utf-8")
+        (maintained / "extracted_aoc.h").write_text("#pragma once\n", encoding="utf-8")
         content = TEMPLATE.replace("@NUP_ROOT@", ROOT.as_posix()).replace(
             "@WORK_ROOT@", root.as_posix())
         project = root / "CMakeLists.txt"
