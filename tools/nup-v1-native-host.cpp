@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 7);
+    assert(argc == 8);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -173,6 +173,15 @@ int main(int argc, char** argv) {
     auto playable_mount = Eden::NupV1::Native::Mount::Open(executable_input, &error);
     assert(playable_mount && playable_mount->Packages().size() == 7);
     Eden::NupV1::Native::ContentSet exec_content(playable_mount);
+    const auto* metadata = playable_mount->ApplicationMetadata();
+    assert(metadata);
+    assert(metadata->title == "Demo / Game");
+    assert(metadata->publisher == "Example Publisher");
+    assert(metadata->display_version == "3.0.0");
+    assert(metadata->default_icon.size() >= 3);
+    assert(metadata->default_icon[0] == 0xff);
+    assert(metadata->default_icon[1] == 0xd8);
+    assert(metadata->default_icon[2] == 0xff);
     assert(exec_content.HasExecutableMain());
     auto exefs = exec_content.ExeFS();
     assert(exefs && Read(exefs->GetFile("main")) == "latest-main");
@@ -238,7 +247,12 @@ int main(int argc, char** argv) {
     assert(app->ReadProgramId(program_id) == Loader::ResultStatus::Success);
     assert(program_id == 0x0100123400000000ULL);
     assert(app->ReadTitle(app_title) == Loader::ResultStatus::Success);
-    assert(app_title == "Synthetic Host App");
+    assert(app_title == "Demo / Game");
+    std::vector<u8> app_icon;
+    assert(app->ReadIcon(app_icon) == Loader::ResultStatus::Success);
+    assert(app_icon.size() == metadata->default_icon.size());
+    assert(app_icon[0] == 0xff && app_icon[1] == 0xd8);
+
     Loader::AppLoader::Modules modules;
     assert(app->ReadNSOModules(modules) == Loader::ResultStatus::ErrorNotInitialized);
     Kernel::KProcess process;
@@ -301,5 +315,11 @@ int main(int argc, char** argv) {
     assert(sibling->ReadRomFS(forbidden_romfs) ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
     assert(!forbidden_romfs);
+    // A checksummed archive with an invalid UTF-8 metadata TLV is rejected
+    // before exposing any title, icon or VFS view to an application.
+    error.clear();
+    auto invalid_meta = Eden::NupV1::Native::Mount::Open(
+        std::make_shared<MemoryFile>(Load(argv[7])), &error);
+    assert(!invalid_meta && error == "invalid NUP UTF-8 metadata");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
