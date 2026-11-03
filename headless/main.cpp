@@ -1946,14 +1946,18 @@ int main(int argc, char** argv) {
                         if (name != "." && name != ".." &&
                             !Eden::IsAddOnContainerName(name)) {
                             const auto title_root = library_root / segment;
-                            bool complete = false;
-                            const auto roots = Eden::FindAddOnContentDirectories(
-                                title_root, &complete);
-                            if (!complete)
-                                Eden::Report("loader",
-                                    "Local update/DLC discovery incomplete; no partial add-ons registered");
-                            for (const auto& dir : roots)
-                                external_dirs.push_back(dir.string());
+                            // A top-level .nsp/.xci is a file, not a game folder
+                            // with missing DLC. Do not flag every flat ROM boot.
+                            if (Eden::IsSafeExtractedDirectory(title_root)) {
+                                bool complete = false;
+                                const auto roots = Eden::FindAddOnContentDirectories(
+                                    title_root, &complete);
+                                if (!complete)
+                                    Eden::Report("loader",
+                                        "Local update/DLC discovery incomplete; no partial add-ons registered");
+                                for (const auto& dir : roots)
+                                    external_dirs.push_back(dir.string());
+                            }
                         }
                     }
                 }
