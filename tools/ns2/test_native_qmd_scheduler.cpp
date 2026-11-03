@@ -73,6 +73,31 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // P2.7: before native shader submission, all enabled QMD release
+    // targets must be mapped and aligned. The target index is entirely
+    // guest-controlled; one invalid slot must reject the whole dispatch.
+    {
+        Descriptor qmd = EmptyGrid();
+        unsigned checks{};
+        const auto mapped = [&](Address address, std::size_t bytes) {
+            ++checks;
+            return (address == 0x1000 || address == 0x3000) &&
+                   bytes == sizeof(std::uint32_t);
+        };
+        assert(Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 0);
+        SetRelease(qmd, 24, 0x1000, 7);
+        assert(Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 1);
+        SetRelease(qmd, 28, 0x2000, 8);
+        assert(!Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 3);
+        SetRelease(qmd, 28, 0x3000, 8);
+        assert(Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 5);
+        SetRelease(qmd, 52, 0x1001, 9);
+        assert(!Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 7);
+        SetRelease(qmd, 52, 0, 9);
+        assert(!Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 9);
+        SetRelease(qmd, 52, 0x3000, 9);
+        assert(Tegra::NativeQmdReleaseTargetsMapped(qmd, mapped) && checks == 12);
+    }
     // MKW native Compute hot path: side-effect-free register writes avoid
     // KeplerCompute::CallMethod. The special methods MUST still execute
     // their original upload, semaphore, QMD and legacy side effects.
