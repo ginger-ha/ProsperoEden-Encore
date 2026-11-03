@@ -3,6 +3,9 @@
 
 #include <utility>
 
+#include "core/file_sys/common_funcs.h"
+#include "core/file_sys/program_metadata.h"
+#include "core/file_sys/vfs/vfs.h"
 #include "core/loader/deconstructed_rom_directory.h"
 
 namespace Eden::NupV1::Native {
@@ -36,10 +39,46 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     return loader;
 }
 
+Loader::ResultStatus NupAppLoader::ValidateProgramIdentity(u64& program_id) const {
+    if (!content_ || !mount_) return Loader::ResultStatus::ErrorNoExeFS;
+    const auto exefs = content_->ExeFS();
+    if (!exefs) return Loader::ResultStatus::ErrorNoExeFS;
+    const auto npdm = exefs->GetFile("main.npdm");
+    if (!npdm) return Loader::ResultStatus::ErrorMissingNPDM;
+
+    FileSys::ProgramMetadata metadata;
+    const auto status = metadata.Load(npdm);
+    if (status != Loader::ResultStatus::Success) return status;
+
+    // Both the NUP record and the actual executable's NPDM must identify
+    // the same base program. Without this check an otherwise valid archive
+    // can misassociate a dumped executable with another application's ID.
+    const auto& packages = mount_->Packages();
+    const Package* declared = nullptr;
+    for (const auto& package : packages) {
+        if (package.kind == 0) {
+            declared = &package;
+            break;
+        }
+        if (package.kind == 1 && (!declared || package.version > declared->version))
+            declared = &package;
+    }
+    if (!declared) return Loader::ResultStatus::ErrorNoExeFS;
+    program_id = metadata.GetTitleID();
+    if (FileSys::GetBaseTitleID(program_id) !=
+        FileSys::GetBaseTitleID(declared->title_id)) {
+        return Loader::ResultStatus::ErrorBadNPDMHeader;
+    }
+    return Loader::ResultStatus::Success;
+}
+
 NupAppLoader::LoadResult NupAppLoader::Load(Kernel::KProcess& process,
                                              Core::System& system) {
     if (!extracted_loader_)
         return {Loader::ResultStatus::ErrorNoExeFS, {}};
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return {status, {}};
     return extracted_loader_->Load(process, system);
 }
 
@@ -58,8 +97,10 @@ Loader::ResultStatus NupAppLoader::ReadIcon(std::vector<u8>& out_buffer) {
 }
 
 Loader::ResultStatus NupAppLoader::ReadProgramId(u64& out_program_id) {
-    return extracted_loader_ ? extracted_loader_->ReadProgramId(out_program_id)
-                             : Loader::ResultStatus::ErrorNoExeFS;
+    u64 validated{};
+    const auto status = ValidateProgramIdentity(validated);
+    if (status == Loader::ResultStatus::Success) out_program_id = validated;
+    return status;
 }
 
 Loader::ResultStatus NupAppLoader::ReadTitle(std::string& out_title) {
