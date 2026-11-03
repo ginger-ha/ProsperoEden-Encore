@@ -42,6 +42,7 @@ struct NativeRetirementMockScheduler {
     // A Wait for the earlier tick must not require it to be the latest tick.
     u64 completed_tick{};
     bool throw_after_flush_once{};
+    bool throw_on_wait_once{};
     u32 finish_count{};
     u64 Flush() {
         const u64 tick = ++current_tick;
@@ -58,6 +59,10 @@ struct NativeRetirementMockScheduler {
         Wait(current_tick);
     }
     void Wait(u64 tick) {
+        if (throw_on_wait_once) {
+            throw_on_wait_once = false;
+            throw std::runtime_error{"mock GPU timeline wait failed"};
+        }
         assert(tick && tick <= current_tick && tick <= completed_tick);
         if (tick > waited) waited = tick;
     }
@@ -182,6 +187,32 @@ int main() {
         }
         assert(refused && scheduler.current_tick == 1 &&
                scheduler.waited == 1 && destroyed == 1);
+    }
+    {
+        // A failed registration followed by a transient GPU timeline wait
+        // failure must drain outstanding work before releasing the pipeline.
+        // A simple catch/rethrow used to destroy the live GPU owner early.
+        NativeRetirementMockScheduler scheduler{};
+        scheduler.throw_on_wait_once = true;
+        NativeRetirementMockFences fences{};
+        fences.reject_registration = true;
+        int destroyed{};
+        auto pipeline = std::shared_ptr<int>(new int(19), [&](int* value) {
+            assert(scheduler.finish_count == 1 &&
+                   scheduler.waited == scheduler.current_tick);
+            ++destroyed;
+            delete value;
+        });
+        bool refused{};
+        try {
+            Shader::Ampere::RetainNativeComputeUntilGpuTick(
+                scheduler, fences, std::move(pipeline));
+        } catch (const std::runtime_error&) {
+            refused = true;
+        }
+        assert(refused && scheduler.current_tick == 1 &&
+               scheduler.finish_count == 1 && scheduler.waited == 1 &&
+               destroyed == 1 && !fences.signaled);
     }
     {
         // A guest-fence signal failure AFTER SyncOperation registration must
