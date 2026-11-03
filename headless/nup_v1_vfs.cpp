@@ -100,6 +100,28 @@ bool Utf8Metadata(std::string_view value, std::size_t limit) {
     return true;
 }
 
+// Normalize BCP-47 ASCII tags without consulting UI or system locale.
+// The parser rejects empty segments and control characters.
+std::optional<std::string> NormalizeLanguage(std::string_view value) {
+    if (value.empty() || value.size() > 35 ||
+        value.front() == '-' || value.back() == '-') return std::nullopt;
+    std::string result;
+    result.reserve(value.size());
+    char prev = '\0';
+    for (const char chr : value) {
+        if (chr == '-' && prev == '-') return std::nullopt;
+        if ((chr < 'A' || chr > 'Z') &&
+            (chr < 'a' || chr > 'z') &&
+            (chr < '0' || chr > '9') && chr != '-')
+            return std::nullopt;
+        const char normalized = chr >= 'A' && chr <= 'Z'
+                                    ? static_cast<char>(chr - 'A' + 'a') : chr;
+        result.push_back(normalized);
+        prev = chr;
+    }
+    return result;
+}
+
 bool ImageSignature(std::span<const std::uint8_t> bytes) {
     const bool jpeg = bytes.size() >= 3 &&
         bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff;
@@ -337,6 +359,8 @@ void Archive::Parse() {
         const auto meta_at = ReadLe<std::uint64_t>(toc, at + 0x20);
         const auto meta_size = ReadLe<std::uint32_t>(toc, at + 0x28);
         PackageMetadata package_meta;
+        std::set<std::string> localized_title_tags;
+        std::set<std::string> localized_icon_tags;
         if (!meta_size) Check(meta_at == 0, "zero metadata with nonzero address");
         else {
             Check(meta_size <= MaxMeta && meta_at >= blob_at &&
@@ -371,6 +395,48 @@ void Archive::Parse() {
                                    kind == 0x0005 ? package_meta.title :
                                                     package_meta.publisher;
                     if (target.empty()) target.assign(text);
+                } else if (kind == 0x0009 || kind == 0x000A) {
+                    // Repeated LocalizedRecord: u8 lang_len, language bytes,
+                    // u32 data_len, data bytes. Never trust nested lengths.
+                    std::size_t cursor = 0;
+                    auto& seen = kind == 0x0009 ?
+                                     localized_title_tags : localized_icon_tags;
+                    while (cursor < payload.size()) {
+                        const auto lang_len = payload[cursor++];
+                        Check(lang_len > 0 && lang_len <= payload.size() - cursor,
+                              "invalid NUP localized language length");
+                        const auto raw_tag = std::string_view(
+                            reinterpret_cast<const char*>(payload.data() + cursor), lang_len);
+                        const auto tag = NormalizeLanguage(raw_tag);
+                        Check(tag.has_value(), "invalid NUP localized language tag");
+                        cursor += lang_len;
+                        Check(payload.size() - cursor >= 4,
+                              "truncated NUP localized record");
+                        const auto data_len = ReadLe<std::uint32_t>(payload, cursor);
+                        cursor += 4;
+                        Check(data_len <= payload.size() - cursor,
+                              "invalid NUP localized payload length");
+                        Check(seen.insert(*tag).second && seen.size() <= 64,
+                              "duplicate or excessive NUP localized entries");
+                        const auto data = payload.subspan(cursor, data_len);
+                        if (kind == 0x0009) {
+                            const auto title = std::string_view(
+                                reinterpret_cast<const char*>(data.data()), data.size());
+                            Check(Utf8Metadata(title, 4096),
+                                  "invalid NUP localized title UTF-8");
+                            package_meta.localized_titles.emplace(*tag, title);
+                        } else {
+                            Check(data_len <= 4 * 1024 * 1024,
+                                  "NUP localized icon too large");
+                            if (ImageSignature(data) &&
+                                data_len <= MaxCachedIcons - cached_icon_bytes) {
+                                package_meta.localized_icons.emplace(
+                                    *tag, std::vector<std::uint8_t>(data.begin(), data.end()));
+                                cached_icon_bytes += data_len;
+                            }
+                        }
+                        cursor += data_len;
+                    }
                 }
                 pos += 8 + length;
             }
@@ -447,6 +513,40 @@ void Archive::Parse() {
         Check(it == regions.end() || it->first >= meta.second,
               "metadata overlaps file payload");
     }
+}
+
+std::string_view PackageMetadata::TitleFor(std::string_view language) const {
+    if (const auto tag = NormalizeLanguage(language)) {
+        auto exact = localized_titles.find(*tag);
+        if (exact != localized_titles.end()) return exact->second;
+        const auto cut = tag->find('-');
+        if (cut != std::string::npos) {
+            exact = localized_titles.find(tag->substr(0, cut));
+            if (exact != localized_titles.end()) return exact->second;
+        }
+    }
+    if (!title.empty()) return title;
+    const auto english = localized_titles.find("en-us");
+    if (english != localized_titles.end()) return english->second;
+    return localized_titles.empty() ? std::string_view{} :
+                                     std::string_view{localized_titles.begin()->second};
+}
+
+const std::vector<std::uint8_t>* PackageMetadata::IconFor(
+    std::string_view language) const {
+    if (const auto tag = NormalizeLanguage(language)) {
+        auto exact = localized_icons.find(*tag);
+        if (exact != localized_icons.end()) return &exact->second;
+        const auto cut = tag->find('-');
+        if (cut != std::string::npos) {
+            exact = localized_icons.find(tag->substr(0, cut));
+            if (exact != localized_icons.end()) return &exact->second;
+        }
+    }
+    if (!default_icon.empty()) return &default_icon;
+    const auto english = localized_icons.find("en-us");
+    if (english != localized_icons.end()) return &english->second;
+    return localized_icons.empty() ? nullptr : &localized_icons.begin()->second;
 }
 
 const PackageMetadata* Archive::MetadataOf(std::size_t index) const {
