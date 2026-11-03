@@ -34,6 +34,9 @@ public:
     // Directory handles only. Registration into the shared AoC provider
     // is deliberately deferred; no addon is folded into effective RomFS.
     const std::vector<AddOnDirectory>& AddOns() const { return addons_; }
+    // Explicit addon-only RomFS binary for a future AoC provider.
+    // Base/update packages are rejected, never merged into CreateRomFS().
+    FileSys::VirtualFile CreateAddOnRomFS(std::size_t package_index) const;
 
 private:
     std::shared_ptr<Mount> mount_;
