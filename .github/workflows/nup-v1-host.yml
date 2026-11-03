@@ -17,6 +17,8 @@ on:
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - tools/nup-v1-native-host.cpp
+      - tools/nup-v1-real-romfs-host.cpp
+      - tools/check-nup-v1-real-romfs-host.py
       - tools/nup-v1-content-fixture.py
       - tools/check-nup-v1-native-host.py
       - tools/check-nup-v1-native-abi.py
@@ -37,6 +39,8 @@ on:
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - tools/nup-v1-native-host.cpp
+      - tools/nup-v1-real-romfs-host.cpp
+      - tools/check-nup-v1-real-romfs-host.py
       - tools/nup-v1-content-fixture.py
       - tools/check-nup-v1-native-host.py
       - tools/check-nup-v1-native-abi.py
@@ -72,3 +76,5 @@ jobs:
         run: python3 tools/check-nup-v1-native-host.py
       - name: Compile native adapter against pinned actual vendor VFS API
         run: python3 tools/check-nup-v1-native-abi.py
+      - name: Build actual pinned vendor RomFS tables from synthetic NUP trees
+        run: python3 tools/check-nup-v1-real-romfs-host.py
