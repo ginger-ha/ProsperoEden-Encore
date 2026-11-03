@@ -416,6 +416,9 @@ assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
 )
 assert "kNativeQmdMaxContiguousBytes = 256ULL * 1024 * 1024" in native_env
 assert "NativeQmdWithinByteBudget(" in native_env
+assert "constexpr bool NativeQmdMipChainMinimumBytes(" in native_env
+assert "kNativeQmdMaxContiguousBytes - minimum" in native_env
+print("NS2_NATIVE_TIC_FULL_MIP_BUDGET_PASS full_chain=1 layered=1 generator_parity=required")
 for path in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
@@ -424,7 +427,11 @@ for path in (
     assert "VideoCommon::ImageType::Buffer" in renderer, path
     assert "VideoCommon::ImageType::Linear" in renderer, path
     assert "info.resources.layers > 1" in renderer, path
-    assert renderer.count("NativeQmdWithinByteBudget(") == 4, path
+    assert renderer.count("NativeQmdWithinByteBudget(") == 3, path
+    assert "NativeQmdMipChainMinimumBytes(" in renderer, path
+    assert "minimum_bytes < tiled_minimum" in renderer, path
+    assert renderer.index("NativeQmdMipChainMinimumBytes(") < (
+        renderer.index("VideoCommon::CalculateGuestSizeInBytes(info)")), path
     assert "const u64 layer_offset =" in renderer, path
     assert renderer.index("NativeQmdWithinByteBudget(") < (
         renderer.index("VideoCommon::CalculateGuestSizeInBytes(info)")), path
