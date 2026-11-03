@@ -151,6 +151,7 @@ jobs:
               -Ibuild-ns2-a64/vulkan-headers/include \
               -Ibuild-ns2-a64/vma/include \
               -Ivendor/encore-active/ns2-astc/include \
+              -Ivendor/encore-active/ns2-helpers/include \
               -Ivendor/encore-active/eden-vulkan/vulkan-cache \
               -Ivendor/encore-active/eden-vulkan/include \
               -Ivendor/encore-active/eden-vulkan \
