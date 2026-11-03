@@ -32,10 +32,12 @@ assert "update_present = true" in metadata_cpp
 # publish a complete snapshot; the mixed-root scan must keep this guard.
 assert "if (add_on_roots.empty()) {" in metadata_cpp
 assert "const bool global_exists = std::filesystem::exists(updates_dir, error);" in metadata_cpp
-assert "if (!error && !global_exists) publish(true);" in metadata_cpp
+assert "if (!error && !global_exists) publication.Commit();" in metadata_cpp
 assert "const FileSys::ExternalContentProvider provider(std::move(add_on_roots));" in metadata_cpp
 assert "const std::lock_guard scan_job_guard{ScanAddOnsJobMutex()};" in metadata_cpp
-assert "ScannedAddOns().swap(scanned);" in metadata_cpp
+assert "ScannedAddOns().swap(candidate_);" in metadata_cpp
+assert "AddOnScanTransaction publication(scanned);" in metadata_cpp
+assert "ScannedAddOns().clear();" not in metadata_cpp
 assert "const std::lock_guard lock{ScannedAddOnsMutex()};" in metadata_cpp
 # The metadata reader handles XCI/XCZ and NSP/NSZ through the shared,
 # case-normalized format selector, not a hard-coded XCI-only condition.
