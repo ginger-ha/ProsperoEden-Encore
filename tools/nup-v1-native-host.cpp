@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 9);
+    assert(argc == 10);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -333,5 +333,28 @@ int main(int argc, char** argv) {
     auto duplicate_locale = Eden::NupV1::Native::Mount::Open(
         std::make_shared<MemoryFile>(Load(argv[8])), &error);
     assert(!duplicate_locale && error == "duplicate or excessive NUP localized entries");
+    // A container without an executable cannot be automatically attributed
+    // to a running game. Explicit caller program ID selects exactly its DLC.
+    auto addons_input = std::make_shared<MemoryFile>(Load(argv[9]));
+    error.clear();
+    auto addon_mount = Eden::NupV1::Native::Mount::Open(addons_input, &error);
+    assert(addon_mount && addon_mount->Packages().size() == 2);
+    Eden::NupV1::Native::ContentSet unscoped(addon_mount);
+    assert(unscoped.AddOns().empty());
+    Eden::NupV1::Native::ContentSet first_scoped(
+        addon_mount, 0x0100123400000000ULL);
+    assert(first_scoped.AddOns().size() == 1);
+    assert(first_scoped.AddOns().front().package_index == 0);
+    assert(Read(first_scoped.CreateAddOnRomFS(0)) == "addon.dat=family-one\n");
+    assert(!first_scoped.CreateAddOnRomFS(1));
+    Eden::NupV1::Native::ContentSet second_scoped(
+        addon_mount, 0x0100123400002000ULL);
+    assert(second_scoped.AddOns().size() == 1);
+    assert(second_scoped.AddOns().front().package_index == 1);
+    assert(Read(second_scoped.CreateAddOnRomFS(1)) == "addon.dat=family-two\n");
+    assert(!second_scoped.CreateAddOnRomFS(0));
+    Eden::NupV1::Native::ContentSet wrong_program(
+        playable_mount, 0x0100123400002000ULL);
+    assert(wrong_program.AddOns().empty());
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
