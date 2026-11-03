@@ -4,6 +4,7 @@
 #include "nup_v1_native_content.h"
 #include "nup_v1_native_aoc.h"
 #include "nup_v1_native_loader.h"
+#include "core/loader/loader.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/control_metadata.h"
 #include "core/file_sys/vfs/vfs.h"
@@ -81,12 +82,48 @@ std::string Read(const FileSys::VirtualFile& file) {
     return bytes;
 }
 
+// P5-only factory test: never instrument or modify the vendor loader.
+// This stand-in records whether non-NUP inputs kept the original route.
+static int original_loader_calls = 0;
+namespace Loader {
+std::unique_ptr<AppLoader> EdenOriginalGetLoader(
+    Core::System&, FileSys::VirtualFile, u64, std::size_t) {
+    ++original_loader_calls;
+    return {};
+}
+std::unique_ptr<AppLoader> GetLoader(
+    Core::System&, FileSys::VirtualFile, u64, std::size_t);
+} // namespace Loader
+
 int main(int argc, char** argv) {
     assert(argc == 19);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     // File recognition must be based on the superblock, not .nup extension.
     // This cheap probe does not replace the full archive validation.
     assert(Eden::NupV1::Native::HasNupV1Header(input));
+    // The prepared, OFF-by-default factory is tested on host for strict
+    // dispatch and no regressions in the ordinary vendor loader route.
+    Core::System factory_system;
+    auto normal_selection = std::make_shared<MemoryFile>(std::vector<u8>(0x80));
+    assert(!Loader::GetLoader(factory_system, normal_selection, 0, 0));
+    assert(original_loader_calls == 1);
+    auto valid_nup_routed = Loader::GetLoader(
+        factory_system, std::make_shared<MemoryFile>(Load(argv[3])), 0, 0);
+    assert(valid_nup_routed);
+    assert(original_loader_calls == 1);
+    u64 routed_title{};
+    assert(valid_nup_routed->ReadProgramId(routed_title) ==
+           Loader::ResultStatus::Success);
+    assert(routed_title == 0x0100123400000000ULL);
+    assert(!Loader::GetLoader(factory_system,
+        std::make_shared<MemoryFile>(Load(argv[3])),
+        0x0100123400002000ULL, 0));
+    assert(!Loader::GetLoader(factory_system,
+        std::make_shared<MemoryFile>(Load(argv[3])), 0, 1));
+    assert(!Loader::GetLoader(factory_system,
+        std::make_shared<MemoryFile>(Load(argv[5])), 0, 0));
+    assert(original_loader_calls == 1);
+
     assert(!Eden::NupV1::Native::HasNupV1Header(
         std::make_shared<MemoryFile>(std::vector<u8>(0x80, 0))));
     auto bad_magic = Load(argv[1]);

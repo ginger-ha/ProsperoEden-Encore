@@ -18,6 +18,8 @@ on:
       - headless/nup_v1_native_aoc.cpp
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
+      - headless/nup_v1_loader_route.cpp
+      - headless/CMakeLists.txt
       - tools/nup-v1-native-host.cpp
       - tools/nup-v1-real-romfs-host.cpp
       - tools/check-nup-v1-real-romfs-host.py
@@ -42,6 +44,8 @@ on:
       - headless/nup_v1_native_aoc.cpp
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
+      - headless/nup_v1_loader_route.cpp
+      - headless/CMakeLists.txt
       - tools/nup-v1-native-host.cpp
       - tools/nup-v1-real-romfs-host.cpp
       - tools/check-nup-v1-real-romfs-host.py
