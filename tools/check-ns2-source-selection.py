@@ -385,6 +385,10 @@ def main() -> int:
                 "launch.local_pos_bytes + launch.local_crs_bytes" in qmd_environment.read_text() and
                 "BuildResourcePlan(" in qmd_environment.read_text() and
                 "shader_info.storage_buffers_descriptors" in qmd_environment.read_text() and
+                "ReadStorageDescriptor(" in qmd_environment.read_text() and
+                "std::array<u32, 4> descriptor{};" in qmd_environment.read_text() and
+                "descriptor.data(), sizeof(descriptor)" in qmd_environment.read_text() and
+                "const auto record = ReadStorageDescriptor(desc.cbuf_index, offset);" in qmd_environment.read_text() and
                 "const bool known_size = tag == 0 && bytes != 0" in qmd_environment.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in qmd_api.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in pipeline_source.read_text() and
