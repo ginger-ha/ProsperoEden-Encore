@@ -95,6 +95,8 @@ int main(int argc, char** argv) {
     assert(content.AddOns().front().romfs->GetFile("state.bin"));
     // Test serializer is a sentinel: verifies selected VFS contents only.
     assert(Read(content.CreateRomFS()) == "state.bin=latest-v3\n");
+    assert(Read(content.CreateAddOnRomFS(2)) == "state.bin=addon-aoc\n");
+    assert(!content.CreateAddOnRomFS(0));
     using Eden::NupV1::ContentView;
     assert(!mount->Effective(ContentView::ExeFS));
     assert(!mount->PackageView(100, ContentView::RomFS));
@@ -183,6 +185,11 @@ int main(int argc, char** argv) {
     assert(exec_content.AddOns()[0].title_id != exec_content.AddOns()[1].title_id);
     assert(Read(exec_content.AddOns()[0].romfs->GetFile("addon.dat")) == "addon-one");
     assert(Read(exec_content.AddOns()[1].romfs->GetFile("addon.dat")) == "addon-two");
+    assert(Read(exec_content.CreateAddOnRomFS(3)) == "addon.dat=addon-one\n");
+    assert(Read(exec_content.CreateAddOnRomFS(4)) == "addon.dat=addon-two\n");
+    assert(!exec_content.CreateAddOnRomFS(0)); // base
+    assert(!exec_content.CreateAddOnRomFS(1)); // update
+    assert(!exec_content.CreateAddOnRomFS(500));
     assert(!effective_tree->GetFile("addon.dat"));
     // ExeFS handles remain valid after dropping the owning ContentSet/Mount.
     auto still_readable = exefs->GetFile("main");
