@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 11);
+    assert(argc == 12);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -380,5 +380,19 @@ int main(int argc, char** argv) {
     auto oversized = Eden::NupV1::Native::NupAppLoader::Open(
         oversized_input, &error);
     assert(!oversized && error == "NUP invalid NPDM program identity");
+    // Auto-derive the real AoC base ID from the base package's 0x4000-byte
+    // NACP only *after* NPDM program identity is validated. DLC at the
+    // traditional +0x1000 offset must not silently join the declared family.
+    error.clear();
+    auto nacp_source = std::make_shared<MemoryFile>(Load(argv[11]));
+    auto nacp_loader = Eden::NupV1::Native::NupAppLoader::Open(
+        nacp_source, &error);
+    assert(nacp_loader && error.empty());
+    assert(nacp_loader->SelectedAddOns().size() == 1);
+    assert(nacp_loader->SelectedAddOns()[0].package_index == 1);
+    assert(nacp_loader->SelectedAddOns()[0].title_id ==
+           0x0100123400003001ULL);
+    assert(Read(nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
+           "nacp-declared");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
