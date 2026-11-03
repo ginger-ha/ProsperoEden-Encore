@@ -108,6 +108,10 @@ int main(int argc, char** argv) {
     effective.reset();
     base.reset();
     addon.reset();
+    // AppLoader_DeconstructedRomDirectory(main) dereferences this directory.
+    // The file must pin its containing directory even after Mount is gone.
+    const auto held_parent = newest->GetContainingDirectory();
+    assert(held_parent && held_parent->GetFile("state.bin"));
     assert(Read(newest) == "latest-v3");
     // First successful read MUST NOT memoize integrity on mutable VfsFile.
     input->Corrupt("latest-v3");
