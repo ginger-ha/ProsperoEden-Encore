@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 12);
+    assert(argc == 13);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -393,6 +393,17 @@ int main(int argc, char** argv) {
     assert(nacp_loader->SelectedAddOns()[0].title_id ==
            0x0100123400003001ULL);
     assert(Read(nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
+           "nacp-declared");
+    // The same declared AoC family must be recovered from extracted
+    // control.nacp when the NUP TLV is absent.
+    error.clear();
+    auto extracted_nacp_source = std::make_shared<MemoryFile>(Load(argv[12]));
+    auto extracted_nacp_loader = Eden::NupV1::Native::NupAppLoader::Open(
+        extracted_nacp_source, &error);
+    assert(extracted_nacp_loader && error.empty());
+    assert(extracted_nacp_loader->SelectedAddOns().size() == 1);
+    assert(extracted_nacp_loader->SelectedAddOns()[0].package_index == 1);
+    assert(Read(extracted_nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
            "nacp-declared");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
