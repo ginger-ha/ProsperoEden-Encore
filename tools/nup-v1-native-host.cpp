@@ -2,6 +2,7 @@
 // Exercise native adapter WITHOUT linking a PS5 renderer/loader.
 #include "nup_v1_native_vfs.h"
 #include "nup_v1_native_content.h"
+#include "nup_v1_native_loader.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/vfs/vfs.h"
 
@@ -200,6 +201,42 @@ int main(int argc, char** argv) {
     exefs.reset();
     playable_mount.reset();
     assert(Read(still_readable) == "latest-main");
+    // Explicit-only NUP AppLoader adapter: reuse the extracted ExeFS loader
+    // while overriding ReadRomFS with the NUP effective tree. No FileType,
+    // catalogue or frontend registration is performed by this test.
+    error.clear();
+    auto app = Eden::NupV1::Native::NupAppLoader::Open(executable_input, &error);
+    assert(app && error.empty());
+    assert(app->GetFileType() == Loader::FileType::Unknown);
+    assert(!app->IsRomFSUpdatable()); // already overlaid highest NCM version
+    FileSys::VirtualFile romfs_result;
+    assert(app->ReadRomFS(romfs_result) == Loader::ResultStatus::Success);
+    assert(Read(romfs_result) == "state.bin=latest-v3\n");
+    FileSys::VirtualFile second_romfs;
+    assert(app->ReadRomFS(second_romfs) == Loader::ResultStatus::Success);
+    assert(romfs_result == second_romfs); // lazily built once per app
+    std::uint64_t program_id{};
+    std::string app_title;
+    assert(app->ReadProgramId(program_id) == Loader::ResultStatus::Success);
+    assert(program_id == 0x0100123400000000ULL);
+    assert(app->ReadTitle(app_title) == Loader::ResultStatus::Success);
+    assert(app_title == "Synthetic Host App");
+    Loader::AppLoader::Modules modules;
+    assert(app->ReadNSOModules(modules) == Loader::ResultStatus::ErrorNotInitialized);
+    Kernel::KProcess process;
+    Core::System system;
+    assert(app->Load(process, system).first == Loader::ResultStatus::Success);
+    assert(app->ReadNSOModules(modules) == Loader::ResultStatus::Success);
+    assert(modules.at(0) == "main");
+    assert(app->Load(process, system).first == Loader::ResultStatus::Success);
+    app.reset();
+    assert(Read(romfs_result) == "state.bin=latest-v3\n");
+
+    auto missing_exefs_source = std::make_shared<MemoryFile>(Load(argv[1]));
+    error.clear();
+    auto missing_exefs = Eden::NupV1::Native::NupAppLoader::Open(
+        missing_exefs_source, &error);
+    assert(!missing_exefs && error == "NUP effective ExeFS lacks main or main.npdm");
     auto cross_title_input = std::make_shared<MemoryFile>(Load(argv[4]));
     error.clear();
     auto cross_title = Eden::NupV1::Native::Mount::Open(cross_title_input, &error);
