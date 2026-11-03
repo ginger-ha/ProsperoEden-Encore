@@ -79,7 +79,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 3);
+    assert(argc == 4);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -159,5 +159,35 @@ int main(int argc, char** argv) {
     auto rejected = Eden::NupV1::Native::Mount::Open(
         std::make_shared<MemoryFile>(std::move(invalid)), &error);
     assert(!rejected && !error.empty());
+    // Full synthetic content: effective ExeFS, nested RomFS overlay and
+    // multiple separately addressed addons (never registered in AoC).
+    auto executable_input = std::make_shared<MemoryFile>(Load(argv[3]));
+    auto playable_mount = Eden::NupV1::Native::Mount::Open(executable_input, &error);
+    assert(playable_mount && playable_mount->Packages().size() == 5);
+    Eden::NupV1::Native::ContentSet exec_content(playable_mount);
+    assert(exec_content.HasExecutableMain());
+    auto exefs = exec_content.ExeFS();
+    assert(exefs && Read(exefs->GetFile("main")) == "latest-main");
+    assert(Read(exefs->GetFile("main.npdm")) == "latest-npdm");
+    assert(exefs->GetFile("main")->GetContainingDirectory() == exefs);
+    assert(Read(exec_content.CreateRomFS()) == "state.bin=latest-v3\n");
+    auto effective_tree = playable_mount->Effective(ContentView::RomFS);
+    assert(effective_tree);
+    auto sub = effective_tree->GetSubdirectory("sub");
+    assert(sub);
+    assert(Read(sub->GetFile("base.dat")) == "base-only");
+    assert(Read(sub->GetFile("update.dat")) == "update-only");
+    assert(exec_content.AddOns().size() == 2);
+    assert(exec_content.AddOns()[0].package_index == 3);
+    assert(exec_content.AddOns()[1].package_index == 4);
+    assert(exec_content.AddOns()[0].title_id != exec_content.AddOns()[1].title_id);
+    assert(Read(exec_content.AddOns()[0].romfs->GetFile("addon.dat")) == "addon-one");
+    assert(Read(exec_content.AddOns()[1].romfs->GetFile("addon.dat")) == "addon-two");
+    assert(!effective_tree->GetFile("addon.dat"));
+    // ExeFS handles remain valid after dropping the owning ContentSet/Mount.
+    auto still_readable = exefs->GetFile("main");
+    exefs.reset();
+    playable_mount.reset();
+    assert(Read(still_readable) == "latest-main");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
