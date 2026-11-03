@@ -174,4 +174,10 @@ Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin
 - [CI #41589275490](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41589275490) **réussie** : sources `romfs.cpp`, `fsmitm_romfsbuild.cpp`, `vfs_concat.cpp`, `vfs_vector.cpp` et `vfs_offset.cpp` récupérées au gitlink vendor et compilées sur hôte. En-tête, chemins, base+update, DLC et extraction inverse validés contre un décodeur indépendant. Seules les classes VFS abstraites et les extensions IPS non utilisées sont simulées.
 - La compilation de l'interface AoC ci-dessus reproduit aussi cette étape dans la [CI #41590084963](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41590084963), réussie. Aucun lien GPU, firmware ou noyau PS5 n'est déduit de cette réussite.
 
+### Reconnaissance par signature — prête, non activée
+
+- `Native::HasNupV1Header` réalise un sondage bon marché sur le superbloc `NUP v1`, la version, les longueurs TOC et la taille du fichier. L'extension du chemin n'est jamais une autorité. Le sondage ne lit ni clés ni ROM complète.
+- Les tests synthétiques couvrent un NUP bien formé, un faux en-tête, une taille annoncée corrompue et un conteneur portant une mise à jour d'un autre titre : ce dernier a un en-tête reconnaissable mais `Mount::Open` continue de le rejeter. [CI #41590746472](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41590746472) **réussie**. Commits [34fd714](https://github.com/niakw/ProsperoEden-Encore/commit/34fd714da843b933144be4377dfef933d9b616e3), [e7aebf4](https://github.com/niakw/ProsperoEden-Encore/commit/e7aebf4a76a1020b3306810b5d161c9ac4d23192) et [0982ecf](https://github.com/niakw/ProsperoEden-Encore/commit/0982ecf2c0438600ffe242ca2a06981a14c07652).
+- **Pas de branchement au catalogue, ni au `FileType` commun, ni au chargeur actif** : cette API préparatoire n'expose pas de format expérimental à l'utilisateur et n'affecte pas les formats NS1 existants.
+
 **Limite actuelle : NUP n'est PAS lancé par Encore.** Les contrôles ajoutés sont un prérequis sûr, pas un port complet. P2.2/Vulkan continue indépendamment. Ne fermer aucun jalon GPU ou loader sur une simple réussite du préflight.
