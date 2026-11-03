@@ -377,6 +377,46 @@ int main() {
     memory.accessible_bytes=12;
     assert(!env.BuildResourcePlan(shader_info));
     memory.accessible_bytes=32;
+    // P2.3: the real shared SPIR-V backend already implements 64-bit global
+    // loads and stores by selecting reflected NVN storage-buffer records.
+    // The native QMD plan may now admit this authentic subset (no invented
+    // size or descriptor array); Vulkan separately checks device alignment.
+    {
+        auto global = shader_info;
+        global.uses_global_memory = true;
+        global.stores_global_memory = true;
+        global.nvn_buffer_used.set(0);
+        const auto gp = env.BuildResourcePlan(global);
+        assert(gp && gp->uses_global_memory && gp->global_layout_resolved);
+        assert(gp->HasResolvedBufferBindings());
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 64));
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 256));
+        auto bad = *gp;
+        bad.storage_buffers[0].gpu_address += 4;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, bad, 64));
+        bad = *gp;
+        bad.global_layout_resolved = false;
+        assert(!bad.HasResolvedGpuBufferBindings());
+        assert(!gp->SameBufferBindings(bad));
+        auto no_use = global;
+        no_use.nvn_buffer_used.reset();
+        assert(!env.BuildResourcePlan(no_use));
+        auto unbounded = global;
+        memory.words[3] = 1; // unknown-size tag
+        assert(!env.BuildResourcePlan(unbounded));
+        memory.words[3] = 0;
+        auto stores_only = global;
+        stores_only.uses_global_memory = false;
+        assert(!env.BuildResourcePlan(stores_only));
+        auto array = global;
+        array.storage_buffers_descriptors[0].count = 2;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(array, *gp, 64));
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 0));
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(global, *gp, 3));
+        // Ordinary NS1 and non-global NS2 shaders never enter this new gate.
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            shader_info, *plan, 1));
+    }
     // P2.2: reflected TIC/TSC handle words must be read from the native QMD
     // CBUF, in the shared cache descriptor order. This is NOT an image binding.
     {
