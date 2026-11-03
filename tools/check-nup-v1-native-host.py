@@ -30,6 +30,7 @@ def main():
             str(ROOT / "headless/nup_v1_vfs.cpp"),
             str(ROOT / "headless/nup_v1_native_vfs.cpp"),
             str(ROOT / "headless/nup_v1_native_content.cpp"),
+            str(ROOT / "headless/nup_v1_native_loader.cpp"),
             str(ROOT / "tools/nup-v1-native-host.cpp"),
             "-lcrypto", "-lzstd", "-pthread", "-o", str(binary)
         ], check=True)
