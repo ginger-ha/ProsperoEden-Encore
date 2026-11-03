@@ -141,6 +141,15 @@ def build(packages: list[dict]) -> bytes:
     return bytes(header + toc + blobs)
 
 
+def localized(records: list[tuple[str, bytes]]) -> bytes:
+    out = bytearray()
+    for language, data in records:
+        encoded = language.encode("ascii")
+        assert 0 < len(encoded) <= 35
+        out += bytes([len(encoded)]) + encoded + struct.pack("<I", len(data)) + data
+    return bytes(out)
+
+
 def executable_fixture() -> bytes:
     title = 0x0100123400000000
     return build([
@@ -150,6 +159,13 @@ def executable_fixture() -> bytes:
              0x0004: b"3.0.0",
              0x0005: b"Demo / Game",
              0x0006: b"Example Publisher",
+             0x0009: localized([
+                 ("en-us", b"Demo Game (US)"),
+                 ("fr", "Démo / Jeu".encode("utf-8")),
+             ]),
+             0x000A: localized([
+                 ("fr", bytes.fromhex("89504e470d0a1a0a") + b"synthetic-png"),
+             ]),
              0x8000: b"unknown-type-is-ignored",
          },
          "files": {
@@ -231,4 +247,17 @@ def bad_metadata_fixture() -> bytes:
         {"title_id": title, "version": 1, "kind": 0,
          "metadata": {0x0005: b"\xC0\xAF"},
          "files": {"romfs/state.bin": b"metadata-error"}},
+    ])
+
+
+def duplicate_locale_fixture() -> bytes:
+    """Case-insensitive duplicate BCP-47 tags must not be silently merged."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "metadata": {0x0009: localized([
+             ("fr", b"First"),
+             ("FR", b"Duplicate"),
+         ])},
+         "files": {"romfs/state.bin": b"duplicate-locale"}},
     ])
