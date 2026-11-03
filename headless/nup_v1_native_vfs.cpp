@@ -2,6 +2,7 @@
 #include "nup_v1_native_vfs.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <mutex>
@@ -13,6 +14,37 @@
 #include "core/file_sys/vfs/vfs.h"
 
 namespace Eden::NupV1::Native {
+
+bool HasNupV1Header(const FileSys::VirtualFile& source) {
+    if (!source || !source->IsReadable() || source->GetSize() < 0x80)
+        return false;
+    std::array<u8, 0x80> header{};
+    if (source->Read(header.data(), header.size(), 0) != header.size())
+        return false;
+    const auto le16 = [&](std::size_t off) -> std::uint64_t {
+        return std::uint64_t(header[off]) | (std::uint64_t(header[off + 1]) << 8);
+    };
+    const auto le64 = [&](std::size_t off) -> std::uint64_t {
+        std::uint64_t value{};
+        for (std::size_t i = 0; i < 8; ++i)
+            value |= std::uint64_t(header[off + i]) << (8 * i);
+        return value;
+    };
+    const auto toc_size = le64(0x10);
+    const auto blob_offset = le64(0x38);
+    const auto actual_size = std::uint64_t(source->GetSize());
+    return header[0] == 'N' && header[1] == 'U' &&
+           header[2] == 'P' && header[3] == 1 &&
+           le16(4) == 0x80 && le16(6) == 1 &&
+           le64(8) == 0x80 && toc_size > 0 &&
+           toc_size <= 64ULL * 1024 * 1024 &&
+           toc_size <= actual_size - 0x80 &&
+           blob_offset >= 0x80 + toc_size &&
+           blob_offset <= actual_size &&
+           blob_offset % 16 == 0 &&
+           le64(0x40) == actual_size;
+}
+
 namespace {
 class NativeSource final : public Eden::NupV1::Source {
 public:
