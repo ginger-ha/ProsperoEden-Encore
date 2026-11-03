@@ -797,7 +797,8 @@ void Launcher::apply_games(std::vector<Game> games)
     // the selection follows its game.
     bool same = games_loaded_ && games.size() == games_.size();
     for (std::size_t i = 0; same && i < games.size(); ++i)
-        same = games[i].file == games_[i].file;
+        same = games[i].file == games_[i].file &&
+               games[i].title_id == games_[i].title_id;
     const std::string selected = library_.selected >= 0 &&
                                  library_.selected < static_cast<int>(games_.size()) ?
                                      games_[static_cast<std::size_t>(library_.selected)].file :
@@ -855,8 +856,13 @@ void Launcher::apply_games(std::vector<Game> games)
             games_[static_cast<std::size_t>(library_.selected)].mods_enabled;
     games_ = std::move(games);
     games_loaded_ = true;
-    library_back_focused_ = false;
-    library_back_zoom_ = false;
+    // Keep the player's jacket inspection during a same-identity metadata
+    // or preferences refresh. A different file/TitleID or a reordered list
+    // resets the viewer so it cannot show a stale game's rear artwork.
+    if (!same) {
+        library_back_focused_ = false;
+        library_back_zoom_ = false;
+    }
     // Even if file order stayed identical, a preferences refresh may
     // have changed the selected game's effective docked mode.
     if (same && library_.selected >= 0 &&
