@@ -24,8 +24,12 @@ glyphs = source.split("int eden_game_glyph_display_version(", 1)[1].split("\nint
 languages = source.split("int eden_game_language(", 1)[1].split("\nint eden_game_addons(", 1)[0]
 addons = source.split("int eden_game_addons(", 1)[1].split("\nnamespace {", 1)[0]
 assert "const std::lock_guard scan_job_guard{ScanAddOnsJobMutex()};" in scan
-assert "ScannedAddOns().swap(scanned);" in scan
-assert "UpdatesScanCompleted() = complete;" in scan
+assert "AddOnScanTransaction publication(scanned);" in scan
+assert "publication.Commit();" in scan
+assert "ScannedAddOns().clear();" not in scan
+assert "ScannedAddOns().swap(candidate_);" in registry_source
+assert "UpdatesScanCompleted() = true;" in registry_source
+assert "~AddOnScanTransaction()" in registry_source
 assert "const std::lock_guard lock{ScannedAddOnsMutex()};" in glyphs
 assert "const std::lock_guard lock{ScannedAddOnsMutex()};" in languages
 assert "const std::lock_guard lock{ScannedAddOnsMutex()};" in addons
@@ -68,21 +72,24 @@ int main() {
         start.store(true, std::memory_order_release);
         for (unsigned i = 1; i <= 3000; ++i) {
             const std::lock_guard scan_job_guard{ScanAddOnsJobMutex()};
-            // In-progress readers must never see partial entries.
-            {
-                const std::lock_guard lock{ScannedAddOnsMutex()};
-                ScannedAddOns().clear();
-                UpdatesScanCompleted() = false;
-            }
+            // Keep the last complete snapshot visible until publication.
+            // Every 73rd scan simulates a failed provider read: the old
+            // map remains allocated but completion is invalidated, so
+            // readers never consume stale or partially prepared entries.
             std::map<std::uint64_t, AddOns> pending;
             AddOns entry{};
             entry.update_present = true;
             entry.update = "v" + std::to_string(i);
             pending.emplace(i, std::move(entry));
             {
-                const std::lock_guard lock{ScannedAddOnsMutex()};
-                ScannedAddOns().swap(pending);
-                UpdatesScanCompleted() = true;
+                AddOnScanTransaction publication(pending);
+                if (i % 73 != 0) {
+                    publication.Commit();
+                } else {
+                    const std::lock_guard lock{ScannedAddOnsMutex()};
+                    assert(ScannedAddOns().size() == 1);
+                    assert(ScannedAddOns().begin()->first == i - 1);
+                }
             }
             if ((i & 31) == 0) std::this_thread::yield();
         }
