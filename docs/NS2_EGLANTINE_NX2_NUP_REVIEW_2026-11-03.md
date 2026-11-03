@@ -46,12 +46,16 @@ La spec décrit une archive de dumps **déjà déchiffrés**, indifférente à l
 
 Déjà livré sans risque d'interférence :
 - `tools/check-nup-v1-host.py` : vérification de structure/TOC, chemins/offsets, packages, UUID. Les tests injectent cinq corruptions. Ne vérifie **pas** les hash SHA-256 des fichiers décompressés et ne lance aucun logiciel invité.
+- `tools/check-nup-v1-payload-host.py` : vérification hôte du hash des **membres** raw/zstd, lecture par blocs de 1 Mio, fenêtre zstd bornée (64 Mio), refus des frames surnuméraires, extents chevauchants, incohérences de déduplication et TLV hors limites. Les extents parfaitement partagés sont vérifiés une seule fois.
+- Contrôles structurels additionnels : refus des cycles de répertoires et des flags incohérents pour les mises à jour autonomes. Les arbres mal formés ne peuvent pas être considérés comme valides pour un futur montage VFS.
+- CI hôte avec structure **et** intégrité des payloads validée le 3 novembre : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41557420412 (une CI plus récente couvre les cas de déduplication).
 - `.github/workflows/nup-v1-host.yml` : exécute `--self-test` sur hôte. Run **réussi** : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41555437627
 - Commits : https://github.com/niakw/ProsperoEden-Encore/commit/4cab01fa96f9cd960d3ba6bde1c22e9ce4c399f6 et https://github.com/niakw/ProsperoEden-Encore/commit/a07225c4ce3e7b0caaeab059916e000022699e7e
 
 Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin incomplet :
 
 1. Un VFS NUP v1 avec validation intégrale TOC/régions/noeuds/chemins/TLV, lecture raw et zstd paresseuse et bornée, hash par fichier et protections contre décompression excessive.
+   - Le préflight hôte de ces invariants est avancé, mais **aucun VFS C++ n'est intégré** au moteur et aucune image PS5 n'a été qualifiée pour NUP.
 2. Un chargeur commun NS1/NS2 qui expose ExeFS + RomFS et overlays base/mise à jour de manière déterministe; gestion de plusieurs updates et des index de DLC via le mécanisme AoC déjà maintenu, sans double application des patches.
 3. Détection par **signature** avant tout fallback d'extension, reconnaissance catalogue uniquement lorsque le chargeur accepte réellement le format; ne pas annoncer NUP jouable sur le frontend prématurément.
 4. Wiring dans le CMake réel, dans tous les sélecteurs de source NS1/NS2 et la table `FileType`/erreurs, en conservant NSP/XCI/NSZ/XCZ/extracted et le loader NSO PS5 16 KiB.
