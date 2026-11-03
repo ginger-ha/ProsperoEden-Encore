@@ -7,6 +7,7 @@ import importlib.util
 import os
 from pathlib import Path
 import subprocess
+import struct
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,6 +25,49 @@ def payload_tools():
 def expected(data: bytes) -> str:
     width = min(len(data), 64)
     return f"size={len(data)} first={data[:width].hex()} last={data[-width:].hex()}"
+
+
+def layered_fixture(*, duplicate_version: bool = False) -> bytes:
+    """Base plus two full update snapshots in deliberately non-version order."""
+    bad = 0xFFFFFFFF
+    title = 0x0100123400000000
+    packages = (
+        (title, 1, 0, b"base-v1"),
+        (title + 0x800, 3, 1, b"latest-v3"),
+        (title + 0x800, 3 if duplicate_version else 2, 1, b"older-v2"),
+    )
+    toc = bytearray(0x2A0)
+    names = b"romfsstate.bin"
+    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\\x01",
+                     len(packages), 6, 3, 0x288, len(names), 0)
+    blob = bytearray()
+    absolute = 0x320
+    signature = bytearray()
+    for i, (title_id, version, kind, data) in enumerate(packages):
+        p = 0x30 + 0x40 * i
+        struct.pack_into("<QIIII", toc, p, title_id, 2 * i, bad, 2 * i + 1, version)
+        toc[p + 0x18] = kind
+        signature.extend(struct.pack("<QIB", title_id, version, kind))
+        d = 0xF0 + i * 2 * 0x18
+        struct.pack_into("<IIIIQ", toc, d, 0, 0, 2 * i, 1, 0)
+        struct.pack_into("<IIIIQ", toc, d + 0x18, 0, 5, 2 * i + 1, 1, 0)
+        struct.pack_into("<II", toc, 0x270 + i * 8, 2 * i + 1, 6 + i)
+        aligned = (absolute + 15) & ~15
+        blob.extend(bytes(aligned - absolute))
+        absolute = aligned
+        f = 0x180 + i * 0x50
+        struct.pack_into("<IIQQQ", toc, f, 5, 9, len(data), absolute, len(data))
+        toc[f + 0x20:f + 0x40] = hashlib.sha256(data).digest()
+        blob.extend(data)
+        absolute += len(data)
+    toc[0x288:0x288 + len(names)] = names
+    header = bytearray(0x80)
+    header[:4] = b"NUP\\x01"
+    struct.pack_into("<HHQQ", header, 4, 0x80, 1, 0x80, len(toc))
+    header[0x18:0x38] = hashlib.sha256(toc).digest()
+    struct.pack_into("<QQII", header, 0x38, 0x320, absolute, len(packages), 0)
+    header[0x50:0x60] = hashlib.sha256(signature).digest()[:16]
+    return bytes(header + toc + blob)
 
 
 def main() -> None:
@@ -75,6 +119,13 @@ def main() -> None:
         execute(fixtures.fixture(1, compressed,
                                  extra=fixtures.Zstd().compress_fixture(b"second")),
                 "proof.bin", None)
+        layered = layered_fixture()
+        execute(layered, "@base/romfs/state.bin", b"base-v1")
+        execute(layered, "@update1/romfs/state.bin", b"latest-v3")
+        execute(layered, "@update2/romfs/state.bin", b"older-v2")
+        execute(layered, "@effective/romfs/state.bin", b"latest-v3")
+        execute(layered_fixture(duplicate_version=True),
+                "@effective/romfs/state.bin", None)
         print(f"NUP C++ read-only VFS: {valid} valid / {rejected} malformed cases passed")
 
 
