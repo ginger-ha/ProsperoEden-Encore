@@ -409,6 +409,14 @@ def main() -> int:
         native_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_shader_capture.cpp").read_text()
         native_capture_core = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/capture.cpp").read_text()
         native_capture_fixture = (ROOT / "tools/ns2/test_ampere_gpu_capture.cpp").read_text()
+        native_branch_tables = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/program_capture.h").read_text()
+        require("opcode == 0x949 || opcode == 0x958" in native_capture_core and
+                "if (bank >= 18 || (offset & 3U) ||" in native_branch_tables and
+                "offset > 0x10000U - entries * sizeof(u32)" in native_branch_tables and
+                "indirect_uniform.status==NativeCaptureStatus::UnresolvedIndirectBranch" in native_capture_fixture and
+                "table[0].cbuf_offset==0xffc0U" in native_capture_fixture and
+                "TrackCaptureIndirectBranches(motif).empty()" in native_capture_fixture,
+                "Native BRX/BRXU must never publish unresolved targets or probe CBUF past 64 KiB")
         require("const auto checked_read = " in native_capture_core and
                 "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and
                 "checked_read(addr, page.data(), aligned_batch)" in native_capture_core and

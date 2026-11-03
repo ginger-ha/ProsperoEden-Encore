@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <vector>
 #include "shader_recompiler/frontend/ampere/capture.h"
+#include "shader_recompiler/frontend/ampere/program_capture.h"
 #include "shader_recompiler/stage.h"
 
 using namespace Shader::Ampere;
@@ -153,6 +154,39 @@ int main() {
             indirect.first_error_offset==0x80 &&
             indirect.image.code.empty(),
             "BRX must not become a valid image without target-table resolution");
+    mem.data.resize(0x80);
+    Push(mem.data,pred_true|0x958); // Uniform BRXU is indirect too.
+    Push(mem.data,pred_true|0x94d,0,exit_true);
+    mem.mapped_bytes=mem.data.size();
+    const auto indirect_uniform=CaptureNativeGraphicsShader(mem.base,4,Read,&mem);
+    Require(indirect_uniform.status==NativeCaptureStatus::UnresolvedIndirectBranch &&
+            indirect_uniform.first_error_offset==0x80 &&
+            indirect_uniform.image.code.empty(),
+            "BRXU must not publish an untracked native-PC shader");
+
+    // The existing native-PC jump-table recognizer is useful only as a
+    // preflight; the CBUF words still require a native->Maxwell address
+    // transform and shader-visible value remap before a BRX can execute.
+    // Validate the last possible 16-entry U32 table and reject wrap/invalid
+    // banks without performing any guest CBUF reads.
+    std::vector<Instruction> motif{
+        Instruction{{pred_true|0x817U|(4U<<16),15U,0x03800000U,0}},
+        Instruction{{pred_true|0x819U|(5U<<16)|(4U<<24),2U,0x000006ffU,0}},
+        Instruction{{pred_true|0xb82U|(6U<<16)|(5U<<24),
+                     (7U<<22)|(0xffc0U<<6),0x00000800U,0}},
+        Instruction{{pred_true|0x949U|(6U<<24),0xffffffc0U,0x0383ffffU,0}},
+    };
+    auto table=TrackCaptureIndirectBranches(motif);
+    Require(table.size()==1 && table[0].index==3 &&
+            table[0].cbuf_index==7 && table[0].cbuf_offset==0xffc0U &&
+            table[0].entries==16,
+            "BRX table ending at 64-KiB CBUF boundary is valid metadata");
+    motif[2].words[1]=(7U<<22)|(0xffc4U<<6);
+    Require(TrackCaptureIndirectBranches(motif).empty(),
+            "BRX table crossing 64-KiB CBUF boundary must not be read");
+    motif[2].words[1]=(18U<<22)|(0xffc0U<<6);
+    Require(TrackCaptureIndirectBranches(motif).empty(),
+            "BRX CBUF bank outside 18 reflected shader banks rejected");
     mem.data.resize(0x80);
     Push(mem.data,pred_true|0xfff);
     Push(mem.data,pred_true|0x94d,0,exit_true);
