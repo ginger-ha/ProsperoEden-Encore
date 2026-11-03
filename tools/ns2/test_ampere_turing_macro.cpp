@@ -96,6 +96,50 @@ int main(){
            emitted.front().second==23);
     assert(!state.Execute(0xe01,std::span<const W>{fifo},read,emit).success);
     assert(!state.Execute(0xe02,std::span<const W>{fifo},read,emit).success);
+
+    // P2.4: macro writes must be atomic at the GPU-method boundary.
+    // A later invalid output cannot dispatch an earlier valid PCAS/draw.
+    Tegra::NativeAmpereMacroState atomic;
+    code.clear();
+    Append(code,Insn(0x230,0xAAAA,false,false));
+    Append(code,Insn(0x10,0xBBBB,false,true)); // invalid 3D method after valid emit
+    Append(code,Insn(0,0,false,false,false));
+    assert(atomic.SetCodePointer(0));
+    for(W w:code) assert(atomic.PushCode(w));
+    assert(atomic.SetPositionPointer(0) && atomic.BindPosition(0));
+    std::vector<std::pair<W,W>> committed;
+    const auto allowed=[](W addr,W){return addr>=0x40 && addr<0xe00;};
+    const auto commit=[&](W addr,W val){committed.emplace_back(addr,val);};
+    const auto valid=[](){return true;};
+    result=atomic.ExecuteStaged(0xe00,std::span<const W>{},read,allowed,commit,valid);
+    assert(!result.success && committed.empty());
+    // With BOTH outputs admissible, preserve the exact emission order.
+    const auto allow_all=[](W addr,W){return addr<0xe00;};
+    result=atomic.ExecuteStaged(0xe00,std::span<const W>{},read,allow_all,commit,valid);
+    assert(result.success && committed.size()==2);
+    assert(committed[0]==std::pair<W,W>(0x230,0xAAAA));
+    assert(committed[1]==std::pair<W,W>(0x10,0xBBBB));
+    committed.clear();
+    // A late invalid native register read must not publish an earlier
+    // perfectly valid method, even if the interpreter itself returns true.
+    Tegra::NativeAmpereMacroState late_read;
+    code.clear();
+    Append(code,Insn(0x230,0x1234,false,false));
+    Append(code,RegisterReadInsn(0x4000));
+    Append(code,Insn(0,0,false,false,false));
+    assert(late_read.SetCodePointer(0));
+    for(W w:code) assert(late_read.PushCode(w));
+    assert(late_read.SetPositionPointer(0) && late_read.BindPosition(0));
+    bool bad_native_read=false;
+    const auto read_checked=[&](W index)->W {
+        if(index>=0x1000){bad_native_read=true;return 0;}
+        return index;
+    };
+    result=late_read.ExecuteStaged(
+        0xe00,std::span<const W>{},read_checked,allow_all,commit,
+        [&]{return !bad_native_read;});
+    assert(!result.success && bad_native_read && committed.empty());
+
     std::vector<W> oversized(Tegra::NativeAmpereMacroState::MaxFifo+1,3);
     auto too_many=state.Execute(0xe00,std::span<const W>{oversized},read,emit);
     assert(!too_many.success &&
