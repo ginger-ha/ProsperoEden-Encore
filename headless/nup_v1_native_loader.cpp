@@ -45,17 +45,34 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     }
 
     std::optional<std::uint64_t> aoc_base;
+    constexpr auto aoc_offset = offsetof(FileSys::RawNACP, dlc_base_title_id);
+    static_assert(sizeof(FileSys::RawNACP) == 0x4000);
+    static_assert(aoc_offset == 0x3070, "vendor RawNACP AoC base field ABI drift");
+    static_assert(aoc_offset + sizeof(std::uint64_t) <= sizeof(FileSys::RawNACP));
+
+    const std::vector<std::uint8_t>* nacp_data = nullptr;
     if (const auto* metadata = loader->mount_->ApplicationMetadata();
         metadata && metadata->control_nacp.size() == sizeof(FileSys::RawNACP)) {
-        // Use the exact pinned vendor layout. Avoid decoding a guessed NS2
-        // title-ID offset: NACP is the source of truth for DLC families.
-        constexpr auto offset = offsetof(FileSys::RawNACP, dlc_base_title_id);
-        static_assert(sizeof(FileSys::RawNACP) == 0x4000);
-        static_assert(offset == 0x3070, "vendor RawNACP AoC base field ABI drift");
-        static_assert(offset + sizeof(std::uint64_t) <= sizeof(FileSys::RawNACP));
+        nacp_data = &metadata->control_nacp; // TLV wins over extracted tree
+    }
+    std::vector<std::uint8_t> extracted_nacp;
+    if (!nacp_data) {
+        // Extracted base/update content is also a legitimate NUP source.
+        // Use the effective ExeFS control.nacp when the optional TLV is absent.
+        const auto exefs = loader->content_->ExeFS();
+        const auto control = exefs ? exefs->GetFile("control.nacp") : nullptr;
+        if (control && control->GetSize() == sizeof(FileSys::RawNACP)) {
+            extracted_nacp.resize(sizeof(FileSys::RawNACP));
+            if (control->Read(extracted_nacp.data(), extracted_nacp.size(), 0) ==
+                extracted_nacp.size()) {
+                nacp_data = &extracted_nacp;
+            }
+        }
+    }
+    if (nacp_data) {
         std::uint64_t raw_id{};
         for (std::size_t i = 0; i < sizeof(std::uint64_t); ++i)
-            raw_id |= std::uint64_t(metadata->control_nacp[offset + i]) << (8 * i);
+            raw_id |= std::uint64_t((*nacp_data)[aoc_offset + i]) << (8 * i);
         if (raw_id != 0) aoc_base = raw_id;
     }
     // Recreate the selection only after the actual NPDM establishes the
