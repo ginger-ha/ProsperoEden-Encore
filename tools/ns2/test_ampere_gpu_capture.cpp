@@ -240,6 +240,18 @@ int main() {
                 captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
             "BRX table with invalid CBUF bank must not map");
     captured_table.tables[0].cbuf_index=7;
+    // Lowering may leave two distinct native instructions at the same
+    // emitted address. Such an image can be structurally valid for linear
+    // translation, but may never be used as an indirect branch target map.
+    auto aliased_image=ok.image;
+    const std::size_t map_count=static_cast<std::size_t>(
+        aliased_image.code[aliased_image.code.size()-2]);
+    const std::size_t map_start=aliased_image.code.size()-map_count-2;
+    aliased_image.code[map_start+1]=aliased_image.code[map_start];
+    Require(aliased_image.ValidForCompiler() &&
+            !TranslateCaptureIndirectTargets(
+                captured_table,aliased_image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "two distinct native BRX targets must not alias one Maxwell PC");
     captured_table.tables.push_back(captured_table.tables[0]);
     Require(!TranslateCaptureIndirectTargets(
                 captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),

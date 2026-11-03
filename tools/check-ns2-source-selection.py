@@ -415,7 +415,11 @@ def main() -> int:
                 "offset > 0x10000U - entries * sizeof(u32)" in native_branch_tables and
                 "indirect_uniform.status==NativeCaptureStatus::UnresolvedIndirectBranch" in native_capture_fixture and
                 "table[0].cbuf_offset==0xffc0U" in native_capture_fixture and
-                "TrackCaptureIndirectBranches(motif).empty()" in native_capture_fixture,
+                "TrackCaptureIndirectBranches(motif).empty()" in native_capture_fixture and
+                "TranslateCaptureIndirectTargets" in native_branch_tables and
+                "prior.native_code_offset != native_offset" in native_branch_tables and
+                "mapped_header_table->front().entries" in native_capture_fixture and
+                "aliased_image.ValidForCompiler()" in native_capture_fixture,
                 "Native BRX/BRXU must never publish unresolved targets or probe CBUF past 64 KiB")
         require("const auto checked_read = " in native_capture_core and
                 "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and
