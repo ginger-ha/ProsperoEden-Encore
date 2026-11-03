@@ -396,6 +396,19 @@ int main() {
         malformed.uses_global_memory = true;
         assert(!malformed.HasResolvedGpuBufferBindings());
         malformed = *tp;
+        malformed.uniform_buffers[0].gpu_address = 0;
+        assert(!malformed.HasResolvedGpuBufferBindings());
+        unsigned null_address_reads{};
+        assert(!malformed.ValidateGpuBufferMappings(
+            [&](u64, u32) { ++null_address_reads; return true; }));
+        assert(null_address_reads == 0);
+        malformed = *tp;
+        malformed.storage_buffers[0].gpu_address = 0;
+        assert(!malformed.HasResolvedGpuBufferBindings());
+        assert(!malformed.ValidateGpuBufferMappings(
+            [&](u64, u32) { ++null_address_reads; return true; }));
+        assert(null_address_reads == 0);
+        malformed = *tp;
         malformed.uniform_buffers[0].gpu_address = (u64{1} << 49) - 8;
         assert(!malformed.ValidateGpuBufferMappings(
             [](u64, u32) { return true; }));

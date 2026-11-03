@@ -408,6 +408,9 @@ for path in (
     assert bridge.index("ValidateGpuBufferMappings(") < bridge.index(
         "NativeQmdContiguousGpuSpan("), path
     assert "return false; // no unbacked image/sampler descriptor publication" in bridge, path
+assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
+    "null QMD CBUF address must fail before any GPU mapping callback"
+)
 assert "HasResolvedGpuBufferBindings() const noexcept" in native_env, (
     "image shader CBUF/SSBO backing policy missing"
 )
