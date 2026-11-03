@@ -184,3 +184,15 @@ def mismatched_npdm_fixture() -> bytes:
             "romfs/state.bin": b"data",
         }},
     ])
+
+
+def sibling_npdm_fixture() -> bytes:
+    """NPDM program index differs although the family/base ID is identical."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0, "files": {
+            "exefs/main": b"synthetic-main",
+            "exefs/main.npdm": b"sibling-npdm",
+            "romfs/state.bin": b"data",
+        }},
+    ])
