@@ -391,6 +391,14 @@ print("NS2_CACHE_CHANNEL_LEASE_PASS upstream=pristine native=thread_local")
 generic_fence = (vendor / "sources/eden/src/video_core/fence_manager.h").read_text()
 assert "if (!delay_fence) {" in generic_fence
 assert "func();" in generic_fence
+assert "HasResolvedGpuBufferBindings() const noexcept" in native_env, (
+    "image shader CBUF/SSBO backing policy missing"
+)
+assert "ValidateGpuBufferMappings(IsMapped&& mapped) const" in native_env
+assert "return !requires_tic_tsc && HasResolvedGpuBufferBindings();" in native_env
+assert "return !requires_tic_tsc &&" in native_env, (
+    "buffer-only pipeline must never accept images before Vulkan lease"
+)
 assert "RetainNativeComputeUntilGpuTick(" in native_env
 assert "tick = scheduler.Flush();" in native_env
 assert "try { scheduler.Finish(); } catch (...) {}" in native_env, (

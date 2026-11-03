@@ -375,6 +375,33 @@ int main() {
                tp->image_handles[0].primary_word == 0x12345000U &&
                tp->image_handles[1].primary_word == 0x10000U &&
                !tp->HasResolvedBufferBindings());
+        // P2.2b proves all CBUF/SSBO spans even when TIC/TSC images
+        // are present, without opening the buffer-only Vulkan dispatch.
+        assert(tp->HasResolvedGpuBufferBindings());
+        unsigned admitted_spans{};
+        const auto image_spans = [&](u64 addr, u32 bytes) {
+            ++admitted_spans;
+            return (addr == memory.address && bytes == 16) ||
+                   (addr == 0x1000012345000ULL && bytes == 0x40);
+        };
+        assert(tp->ValidateGpuBufferMappings(image_spans));
+        assert(admitted_spans == 2);
+        assert(!tp->ValidateGpuMappings(image_spans));
+        assert(admitted_spans == 2); // no image descriptor may reach Vulkan
+        auto malformed = *tp;
+        malformed.requires_memory_layout = true;
+        assert(!malformed.HasResolvedGpuBufferBindings());
+        assert(!malformed.ValidateGpuBufferMappings(image_spans));
+        malformed = *tp;
+        malformed.uses_global_memory = true;
+        assert(!malformed.HasResolvedGpuBufferBindings());
+        malformed = *tp;
+        malformed.uniform_buffers[0].gpu_address = (u64{1} << 49) - 8;
+        assert(!malformed.ValidateGpuBufferMappings(
+            [](u64, u32) { return true; }));
+        malformed = *tp;
+        malformed.storage_buffers[0].known_size = false;
+        assert(!malformed.ValidateGpuBufferMappings(image_spans));
         // Real TIC/TSC entries are 32-byte guest records, not Vulkan views.
         {
             using Shader::Ampere::NativeQmdTextureTables;
