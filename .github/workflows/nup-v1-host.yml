@@ -20,6 +20,8 @@ on:
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
       - headless/CMakeLists.txt
+      - headless/nup_v1_runtime.cmake
+      - tools/check-nup-v1-runtime-cmake.py
       - tools/nup-v1-native-host.cpp
       - tools/nup-v1-real-romfs-host.cpp
       - tools/check-nup-v1-real-romfs-host.py
@@ -46,6 +48,8 @@ on:
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
       - headless/CMakeLists.txt
+      - headless/nup_v1_runtime.cmake
+      - tools/check-nup-v1-runtime-cmake.py
       - tools/nup-v1-native-host.cpp
       - tools/nup-v1-real-romfs-host.cpp
       - tools/check-nup-v1-real-romfs-host.py
@@ -86,3 +90,5 @@ jobs:
         run: python3 tools/check-nup-v1-native-abi.py
       - name: Build actual pinned vendor RomFS tables from synthetic NUP trees
         run: python3 tools/check-nup-v1-real-romfs-host.py
+      - name: Configure-only P5 NUP loader gate (no console build)
+        run: python3 tools/check-nup-v1-runtime-cmake.py
