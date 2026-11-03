@@ -308,6 +308,36 @@ Loader::ResultStatus NupAppLoader::ReadTitle(std::string& out_title) {
                              : Loader::ResultStatus::ErrorNoControl;
 }
 
+Loader::ResultStatus NupAppLoader::ReadLocalizedTitle(
+    std::string& out_title, std::string_view language) {
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
+    if (const auto* metadata = mount_->ApplicationMetadata()) {
+        const auto translated = metadata->TitleFor(language);
+        if (!translated.empty()) {
+            out_title = std::string(translated);
+            return Loader::ResultStatus::Success;
+        }
+    }
+    return ReadTitle(out_title);
+}
+
+Loader::ResultStatus NupAppLoader::ReadLocalizedIcon(
+    std::vector<u8>& out_icon, std::string_view language) {
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
+    if (const auto* metadata = mount_->ApplicationMetadata()) {
+        if (const auto* cover = metadata->IconFor(language);
+            cover && !cover->empty()) {
+            out_icon = *cover;
+            return Loader::ResultStatus::Success;
+        }
+    }
+    return ReadIcon(out_icon);
+}
+
 Loader::ResultStatus NupAppLoader::ReadNSOModules(Modules& out_modules) {
     u64 program_id{};
     const auto status = ValidateProgramIdentity(program_id);
