@@ -53,9 +53,11 @@ def main():
         foreign_npdm.write_bytes(content_module.mismatched_npdm_fixture())
         sibling_npdm = temp / "sibling-npdm.nup"
         sibling_npdm.write_bytes(content_module.sibling_npdm_fixture())
+        malformed_meta = temp / "malformed-meta.nup"
+        malformed_meta.write_bytes(content_module.bad_metadata_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
-                        str(sibling_npdm)], check=True)
+                        str(sibling_npdm), str(malformed_meta)], check=True)
 
 if __name__ == "__main__":
     main()
