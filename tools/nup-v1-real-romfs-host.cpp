@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Binary RomFS test using the *actual pinned vendor* RomFSBuildContext.
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
@@ -38,6 +39,11 @@ public:
     }
     std::size_t Write(const u8*, std::size_t, std::size_t) override { return 0; }
     bool Rename(std::string_view) override { return false; }
+    void Corrupt(std::string_view value) {
+        auto it = std::search(bytes_.begin(), bytes_.end(), value.begin(), value.end());
+        assert(it != bytes_.end());
+        *it ^= 1;
+    }
 private:
     std::vector<u8> bytes_;
 };
@@ -200,5 +206,21 @@ int main(int argc, char** argv) {
     assert(!content.CreateAddOnRomFS(3)); // older DLC revision
     assert(!content.CreateAddOnRomFS(6)); // unrelated title
 
-    std::cout << "Real vendor RomFSBuildContext: base/updates/nested/DLC binaries OK\n";
+    // The authentic vendor builder produces a lazy table-to-file mapping.
+    // Even after a successful read, the native NUP source must NOT cache
+    // an integrity verdict for mutable underlying bytes.
+    const auto header = ReadAt(base, 0, 0x50);
+    const auto data_offset = Read64(header, 0x48);
+    assert(data_offset == 0x200);
+    input->Corrupt("latest-v3");
+    std::array<u8, 8> rejected{};
+    rejected.fill(0xa5);
+    assert(base->Read(rejected.data(), rejected.size(), data_offset) == 0);
+    assert(std::all_of(rejected.begin(), rejected.end(),
+                       [](u8 byte) { return byte == 0; }));
+    // The directory tables remain readable, while the corrupted payload is
+    // never returned through the actual vendor-generated RomFS offsets.
+    assert(Read64(ReadAt(base, 0, 0x50), 0) == 0x50);
+
+    std::cout << "Real vendor RomFSBuildContext: base/updates/nested/DLC binaries and mutable SHA rejection OK\n";
 }
