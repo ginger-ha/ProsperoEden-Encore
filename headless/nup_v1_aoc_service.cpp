@@ -73,8 +73,8 @@ static std::vector<u64> AccumulateAOCTitleIDs(Core::System& system) {
         std::remove_if(
             add_on_content.begin(), add_on_content.end(),
             [&rcu](u64 tid) {
-                // Content inventories may outlive a removed or unreadable
-                // NCA. Do not dereference a missing entry while creating aoc:u.
+                // A registered content ID can become unavailable before
+                // aoc:u is constructed. Never dereference a missing NCA.
                 const auto entry = rcu.GetEntry(tid, FileSys::ContentRecordType::Data);
                 return !entry || entry->GetStatus() != Loader::ResultStatus::Success;
             }),
