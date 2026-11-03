@@ -164,10 +164,32 @@ assert 'target_include_directories(video_core BEFORE PUBLIC "${PORT_BUILD_DIR}/v
     root / "headless/vulkan.cmake").read_text()
 print("ENCORE_POST_F07_NS2_TYPED_TEXTURE_CACHE_OWNER_PASS",
       f"owners={len(native_typed_texture_owners)}")
+# P1.2: one common native GPU scalar seam helper is selected by the already
+# maintained PS5 memory manager for BOTH NS1 and NS2. It was introduced after
+# the frozen F07 source audit and must carry independent source/host proof.
+shared_gpu_scalar_owners = {"eden-core/src/video_core/native_paged_scalar.h"}
+assert shared_gpu_scalar_owners <= set(physical_all), (
+    "Missing shared native GPU scalar owner",
+    sorted(shared_gpu_scalar_owners - set(physical_all)))
+assert not shared_gpu_scalar_owners.intersection(
+    set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
+    shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners |
+    shared_compute_owners | native_typed_texture_owners
+)
+gpu_owner = (active / "eden-core/src/video_core/memory_manager.cpp").read_text()
+assert '#include "native_paged_scalar.h"' in gpu_owner
+assert "Eden::GpuScalar::Read(addr, value," in gpu_owner
+assert "Eden::GpuScalar::Write(addr, data," in gpu_owner
+assert "memory.GetSpan(dev_addr_base, copy_amount)" in gpu_owner
+assert "python3 -B tools/ns2/check_paged_gpu_scalar_host.py" in (
+    root / ".github/workflows/encore-core-preflight.yml").read_text()
+print("ENCORE_POST_F07_SHARED_GPU_SCALAR_OWNER_PASS",
+      f"owners={len(shared_gpu_scalar_owners)}")
 physical = [p for p in physical_all
             if p not in set(research_paths) | shared_ns2_kernel_owners | shared_ns2_audio_owners |
             shared_ns2_gpu_access_owners | post_f07_native_vulkan_owners |
-            shared_compute_owners | native_typed_texture_owners]
+            shared_compute_owners | native_typed_texture_owners |
+            shared_gpu_scalar_owners]
 # These two versioned headers preserve the immutable upstream Eden snapshot.
 # They must be present in the real source catalogue, not excluded as NS2 fixtures.
 warning_hygiene = {
