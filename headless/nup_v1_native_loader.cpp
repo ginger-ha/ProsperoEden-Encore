@@ -169,12 +169,8 @@ std::unique_ptr<NupAppLoader> NupAppLoader::Open(FileSys::VirtualFile source,
     loader->extracted_loader_ =
         std::make_unique<Loader::AppLoader_DeconstructedRomDirectory>(
             main_file, false);
-    // Only publish a fully validated native loader. Its destructor revokes
-    // visibility before source buffers can be released at game teardown.
-    PublishActiveAddOns(
-        loader.get(),
-        std::make_shared<AddOnIndex>(
-            loader->mount_, validated_program_id, aoc_base));
+    // Merely inspecting NUP metadata for the game catalogue must NOT expose
+    // add-ons to a running game's services. Publish only after Load succeeds.
     return loader;
 }
 
@@ -229,7 +225,12 @@ NupAppLoader::LoadResult NupAppLoader::Load(Kernel::KProcess& process,
     u64 program_id{};
     const auto status = ValidateProgramIdentity(program_id);
     if (status != Loader::ResultStatus::Success) return {status, {}};
-    return extracted_loader_->Load(process, system);
+    auto result = extracted_loader_->Load(process, system);
+    if (result.first == Loader::ResultStatus::Success) {
+        PublishActiveAddOns(this, std::make_shared<AddOnIndex>(
+            mount_, program_id, nacp_aoc_base_id_));
+    }
+    return result;
 }
 
 Loader::ResultStatus NupAppLoader::ReadRomFS(FileSys::VirtualFile& out_file) {
