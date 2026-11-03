@@ -407,6 +407,13 @@ int main() {
         bad.global_layout_resolved = false;
         assert(!bad.HasResolvedGpuBufferBindings());
         assert(!gp->SameBufferBindings(bad));
+        auto unbound_bank = global;
+        unbound_bank.storage_buffers_descriptors[0].cbuf_index = 1;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            unbound_bank, *gp, 64));
+        // An absent CBUF is not a source of authentic global target VA
+        // and size; shader IR must not read an undefined uniform pointer.
+        assert(!env.BuildResourcePlan(unbound_bank));
         auto no_use = global;
         no_use.nvn_buffer_used.reset();
         assert(!env.BuildResourcePlan(no_use));
