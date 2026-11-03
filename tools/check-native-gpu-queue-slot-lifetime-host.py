@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Execute pinned GPU queue slot reuse; reject a skipped moved-from destructor.
+"""Execute pinned GPU queue slot lifetime; reject a skipped moved-from destructor.
 
-The real queue stores preconstructed std::array<T, Capacity> slots. A placement
-new over a popped (but still live) slot discards its moved-from destructor.
-Host fixture uses a valid move type whose source intentionally retains
-shared ownership, proving abandoned resources in the original but not in
-the native-derived code. No console run or graphics timing claim.
+The original queue overwrites still-live preconstructed elements and leaks
+resource owners. The maintained common GPU queue now has explicit Slot storage:
+a successful push constructs its element, Pop destroys it *before* publishing
+the free slot, and destruction of a nonempty queue visits only live entries.
+The native-source fixture checks a valid move whose source retains ownership.
+No console run or graphics timing claim.
 """
 from pathlib import Path
 import shutil
@@ -19,14 +20,21 @@ workflow = (root / ".github/workflows/encore-core-preflight.yml").read_text()
 canonical_path = root / "vendor/encore-active/eden-gpu/include/common/bounded_threadsafe_queue.h"
 canonical = canonical_path.read_text()
 construct = "std::construct_at(std::addressof(m_data[pos]), std::forward<Args>(args)...);"
-cleanup = "std::destroy_at(std::addressof(m_data[pos]));\n        " + construct
+live_construct = "std::construct_at(std::addressof(m_data[pos].value), std::forward<Args>(args)...);"
+live_destroy = "std::destroy_at(std::addressof(m_data[pos].value));"
 
 # Keep the broken pinned source only as a negative regression witness. The
 # corrected compiled queue must be the same full header selected in CMake.
 assert original.count(construct) == 1
 assert original.count("std::destroy_at(std::addressof(m_data[pos]));") == 0
-assert canonical.count(construct) == 2
-assert canonical.count(cleanup) == 2
+assert canonical.count(construct) == 0
+assert canonical.count(live_construct) == 2
+assert canonical.count(live_destroy) == 2
+assert "union Slot {" in canonical
+assert "std::array<Slot, Capacity> m_data;" in canonical
+assert "t = std::move(m_data[pos].value);\n        // Destroy moved-from commands before the producer can reuse the slot.\n        " + live_destroy in canonical
+assert "for (auto cursor = consumer.index.load(std::memory_order_relaxed);" in canonical
+assert "std::destroy_at(std::addressof(m_data[cursor % Capacity].value));" in canonical
 assert canonical.count("bool EmplaceWaitWithStopToken(") == 1
 assert "producer.cv.wait(lock, stop_token" in canonical
 assert "python3 -B tools/check-native-gpu-queue-slot-lifetime-host.py" in workflow
@@ -79,8 +87,8 @@ int main() {
             resource.reset();
         }
 #if EXPECT_REPAIRED
-        // At most two moved-from slots still hold an owner.
-        assert(Resource::living == 2);
+        // Pop eagerly destroys each moved-from slot; no abandoned owner remains.
+        assert(Resource::living == 0);
 #else
         // Baseline has overwritten ten live moved-from owners, leaking each.
         assert(Resource::living == 12);
@@ -121,4 +129,4 @@ with tempfile.TemporaryDirectory(prefix="encore-native-queue-lifetime-") as fold
                                 capture_output=True, timeout=10)
         print(result.stdout, end="")
 
-print("PINNED_GPU_QUEUE_NATIVE_REPAIR_SCOPE_ONLY")
+print("PINNED_GPU_QUEUE_NATIVE_SLOT_DESTRUCTION_SCOPE_ONLY")
