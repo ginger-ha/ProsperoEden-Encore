@@ -360,7 +360,7 @@ def main() -> int:
         require(
             "bool ComputePipeline::ConfigureNative(" in native_vk_pipeline and
             "resources.StageVulkanBufferBindings(" in native_vk_pipeline and
-            "resources.ValidateGpuMappings(mapped)" in native_vk_pipeline and
+            "resources.ValidateGpuBufferMappings(mapped)" in native_vk_pipeline and
             "buffer_cache.ObtainBuffer(" in native_vk_pipeline and
             "WriteDescriptorBuffer(device, descriptor_buffer_layout," in native_vk_pipeline and
             "bool ConfigureNative(" in native_vk_pipeline_h and
@@ -381,7 +381,7 @@ def main() -> int:
             "U93 authenticated native ComputePipeline SPIR-V to driver handoff" in native_vk_port and
             "CaptureComputeTicket(kepler_compute)" in native_vk_cache and
             "CurrentComputePipeline() {" in native_vk_cache,
-            "NS2 native Vulkan QMD3 module and buffer-only handoff must remain session-verified")
+            "NS2 native Vulkan QMD3 typed buffer/image handoff must remain session-verified")
         # U96: native buffer-only Compute inherits NS1's no-worker-wait
         # inside cache-lock ordering. Keep native-only staging fail-closed.
         require(
