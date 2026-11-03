@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 6);
+    assert(argc == 7);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -272,6 +272,15 @@ int main(int argc, char** argv) {
     Kernel::KProcess blocked_process;
     Core::System blocked_system;
     assert(forged->Load(blocked_process, blocked_system).first ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    auto sibling_input = std::make_shared<MemoryFile>(Load(argv[6]));
+    auto sibling = Eden::NupV1::Native::NupAppLoader::Open(sibling_input, &error);
+    assert(sibling);
+    std::uint64_t sibling_id = 0xABCDEFULL;
+    assert(sibling->ReadProgramId(sibling_id) ==
+           Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(sibling_id == 0xABCDEFULL);
+    assert(sibling->Load(blocked_process, blocked_system).first ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
