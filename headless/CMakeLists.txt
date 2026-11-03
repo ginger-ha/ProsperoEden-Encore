@@ -2785,7 +2785,10 @@ if(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
     # complete tracked source only when the NS2 shader bridge is enabled.
     set(EDEN_NS2_QMD_CBUF_SPIRV
         "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/backend/spirv/spirv_emit_context.cpp")
+    set(EDEN_NS2_QMD_CBUF_DIRECT_SPIRV
+        "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp")
     if(NOT EXISTS "${EDEN_NS2_QMD_CBUF_SPIRV}" OR
+       NOT EXISTS "${EDEN_NS2_QMD_CBUF_DIRECT_SPIRV}" OR
        NOT EXISTS "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/frontend/ampere/native_indirect_cbuf.h")
         message(FATAL_ERROR "Missing reviewed native QMD3 indirect CBUF compiler")
     endif()
@@ -2797,6 +2800,15 @@ if(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
     endif()
     list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/spirv_emit_context.cpp")
     list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_SPIRV}")
+    # Native direct-bank LDC also requires a pre-access bounds check. Replace
+    # this FULL companion translation unit only for the NS2 opt-in bridge.
+    list(FIND eden_ns2_shader_sources
+        "backend/spirv/emit_spirv_context_get_set.cpp" eden_ns2_cbuf_direct_source_idx)
+    if(eden_ns2_cbuf_direct_source_idx LESS 0)
+        message(FATAL_ERROR "Pinned direct CBUF emitter owner changed: audit QMD3 selection")
+    endif()
+    list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/emit_spirv_context_get_set.cpp")
+    list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_DIRECT_SPIRV}")
     set_property(TARGET shader_recompiler PROPERTY SOURCES "${eden_ns2_shader_sources}")
     target_sources(video_core PRIVATE "${EDEN_NS2_VULKAN_SHADER_BRIDGE}")
     target_sources(video_core PRIVATE "${EDEN_NS2_NATIVE_GPU_SPIRV_CAPTURE}")

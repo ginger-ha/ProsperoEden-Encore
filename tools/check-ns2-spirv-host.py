@@ -53,15 +53,17 @@ def main():
         r"(?:instructions/)?[^\s()/]+\.cpp", 18,
         ["sirit.cpp", "instructions/type.cpp"])
     overlay = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere"
-    # P2.3 must compile the actual native QMD3 indirect-CBUF emitter, not
-    # Eden's fourteen-bank baseline. Keep every other pinned source intact.
-    native_cbuf_emitter = (
-        ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp"
-    )
-    emitter_owner = "backend/spirv/spirv_emit_context.cpp"
-    if shaders.count(emitter_owner) != 1:
-        raise RuntimeError("pinned SPIR-V emitter source changed")
-    sources = [native_cbuf_emitter if name == emitter_owner else SHADER / name
+    # P2.3: validate BOTH maintained QMD3 source variants, not Eden's
+    # fourteen-bank indirect switch or its unchecked direct-bank accessor.
+    native_cbuf_emitters = {
+        "backend/spirv/spirv_emit_context.cpp":
+            ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
+        "backend/spirv/emit_spirv_context_get_set.cpp":
+            ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
+    }
+    if any(shaders.count(owner) != 1 for owner in native_cbuf_emitters):
+        raise RuntimeError("pinned SPIR-V CBUF source owner changed")
+    sources = [native_cbuf_emitters.get(name, SHADER / name)
                for name in shaders] + [
         overlay / (name + ".cpp") for name in
         ("ir_bridge", "renderer_spirv_bridge", "maxwell_environment", "maxwell_image", "lower_bridge", "probe")

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "base_vendor_commit": "2281ef2780179febb927662c3ce4a83b09f252a6",
   "research_vendor_commit": "209052223111a27fc1c93a07f6af96e61221bb2c",
-  "review_state": "NS2 research source additions including two opt-in Vulkan sparse ABI headers; never historical F07 optimization proofs or NS2 gameplay qualification; native 4K GMMU VA bounds helper added with O0/O2 UBSan preflight, not F07 shipping; two P2.3 opt-in QMD3 CBUF owners added as unqualified NS2 research, not shipping F07 proofs",
+  "review_state": "NS2 research source additions including two opt-in Vulkan sparse ABI headers; never historical F07 optimization proofs or NS2 gameplay qualification; native 4K GMMU VA bounds helper added with O0/O2 UBSan preflight, not F07 shipping; three P2.3 opt-in QMD3 CBUF owners added as unqualified NS2 research, not shipping F07 proofs",
   "paths": [
     "eden-core/include/common/cpu_features.h",
     "eden-core/include/encore/guest_counter_policy.h",
@@ -51,6 +51,7 @@
     "ns2-runtime/am/core/hle/service/am/service/application_proxy.h",
     "ns2-runtime/am/core/hle/service/am/service/graphics_scaling_parameters_functions.cpp",
     "ns2-runtime/am/core/hle/service/am/service/graphics_scaling_parameters_functions.h",
+    "ns2-runtime/ampere/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp",
     "ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/ampere_isa_table.h",
     "ns2-runtime/ampere/shader_recompiler/frontend/ampere/capture.cpp",

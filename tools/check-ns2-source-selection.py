@@ -189,6 +189,8 @@ def main() -> int:
         # P2.3 must select a complete maintained SPIR-V emitter only in
         # the native NS2 bridge. The original fourteen-bank source is kept.
         qmd_spirv = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
+        native_direct_cbuf = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp").read_text()
+        pristine_direct_cbuf = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp").read_text()
         qmd_indirect = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_indirect_cbuf.h").read_text()
         qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
         qmd_env = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h").read_text()
@@ -200,6 +202,13 @@ def main() -> int:
         require('set(EDEN_NS2_QMD_CBUF_SPIRV' in CMAKE and
                 'list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/spirv_emit_context.cpp")' in CMAKE and
                 'list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_SPIRV}")' in CMAKE and
+                'set(EDEN_NS2_QMD_CBUF_DIRECT_SPIRV' in CMAKE and
+                'list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/emit_spirv_context_get_set.cpp")' in CMAKE and
+                'list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_DIRECT_SPIRV}")' in CMAKE and
+                'const Id safe_offset{ctx.OpSelect' in native_direct_cbuf and
+                'ctx.Const(0x10000U / element_size)' in native_direct_cbuf and
+                'ctx.OpAccessChain(uniform_type, cbuf, ctx.u32_zero_value,' in native_direct_cbuf and
+                'if (offset.IsImmediate() || !ctx.profile.has_broken_robust)' in pristine_direct_cbuf and
                 'std::span{buf_labels}.first(bank_count)' in qmd_spirv and
                 'OpReturnValue(ConstantNull(buffer_type))' in qmd_spirv and
                 'NormalizeNativeQmdIndirectCbufIR(ir, qmd_enabled_cbuf_mask)' in qmd_bridge and
@@ -226,8 +235,8 @@ def main() -> int:
                 'qmd_enabled_cbuf_mask = 0xffU' in qmd_spirv_header and
                 'shader_info.constant_buffer_mask != declared_banks' in qmd_env and
                 'OpSwitch(binding, buf_labels[0], buf_literals, buf_labels);' in pristine_spirv and
-                'native_cbuf_emitter if name == emitter_owner else SHADER / name' in host_native_spirv and
-                'emitter_owner = "backend/spirv/spirv_emit_context.cpp"' in host_native_spirv,
+                'native_cbuf_emitters.get(name, SHADER / name)' in host_native_spirv and
+                '"backend/spirv/emit_spirv_context_get_set.cpp":' in host_native_spirv,
                 "Sparse QMD3 CBUF source, native test selection, and Vulkan layout must agree")
         qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
         require("AcquireNativeQmdSession(" in engine_registry and
