@@ -10,6 +10,12 @@
 #include "video_core/renderer_vulkan/vk_texture_cache.h"
 #include "video_core/texture_cache/texture_cache_base.h"
 
+#if defined(EDEN_NS2_ASTC_CACHE_BRIDGE)
+// Parse the actual optional ASTC TextureCache method implementations too;
+// declarations alone cannot prove the combined native-owner ABI compiles.
+#include "video_core/texture_cache/texture_cache.h"
+#endif
+
 #if !defined(PS5_NATIVE) || !defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
 #error "P2.2b native Vulkan cache owner probe requires the exact native gates"
 #endif
