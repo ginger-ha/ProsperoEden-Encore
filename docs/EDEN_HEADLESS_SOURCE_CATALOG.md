@@ -2,7 +2,7 @@
 
 **Branche :** `main`. **Date du relevé :** 3 novembre 2026.
 
-Ce registre complémentaire couvre les **190 chemins** de code, en-têtes et
+Ce registre complémentaire couvre les **191 chemins** de code, en-têtes et
 fragments `.c/.cc/.cpp/.h/.hpp/.inc/.cl` du dossier `headless/`.
 Il ne remplace pas `EDEN_ACTIVE_SOURCE_CATALOG.md` : les 326 fichiers
 de `vendor/encore-active` sont déjà inventoriés séparément.
@@ -13,9 +13,9 @@ pour suivi séparé et n'autorise aucune modification du launcher depuis
 l'audit moteur. Un chemin noté « À qualifier » peut avoir été audité sous
 une autre forme : il manque seulement la référence de chemin exacte.
 
-- **190** chemins sous `headless/`, dont **65** sources C/C++ et **125** en-têtes/fragments.
+- **191** chemins sous `headless/`, dont **66** sources C/C++ et **125** en-têtes/fragments.
 - **98** chemins déjà présents dans le graphe moteur.
-- **92** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
+- **93** chemins sans propriétaire exact dans ce graphe, à trier selon leur rôle réel et leur sélection.
 - Les deux générateurs de profils `headless/encore_overrides_generated.h`,
   `headless/glyph_overrides_generated.h` et les autres ressources générées
   sont des entrées de l'inventaire, **pas** de nouveaux patchs CMake.
@@ -30,13 +30,13 @@ toujours 176/177 chemins ; il n'y a pas 80 overrides de dépendances oubliés.
 | --- | ---: |
 | `launcher/UI` | **66** |
 | `harness/test` | **10** |
-| `outil auxiliaire` | **14** |
+| `outil auxiliaire` | **15** |
 | `données générées` | **2** |
 | `en-tête/fragment` | **0** |
-| **Total non indexé** | **92** |
+| **Total non indexé** | **93** |
 
 Les 66 chemins du launcher et de son handoff sont réservés au périmètre UI séparé.
-Les 10 harnais, 14 outils auxiliaires et 2 ressources générées ne sont pas déclarés
+Les 10 harnais, 15 outils auxiliaires et 2 ressources générées ne sont pas déclarés
 comme unités de correction moteur. `ps5_amd_topology_evidence.h` porte désormais l'ID U79 au statut
 **PARKED** : ses fonctions sont inventoriées, mais le commit d'origine
 `45f9c01` précise « no runtime pinning ». Aucun consommateur natif
@@ -145,6 +145,7 @@ que des fichiers C/C++ apparaissent dans `headless/` sans être ajoutés
 | `headless/network_domain_rules.c` | runtime/bridge | U07 | Chemin indexé, preuve dépend du graphe |
 | `headless/network_domain_rules.h` | en-tête/fragment | U38 | Chemin indexé, preuve dépend du graphe |
 | `headless/ns2_title_catalog.h` | en-tête/fragment | U89 | Chemin indexé, preuve dépend du graphe |
+| `headless/nup_v1_loader_route.cpp` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_native_aoc.cpp` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_native_aoc.h` | outil auxiliaire | — | À qualifier |
 | `headless/nup_v1_native_content.cpp` | outil auxiliaire | — | À qualifier |
