@@ -27,6 +27,26 @@ ui = (root / "headless/metadata_bridge.cpp").read_text()
 assert "FileSys::ExtractedAoc::Scan(scan_paths)" in ui
 assert "dlc.insert(entry.title_id).second" in ui
 assert "std::vector<std::string> scan_paths;" in ui
+# P3.4: no partial update/DLC metadata may be published as complete.
+# The worker scans a bounded number of title roots and every nested addon
+# traversal reports whether it was complete. A missing optional global root
+# is okay; an existing provider root that fails to open must refuse publish.
+scan = ui.split("void eden_scan_addons(", 1)[1].split(
+    "\\n// Native launch-time display-art version:", 1)[0]
+assert "std::filesystem::directory_options::none" in scan
+assert "if (++scanned_titles > 2048)" in scan
+assert "exceeded_limit = true;" in scan
+assert "if (error || exceeded_limit) return;" in scan
+assert "FindAddOnContentDirectories(path, &complete)" in scan
+assert "if (!complete) return;" in scan
+assert "if (!append_root(updates_dir)) return;" in scan
+assert "if (!append_root(directory)) return;" in scan
+assert "if (status_error) return false;" in scan
+assert scan.index("if (error || exceeded_limit) return;") < scan.index("publish(true);")
+boot = (root / "headless/main.cpp").read_text()
+assert "IsSafeExtractedDirectory(title_root)" in boot
+assert "FindAddOnContentDirectories(" in boot
+assert "title_root, &complete" in boot
 
 fixture = r"""
 #include <algorithm>
