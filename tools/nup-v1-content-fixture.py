@@ -146,7 +146,7 @@ def executable_fixture() -> bytes:
     return build([
         {"title_id": title, "version": 1, "kind": 0,
          "metadata": {
-             0x0003: b"\\xff\\xd8\\xff" + b"synthetic-jpeg",
+             0x0003: b"\xff\xd8\xff" + b"synthetic-jpeg",
              0x0004: b"3.0.0",
              0x0005: b"Demo / Game",
              0x0006: b"Example Publisher",
