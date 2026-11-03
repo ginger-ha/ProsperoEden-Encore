@@ -135,8 +135,8 @@ int main(){
     const auto allow_all=[](W addr,W){return addr<0xe00;};
     result=atomic.ExecuteStaged(0xe00,std::span<const W>{},read,allow_all,commit,valid);
     assert(result.success && committed.size()==2);
-    assert(committed[0]==std::pair<W,W>(0x230,0xAAAA));
-    assert(committed[1]==std::pair<W,W>(0x10,0xBBBB));
+    assert((committed[0]==std::pair<W,W>(0x230,0xAAAA)));
+    assert((committed[1]==std::pair<W,W>(0x10,0xBBBB)));
     committed.clear();
     // A late invalid native register read must not publish an earlier
     // perfectly valid method, even if the interpreter itself returns true.
@@ -180,7 +180,7 @@ int main(){
     result=ram_state.ExecuteStaged(
         0xe02,std::span<const W>{},read,allowed,commit,valid);
     assert(result.success && committed.size()==1 &&
-           committed[0]==std::pair<W,W>(0x230,0));
+           (committed[0]==std::pair<W,W>(0x230,0)));
     committed.clear();
     std::vector<W> oversized(Tegra::NativeAmpereMacroState::MaxFifo+1,3);
     auto too_many=state.Execute(0xe00,std::span<const W>{oversized},read,emit);
