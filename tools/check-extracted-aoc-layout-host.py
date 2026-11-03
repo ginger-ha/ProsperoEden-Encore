@@ -42,6 +42,15 @@ assert "if (!complete) return;" in scan
 assert "if (!append_root(updates_dir)) return;" in scan
 assert "if (!append_root(directory)) return;" in scan
 assert "if (status_error) return false;" in scan
+assert "bool scan_rom_library = false;" in scan
+assert "if (root_error && root_error != std::errc::no_such_file_or_directory)" in scan
+assert "root_status.type() != std::filesystem::file_type::not_found" in scan
+assert "if (!std::filesystem::is_directory(root_status) ||" in scan
+assert "if (scan_rom_library) {" in scan
+assert "const auto entry_status = it->symlink_status(error);" in scan
+assert "if (error) return;" in scan
+assert "if (!std::filesystem::is_directory(entry_status)) continue;" in scan
+assert "if (!Eden::IsSafeExtractedDirectory(path)) return;" in scan
 assert scan.index("if (error || exceeded_limit) return;") < scan.rindex("publication.Commit();")
 boot = (root / "headless/main.cpp").read_text()
 assert "IsSafeExtractedDirectory(title_root)" in boot
