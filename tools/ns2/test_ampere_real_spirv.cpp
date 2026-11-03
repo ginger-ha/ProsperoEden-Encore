@@ -211,6 +211,58 @@ int main(int argc,char** argv) {
     host.support_conditional_barrier=true;
     Shader::Profile profile{};
     profile.supported_spirv=0x00010500; // SPIR-V 1.5
+    // P2.4: verify the reviewed BRX dispatch against the REAL graphics
+    // Maxwell CFG/IR optimizer and Sirit, beyond the CFG-only spy fixture.
+    // All guest addresses here come from a synthetic validated two-target
+    // table. No game-specific shader or unchecked Maxwell JMX is involved.
+    std::vector<u8> brx_native;
+    Emit(brx_native,pred|0x817U|(4U<<16),15U,0x03800000U);
+    Emit(brx_native,pred|0x819U|(5U<<16)|(4U<<24),2U,0x000006ffU);
+    Emit(brx_native,pred|0xb82U|(6U<<16)|(5U<<24),
+         (7U<<22)|(0xffc0U<<6),0x00000800U);
+    Emit(brx_native,pred|0x949U|(6U<<24),0xffffffc0U,0x0383ffffU);
+    Emit(brx_native,pred|0x94dU,0,exit_true);
+    for (u32 i=0;i<4;++i) Emit(brx_native,pred|0x918U);
+    Emit(brx_native,pred|0x94dU,0,exit_true);
+    NativeIndirectBranchPlan brx_plan{};
+    brx_plan.branch_instruction_index=3;
+    brx_plan.raw_pc_base=0x80;
+    brx_plan.targets={{0x80U,0U},{0x100U,8U}};
+    auto brx_image=BuildMaxwellShaderImage(
+        header,brx_native,static_cast<u32>(Shader::Stage::VertexB),
+        std::span<const NativeIndirectBranchPlan>{&brx_plan,1});
+    Require(brx_image.ValidForCompiler(),"checked BRX image not compilable");
+    auto brx_env=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<SyntheticSource>(),std::move(brx_image));
+    Require(bool(brx_env),"checked BRX environment not owned");
+    const auto brx_spirv=CompileReviewedNativeVertexSpirv(
+        *brx_env,host,profile,Shader::RuntimeInfo{},false);
+    Require(brx_spirv.PipelineMetadataReady() &&
+            brx_spirv.words.size()>5 && brx_spirv.words[0]==0x07230203U,
+            "actual BRX CFG/IR/SPIR-V graphics compilation failed");
+    // Parsing instruction boundaries proves this SPIR-V still contains a
+    // dynamic dispatch instead of merely a valid header and dead branches.
+    u32 conditional_branches{};
+    u32 loop_merges{};
+    for (std::size_t i=5;i<brx_spirv.words.size();) {
+        const u32 op=brx_spirv.words[i];
+        const u32 words=op>>16;
+        Require(words!=0 && words<=brx_spirv.words.size()-i,
+                "BRX SPIR-V instruction stream malformed");
+        conditional_branches+=(op&0xffffU)==250U; // OpBranchConditional
+        loop_merges+=(op&0xffffU)==246U;          // OpLoopMerge
+        i+=words;
+    }
+    Require(conditional_branches>=2 && loop_merges>=1,
+            "checked BRX dispatch was optimized out of real shader IR");
+    {
+        const auto output=std::string(argv[1])+"-brx.spv";
+        std::ofstream file{output,std::ios::binary|std::ios::trunc};
+        Require(bool(file),"cannot write BRX SPIR-V");
+        file.write(reinterpret_cast<const char*>(brx_spirv.words.data()),
+                   static_cast<std::streamsize>(brx_spirv.words.size()*sizeof(u32)));
+        Require(bool(file),"BRX SPIR-V export failed");
+    }
     // Emit an authentic Compute execution model from the same synthetic
     // 128-bit Ampere instruction sequence, without a graphics SPH.
     auto compute_image=BuildMaxwellShaderImage(

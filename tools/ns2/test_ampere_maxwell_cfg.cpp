@@ -170,6 +170,42 @@ int main() {
                 std::make_unique<NativeSource>(static_cast<Shader::Stage>(0xffffffffU)),
                 std::move(unknown_image)),
             "Unknown stage rejected before GPU IR bridge");
+    // P2.4: an authenticated native BRX dispatch expands into compares,
+    // predicate-preserving stubs and native-PC -> Maxwell-PC relocations.
+    // Run it through the REAL Maxwell CFG, not only the source/image oracle.
+    std::vector<u8> indirect_native;
+    Emit(indirect_native,pt|0x817U|(4U<<16),15U,0x03800000U); // bounded index
+    Emit(indirect_native,pt|0x819U|(5U<<16)|(4U<<24),2U,0x000006ffU);
+    Emit(indirect_native,pt|0xb82U|(6U<<16)|(5U<<24),
+         (7U<<22)|(0xffc0U<<6),0x00000800U);       // LDC CBUF[7]
+    Emit(indirect_native,pt|0x949U|(6U<<24),0xffffffc0U,0x0383ffffU); // BRX
+    Emit(indirect_native,pt|0x94dU,0,exit_true);    // first EXIT
+    for (u32 i=0;i<4;++i) Emit(indirect_native,pt|0x918U);
+    Emit(indirect_native,pt|0x94dU,0,exit_true);    // post-EXIT target
+    NativeIndirectBranchPlan indirect_plan{};
+    indirect_plan.branch_instruction_index=3;
+    indirect_plan.raw_pc_base=0x80U;
+    indirect_plan.targets={{0x80U,0U},{0x100U,8U}};
+    auto indirect_image=BuildMaxwellShaderImage(
+        header,indirect_native,static_cast<u32>(Shader::Stage::VertexB),
+        std::span<const NativeIndirectBranchPlan>{&indirect_plan,1});
+    Require(indirect_image.ValidForCompiler() &&
+            indirect_image.TranslateNativeAddress(0).has_value() &&
+            indirect_image.TranslateNativeAddress(8*16).has_value(),
+            "real checked BRX lowering must produce exact runnable address map");
+    auto indirect_env=NativeMaxwellEnvironment::CreateOwned(
+        std::make_unique<NativeSource>(),std::move(indirect_image));
+    Require(bool(indirect_env),"real BRX image admitted to Maxwell environment");
+    for (bool dispatcher:{false,true}) {
+        Shader::ObjectPool<Shader::Maxwell::Flow::Block> branch_blocks{128};
+        Shader::Maxwell::Flow::CFG branch_cfg{
+            *indirect_env,branch_blocks,
+            static_cast<u32>(indirect_env->StartAddress()+sizeof(Shader::ProgramHeader)),
+            dispatcher};
+        Require(!branch_cfg.Functions().empty() &&
+                !branch_cfg.Functions().front().blocks.empty(),
+                "real Maxwell CFG accepts checked BRX compare/stub dispatch");
+    }
     std::puts("NS2 actual Maxwell CFG and IR handoff ABI: PASS "
-              "(TranslateProgram spy only; real IR/SPIR-V/Vulkan not executed)");
+              "(BRX relocations checked; TranslateProgram spy, no Vulkan execution)");
 }

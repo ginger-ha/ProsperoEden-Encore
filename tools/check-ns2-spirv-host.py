@@ -104,10 +104,11 @@ def main():
     run([cxx, "-pthread", "-Wl,--gc-sections", "-o", str(binary)] +
         [str(obj) for _, obj in jobs] + ["-latomic"])
     print(run([str(binary), str(OUT / "synthetic")]).stdout, end="")
-    # Real live native LDC 0xb82, reaching QMD3 banks 0 and 7 through
-    # shared-memory effects. These must be valid SPIR-V modules as well as
-    # valid reflected descriptor plans, not only successful compiler runs.
-    for mode in ("direct", "dispatcher", "fragment", "merged", "compute", "cbuf0", "cbuf7"):
+    # Real live native LDC 0xb82 reaches QMD3 CBUF banks 0 and 7; BRX
+    # reaches the actual Maxwell CFG/IR/Sirit loop+conditional dispatch.
+    # Validate the executable-structure SPIR-V modules, not only headers or
+    # reflected descriptor plans. No PS5 GPU work is submitted here.
+    for mode in ("direct", "dispatcher", "fragment", "merged", "compute", "cbuf0", "cbuf7", "brx"):
         path = OUT / f"synthetic-{mode}.spv"
         print(run([validator, "--target-env", "spv1.5", str(path)]).stdout, end="")
         print(f"spirv-val SPIR-V 1.5 {mode}: PASS")
