@@ -102,7 +102,8 @@ int main() {
     };
     NativeIndirectBranchPlan plan{
         .branch_instruction_index=0,
-        .targets={{0x80U,1U},{0xb0U,3U}},
+        .raw_pc_base=0x80U,
+        .targets={{0x90U,1U},{0xb0U,3U}},
     };
     const auto expanded=LowerToMaxwell(
         computed_program,{},false,std::span<const NativeIndirectBranchPlan>{&plan,1});
@@ -152,6 +153,18 @@ int main() {
               computed_program,{},false,
               std::span<const NativeIndirectBranchPlan>{&plan,1}),
           "one native BRX raw value cannot map to contradictory blocks");
+    plan.targets[1].native_value=0xb0U;
+    plan.raw_pc_base=0;
+    check(!LowerToMaxwell(
+              computed_program,{},false,
+              std::span<const NativeIndirectBranchPlan>{&plan,1}),
+          "header-relative CBUF PC must not be accepted as code-relative");
+    plan.raw_pc_base=0x80U;
+    plan.targets[1].native_value=0xa0U;
+    check(!LowerToMaxwell(
+              computed_program,{},false,
+              std::span<const NativeIndirectBranchPlan>{&plan,1}),
+          "BRX expected native PC must agree with index plus header origin");
     plan.targets[1].native_value=0xb0U;
     plan.branch_instruction_index=2;
     check(!LowerToMaxwell(
