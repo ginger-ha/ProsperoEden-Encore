@@ -2,6 +2,7 @@
 // Exercise native adapter WITHOUT linking a PS5 renderer/loader.
 #include "nup_v1_native_vfs.h"
 #include "nup_v1_native_content.h"
+#include "nup_v1_native_aoc.h"
 #include "nup_v1_native_loader.h"
 #include "core/file_sys/romfs.h"
 #include "core/file_sys/control_metadata.h"
@@ -326,6 +327,7 @@ int main(int argc, char** argv) {
     FileSys::NACP denied_control;
     assert(mutable_app->ReadControlData(denied_control) ==
            Loader::ResultStatus::ErrorBadNPDMHeader);
+    assert(!mutable_app->MakeAddOnIndex());
     Kernel::KProcess blocked_process;
     Core::System blocked_system;
     assert(mutable_app->Load(blocked_process, blocked_system).first ==
@@ -360,6 +362,21 @@ int main(int argc, char** argv) {
     assert(second_scoped.AddOns().front().package_index == 1);
     assert(Read(second_scoped.CreateAddOnRomFS(1)) == "addon.dat=family-two\n");
     assert(!second_scoped.CreateAddOnRomFS(0));
+    // AoC interface never mixes callers, supports stable pagination and
+    // resolves an add-on index only into its own independently built RomFS.
+    Eden::NupV1::Native::AddOnIndex aoc_first(
+        addon_mount, 0x0100123400000000ULL);
+    assert(aoc_first.Count(0x0100123400000000ULL) == 1);
+    assert(aoc_first.BaseId(0x0100123400000000ULL) ==
+           std::optional<u64>{0x0100123400001000ULL});
+    assert(aoc_first.ListIds(0x0100123400000000ULL, 0, 2) ==
+           std::vector<std::uint32_t>{0});
+    assert(aoc_first.ListIds(0x0100123400000000ULL, 1, 2).empty());
+    assert(aoc_first.ListIds(0x0100123400002000ULL, 0, 2).empty());
+    assert(!aoc_first.OpenRomFS(0x0100123400002000ULL, 0));
+    assert(!aoc_first.OpenRomFS(0x0100123400000000ULL, 1));
+    assert(Read(aoc_first.OpenRomFS(0x0100123400000000ULL, 0)) ==
+           "addon.dat=family-one\n");
     // A trusted NACP can specify a distinct AoC base (e.g., an upgrade
     // pack). Never guess it from the Switch-generation prefix or game ID.
     Eden::NupV1::Native::ContentSet explicit_nacp_base(
@@ -408,6 +425,15 @@ int main(int argc, char** argv) {
     assert(nacp_loader->SelectedAddOns()[0].package_index == 1);
     assert(nacp_loader->SelectedAddOns()[0].title_id ==
            0x0100123400003001ULL);
+    auto aoc_from_nacp = nacp_loader->MakeAddOnIndex();
+    assert(aoc_from_nacp);
+    assert(aoc_from_nacp->BaseId(0x0100123400000000ULL) ==
+           std::optional<u64>{0x0100123400003000ULL});
+    assert(aoc_from_nacp->ListIds(0x0100123400000000ULL, 0, 8) ==
+           std::vector<std::uint32_t>{1});
+    assert(Read(aoc_from_nacp->OpenRomFS(0x0100123400000000ULL, 1)) ==
+           "addon.dat=nacp-declared\n");
+    assert(!aoc_from_nacp->OpenRomFS(0x0100123400002000ULL, 1));
     assert(Read(nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
            "nacp-declared");
     // The same declared AoC family must be recovered from extracted
