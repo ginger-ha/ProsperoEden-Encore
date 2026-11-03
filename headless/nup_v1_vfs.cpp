@@ -26,6 +26,11 @@ constexpr std::uint64_t MaxToc = 64ULL * 1024 * 1024;
 constexpr std::uint64_t MaxMeta = 32ULL * 1024 * 1024;
 constexpr std::uint64_t MaxNodes = 2000000;
 constexpr std::size_t BlockSize = 1 << 20;
+// Guest RomFS performs many tiny random reads. Rehash only the touched 256 KiB
+// of a mutable raw NUP after the initial full-member SHA-256 verification.
+// Streaming remains 1 MiB and the digest cache retains its 16 MiB ceiling.
+constexpr std::size_t MutableRawBlockSize = 1 << 18;
+static_assert(BlockSize % MutableRawBlockSize == 0);
 constexpr std::size_t MaxMutableRawDigestCacheBytes = 16 << 20;
 
 void Check(bool condition, const char* reason) {
@@ -779,13 +784,13 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
             // were recorded. Rehash each touched raw block against that
             // immutable verified reference, even if VfsFile is mutable.
             if (dst.empty()) return true;
-            const auto start_block = offset / BlockSize;
-            const auto last_block = (offset + dst.size() - 1) / BlockSize;
+            const auto start_block = offset / MutableRawBlockSize;
+            const auto last_block = (offset + dst.size() - 1) / MutableRawBlockSize;
             for (auto block = start_block; block <= last_block; ++block) {
                 Check(block < raw_blocks->size(), "verified raw block outside index");
-                const auto block_offset = block * BlockSize;
+                const auto block_offset = block * MutableRawBlockSize;
                 const auto bytes = static_cast<std::size_t>(
-                    std::min<std::uint64_t>(BlockSize, f.size - block_offset));
+                    std::min<std::uint64_t>(MutableRawBlockSize, f.size - block_offset));
                 const auto chunk = ReadChunk(source_, f.offset + block_offset, bytes);
                 Check(Hash(chunk) == (*raw_blocks)[static_cast<std::size_t>(block)],
                       "raw member block SHA-256 mismatch");
@@ -802,7 +807,7 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
         // full SHA validation on every read instead of trusting old content.
         std::vector<std::array<std::uint8_t, 32>> pending_raw_blocks;
         if (!allow_cache && f.codec == 0 && f.size > 0) {
-            const auto blocks = 1 + (f.size - 1) / BlockSize;
+            const auto blocks = 1 + (f.size - 1) / MutableRawBlockSize;
             if (blocks <= MaxMutableRawDigestCacheBytes / 32) {
                 pending_raw_blocks.reserve(static_cast<std::size_t>(blocks));
             }
@@ -825,8 +830,13 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
                 const auto count = static_cast<std::size_t>(
                     std::min<std::uint64_t>(BlockSize, f.stored - cursor));
                 const auto chunk = ReadChunk(source_, f.offset + cursor, count);
-                if (pending_raw_blocks.capacity() != 0)
-                    pending_raw_blocks.push_back(Hash(chunk));
+                if (pending_raw_blocks.capacity() != 0) {
+                    for (std::size_t at = 0; at < chunk.size(); at += MutableRawBlockSize) {
+                        const auto bytes = (std::min)(MutableRawBlockSize, chunk.size() - at);
+                        pending_raw_blocks.push_back(Hash(
+                            std::span<const std::uint8_t>(chunk).subspan(at, bytes)));
+                    }
+                }
                 record(chunk);
                 cursor += count;
             }

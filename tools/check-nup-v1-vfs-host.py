@@ -125,6 +125,20 @@ def main() -> None:
         execute(fixtures.fixture(1, compressed,
                                  extra=fixtures.Zstd().compress_fixture(b"second")),
                 "proof.bin", None)
+        # Dedicated mutable source: random 1-byte reads must rehash only the
+        # touched 256-KiB block, and an in-place mutation must be rejected.
+        mutable_binary = base / "nup-mutable-block-host"
+        mutable_command = [
+            os.environ.get("CXX", "g++"), "-std=c++20", "-O2",
+            "-Wall", "-Wextra", "-Werror", "-pedantic",
+            "-I", str(ROOT / "headless"),
+            str(ROOT / "headless/nup_v1_vfs.cpp"),
+            str(ROOT / "tools/nup-v1-mutable-block-host.cpp"),
+            "-lcrypto", "-lzstd", "-o", str(mutable_binary),
+        ]
+        subprocess.run(mutable_command, check=True)
+        archive.write_bytes(fixtures.fixture(0, raw))
+        subprocess.run([str(mutable_binary), str(archive)], check=True)
         layered = layered_fixture()
         execute(layered, "@base/romfs/state.bin", b"base-v1")
         execute(layered, "@update1/romfs/state.bin", b"latest-v3")

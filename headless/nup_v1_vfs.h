@@ -141,7 +141,7 @@ private:
     // Mutable raw members: a full member SHA-256 is verified first, then
     // immutable per-block digests are retained. Subsequent reads rehash only
     // the touched blocks, so edited source bytes cannot be returned. Bounded
-    // to 16 MiB of hashes per archive (1 MiB source blocks).
+    // to 16 MiB of hashes per archive (256 KiB source blocks).
     mutable std::unordered_map<std::size_t,
         std::shared_ptr<const std::vector<std::array<std::uint8_t, 32>>>>
         raw_block_digests_;
