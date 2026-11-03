@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -52,6 +53,13 @@ struct PackageMetadata {
     std::string publisher;
     std::string display_version;
     std::vector<std::uint8_t> default_icon;
+    std::map<std::string, std::string> localized_titles;
+    std::map<std::string, std::vector<std::uint8_t>> localized_icons;
+
+    // No dependency on frontend settings. Exact BCP-47 tag, primary-language
+    // fallback, default language; no guesswork about the user's locale.
+    std::string_view TitleFor(std::string_view language) const;
+    const std::vector<std::uint8_t>* IconFor(std::string_view language) const;
 };
 
 class Archive final {
