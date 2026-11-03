@@ -51,9 +51,11 @@ def main():
         foreign_update.write_bytes(content_module.foreign_update_fixture())
         foreign_npdm = temp / "foreign-npdm.nup"
         foreign_npdm.write_bytes(content_module.mismatched_npdm_fixture())
+        sibling_npdm = temp / "sibling-npdm.nup"
+        sibling_npdm.write_bytes(content_module.sibling_npdm_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
-                        str(executable), str(foreign_update), str(foreign_npdm)],
-                       check=True)
+                        str(executable), str(foreign_update), str(foreign_npdm),
+                        str(sibling_npdm)], check=True)
 
 if __name__ == "__main__":
     main()
