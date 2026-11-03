@@ -108,6 +108,11 @@ Loader::ResultStatus NupAppLoader::ReadIcon(std::vector<u8>& out_buffer) {
     u64 program_id{};
     const auto status = ValidateProgramIdentity(program_id);
     if (status != Loader::ResultStatus::Success) return status;
+    if (const auto* metadata = mount_->ApplicationMetadata();
+        metadata && !metadata->default_icon.empty()) {
+        out_buffer = metadata->default_icon;
+        return Loader::ResultStatus::Success;
+    }
     return extracted_loader_ ? extracted_loader_->ReadIcon(out_buffer)
                              : Loader::ResultStatus::ErrorNoIcon;
 }
@@ -123,6 +128,11 @@ Loader::ResultStatus NupAppLoader::ReadTitle(std::string& out_title) {
     u64 program_id{};
     const auto status = ValidateProgramIdentity(program_id);
     if (status != Loader::ResultStatus::Success) return status;
+    if (const auto* metadata = mount_->ApplicationMetadata();
+        metadata && !metadata->title.empty()) {
+        out_title = metadata->title;
+        return Loader::ResultStatus::Success;
+    }
     return extracted_loader_ ? extracted_loader_->ReadTitle(out_title)
                              : Loader::ResultStatus::ErrorNoControl;
 }
