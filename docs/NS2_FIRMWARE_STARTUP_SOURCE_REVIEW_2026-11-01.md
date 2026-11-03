@@ -1,6 +1,6 @@
 # Metadata bridge firmware source review — 2026-11-01
 
-Review target: `headless/metadata_bridge.cpp` Git blob `1a51ab040b651ee7f2da437aa001c8deeec4cc14`.
+Review target: `headless/metadata_bridge.cpp` Git blob `83b2b12f48be609520f28c23e0722a55b57597f4`.
 Previous F07 reviewed blob: `9c3ca3d1378eb901726652a1bbc5e28f74601851`.
 
 ## Actual changes since the old source audit
@@ -25,3 +25,7 @@ This review **updates only the source blob identity** in the historical F07 ledg
 | Source owner | Disposition | Evidence limit |
 |---|---|---|
 | `headless/metadata_bridge.cpp` | Source-reviewed 2026-11-01 | No FPS or console first-frame claim |
+
+## Réévaluation du 3 novembre 2026 : métadonnées NUP strictement sous P5
+
+La révision `headless/metadata_bridge.cpp` `83b2b12f48be609520f28c23e0722a55b57597f4` ajoute `PreferredNupLocale`, la lecture d'identité, de titres localisés, d'icônes bornées à 4 Mio et de langues NACP pour des conteneurs NUP. **Toutes** les nouvelles branches exécutables sont encapsulées dans `#ifdef EDEN_NUP_V1_RUNTIME`; un simple include `<string_view>` est ajouté hors garde. Les chemins de métadonnées habituels NSP/XCI et les recherches de firmware/keys NS1 et NS2 restent inchangés dans cette révision. Le CMake `nup_v1_runtime.cmake` garde la sélection OFF par défaut et la refuse au profil final ; `eden-metadata` n'obtient la définition que sous ce sélecteur P5. Ce contrôle de diff ne vaut ni compilation intégrale PS5, ni validation du NUP en jeu, ni qualification du décodage d'images sur console.
