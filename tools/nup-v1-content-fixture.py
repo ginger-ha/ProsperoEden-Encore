@@ -381,3 +381,16 @@ def oversized_icon_fixture() -> bytes:
              "exefs/icon_EnglishAmerican.dat": b"I" * (4 * 1024 * 1024 + 1),
          }},
     ])
+
+
+def large_raw_fixture() -> bytes:
+    """Six 1-MiB raw chunks for bounded, mutation-safe random-read proofs."""
+    block_size = 1 << 20
+    contents = bytearray().join(bytes([ord("A") + i]) * block_size for i in range(6))
+    marker = b"BLOCK-MUTATION-MARKER"
+    contents[4 * block_size + block_size // 2:
+             4 * block_size + block_size // 2 + len(marker)] = marker
+    return build([
+        {"title_id": 0x0100123400000000, "version": 1, "kind": 0,
+         "files": {"romfs/large.bin": bytes(contents)}},
+    ])
