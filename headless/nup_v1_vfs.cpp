@@ -224,6 +224,7 @@ void Archive::Parse() {
         files_.push_back(std::move(f));
     }
 
+    member_verified_.assign(files_.size(), 0);
     std::vector<unsigned> incoming(nd);
     std::vector<std::uint8_t> slot_owners(children_.size());
     for (const auto& dir : dirs_) {
@@ -555,11 +556,21 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
         Check(index < files_.size(), "unknown member");
         const auto& f = files_[index];
         Check(offset <= f.size && dst.size() <= f.size - offset, "member read outside bounds");
+        bool already_verified = false;
+        {
+            std::lock_guard guard(verified_mutex_);
+            already_verified = member_verified_[index] != 0;
+        }
+        if (already_verified && f.codec == 0) {
+            Check(dst.empty() || source_.ReadAt(f.offset + offset, dst),
+                  "verified raw extent short read");
+            return true;
+        }
         Digest digest;
         std::uint64_t produced = 0;
         const auto record = [&](std::span<const std::uint8_t> chunk) {
             Check(chunk.size() <= f.size - produced, "member expansion beyond declared size");
-            digest.Add(chunk);
+            if (!already_verified) digest.Add(chunk);
             const auto start = std::max(produced, offset);
             const auto finish = std::min(produced + chunk.size(), offset + dst.size());
             if (start < finish)
@@ -605,6 +616,9 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
                 const auto status = ZSTD_decompressStream(stream.get(), &out, &in);
                 Check(!ZSTD_isError(status), "invalid zstd payload");
                 record(std::span<const std::uint8_t>(output.data(), out.pos));
+                // Once integrity is memoized, only decode as far as this
+                // range needs; the immutable source was checked in full.
+                if (already_verified && produced >= offset + dst.size()) break;
                 if (status == 0) {
                     Check(consumed == f.stored && in.pos == in.size,
                           "trailing zstd bytes/concatenated frames");
@@ -613,9 +627,15 @@ bool Archive::ReadMember(std::size_t index, std::uint64_t offset,
                 Check(in.pos > before || out.pos > 0, "stalled zstd decoder");
             }
         }
-        Check(produced == f.size, "member decoded size mismatch");
-        const auto actual = digest.End();
-        Check(std::equal(actual.begin(), actual.end(), f.digest), "member SHA-256 mismatch");
+        if (!already_verified) {
+            Check(produced == f.size, "member decoded size mismatch");
+            const auto actual = digest.End();
+            Check(std::equal(actual.begin(), actual.end(), f.digest), "member SHA-256 mismatch");
+            std::lock_guard guard(verified_mutex_);
+            member_verified_[index] = 1;
+        } else {
+            Check(produced >= offset + dst.size(), "short decoded member range");
+        }
         return true;
     } catch (const std::exception& ex) {
         if (error) *error = ex.what();
