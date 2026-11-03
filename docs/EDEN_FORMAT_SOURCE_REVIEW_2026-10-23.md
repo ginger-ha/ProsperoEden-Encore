@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `0432c4c2651b2af22343f1401751b3222e30cdc4` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
+| `headless/game_files.h` | `d292275239472a9df01205ceabbcd96a2e6a2877` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -96,3 +96,7 @@ Le nouvel objet `headless/game_files.h` (`dd89d9f9c5c0cde824f41889918f665275c05b
 ### Revue complémentaire du 3 novembre 2026 — sélection NUP strictement P5
 
 L'objet source `headless/game_files.h` (`0432c4c2651b2af22343f1401751b3222e30cdc4`) ajoute seulement `IsNupFile()` et ses appels dans `IsGameFile`, `IsNestedGameFileSelection` et `FindNestedGamePackage`. Sans définition de compilation `EDEN_NUP_V1_RUNTIME`, `IsNupFile` renvoie **toujours false** : les neuf extensions historiques conservent leur comportement. En P5 uniquement, les chemins `.nup` deviennent candidats, mais la validation de signature, du VFS et du chargeur reste distincte. Le gate CMake est OFF par défaut et interdit en `EDEN_FINAL_RELEASE_PROFILE`; voir `tools/check-nup-v1-runtime-cmake.py` et `tools/check-nup-v1-game-discovery.py`. Les chemins updates/DLC, symlinks, ExeFS, classement et contrôles de niveaux n'ont pas été modifiés par cette révision. La qualification du sélecteur n'est **pas** une preuve d'exécution d'un jeu NUP sur PS5.
+
+### Revue du 3 novembre — sélections enregistrées d'updates/DLC
+
+Le blob `headless/game_files.h` `d292275239472a9df01205ceabbcd96a2e6a2877` applique désormais **la même exclusion** de noms réservés aux packages rencontrés lors de la découverte et aux chemins de titre déjà enregistrés. Les stems exacts update/patch/DLC/AOC/addon et leurs variantes avec suffixe `_` ou `-` sont refusés comme *base*; les noms de conteneurs AOC/patch sont aussi écartés des racines extraites. Les packages réels sont toujours classés via leurs métadonnées par le provider AoC; aucun routage de DLC n'est supprimé. Un fichier caché `.nsp` ou `.xci` ne peut pas être sélectionné depuis un ancien cache. Les tests hôte `tools/check-exefs-directory-host.py` couvrent la découverte et une sélection persistée, sans changement du chemin NS1 normal, du lecteur NUP P5 ou de la console.

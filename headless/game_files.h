@@ -59,7 +59,22 @@ inline bool IsAddOnContainerName(std::string_view name) {
     std::transform(lower.begin(), lower.end(), lower.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lower == "updates" || lower == "update" || lower == "patches" ||
-           lower == "dlc" || lower == "addons" || lower == "add-ons";
+           lower == "patch" || lower == "dlc" || lower == "aoc" ||
+           lower == "addon" || lower == "addons" || lower == "add-on" ||
+           lower == "add-ons" || lower == "add_on";
+}
+// Apply the same update/DLC safeguard to newly discovered packages and
+// previously saved selections. A stale persisted path is not proof of a base.
+inline bool IsReservedAddOnPackageStem(std::string_view name) {
+    std::string lower{name};
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (IsAddOnContainerName(lower)) return true;
+    for (const char* prefix : {"update_", "update-", "patch_", "patch-",
+                               "dlc_", "dlc-", "aoc_", "aoc-", "addon_", "addon-"}) {
+        if (lower.starts_with(prefix)) return true;
+    }
+    return false;
 }
 // Extracted AOC stores can also sit beneath arbitrary wrapper names.
 // Discover only canonical 16-digit hex AOC Title IDs; the vendor filesystem
@@ -207,6 +222,11 @@ inline bool IsNestedGameFileSelection(std::string_view selection) {
     const auto last_slash = selection.find_last_of('/');
     if (last_slash == std::string_view::npos || last_slash == 0 ||
         last_slash == selection.size() - 1) return false;
+    const auto basename = selection.substr(last_slash + 1);
+    const auto extension_dot = basename.find_last_of('.');
+    if (basename.front() == '.' || extension_dot == std::string_view::npos ||
+        IsReservedAddOnPackageStem(basename.substr(0, extension_dot)))
+        return false;
     std::size_t levels = 0;
     while (!selection.empty()) {
         const auto slash = selection.find('/');
@@ -257,13 +277,7 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             if (!fs::is_regular_file(status) ||
                 (!IsPackageFile(name) && !IsCardImageFile(name) &&
                  !IsNupFile(name))) continue;
-            std::string stem = path.stem().string();
-            std::transform(stem.begin(), stem.end(), stem.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (stem == "update" || stem == "patch" || stem == "dlc" ||
-                stem == "aoc" || stem.starts_with("update_") ||
-                stem.starts_with("update-") || stem.starts_with("dlc_") ||
-                stem.starts_with("dlc-")) continue;
+            if (IsReservedAddOnPackageStem(path.stem().string())) continue;
             const auto candidate = relative.empty() ? name : relative + "/" + name;
             // The validator consumes a ROM-root-relative persisted selection.
             // A package in the title folder itself is still nested from roms/.

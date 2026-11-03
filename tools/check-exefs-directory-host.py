@@ -208,7 +208,19 @@ int main() {
                      packaged / "archives" / "nested" / "Updates") != addon_folders.end());
     assert(Eden::IsAddOnContainerName("DLC"));
     assert(Eden::IsAddOnContainerName("add-ons"));
+    assert(Eden::IsAddOnContainerName("PATCH"));
+    assert(Eden::IsAddOnContainerName("aOc"));
     assert(!Eden::IsAddOnContainerName("romfs"));
+    // The saved-selection validator must not reintroduce excluded addons.
+    for (const auto* stale : {"Packaged Game/Update.nsp",
+                              "Packaged Game/base/DLC_v2.xci",
+                              "Packaged Game/base/patch-42.nsz",
+                              "Packaged Game/base/AOC_01.xcz",
+                              "Packaged Game/.nsp"}) {
+        assert(!Eden::IsNestedGameFileSelection(stale));
+        assert(!Eden::IsSafeNestedGameFilePath(root, stale));
+    }
+    assert(Eden::IsNestedGameFileSelection("Packaged Game/base/container/base.nsp"));
     // A loose packaged DLC/update next to the base also selects the title
     // folder for the native metadata-aware content provider.
     std::ofstream(packaged / "DLC_1.nsp") << "addon";
@@ -225,6 +237,13 @@ int main() {
     std::ofstream(mixed_case / "title.xci") << "base";
     std::ofstream(mixed_case / "Updates" / "v2" / "patch.nsp") << "patch";
     assert(Eden::FindGameFolderInput(mixed_case) == "title.xci");
+    // An addon-only wrapper must not be advertised as a standalone base.
+    const auto only_addons = root / "Only Addons";
+    fs::create_directory(only_addons);
+    std::ofstream(only_addons / "UPDATE.nsp") << "patch";
+    std::ofstream(only_addons / "AOC_extra.xci") << "addon";
+    assert(Eden::FindGameFolderInput(only_addons).empty());
+    assert(Eden::FindNestedGamePackage(root / "AOC").empty());
     // Any wrapper name works; content metadata will establish Update/AOC.
     const auto arbitrary = root / "Arbitrary Folders";
     fs::create_directories(arbitrary / "base");
