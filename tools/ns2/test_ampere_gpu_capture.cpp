@@ -50,6 +50,27 @@ static void Push(std::vector<u8>& dst, u32 a, u32 b=0, u32 c=0, u32 d=0) {
         for (u32 byte=0;byte!=4;++byte)
             dst.push_back(static_cast<u8>(word >> (byte*8)));
 }
+struct CbufFixture {
+    std::array<u32,16> entries{};
+    u32 reads{};
+    bool missing{};
+    bool throw_reader{};
+    bool mutate_between_reads{};
+};
+static std::optional<u32> ReadCheckedCbuf(void* context,u32 bank,u32 offset) {
+    auto& cbuf=*static_cast<CbufFixture*>(context);
+    ++cbuf.reads;
+    if (cbuf.throw_reader)
+        throw std::runtime_error("CBUF guest mapping changed");
+    if (cbuf.missing || bank!=7 || offset<0xffc0U ||
+        offset>=0x10000U || offset&3U)
+        return {};
+    const u32 word=(offset-0xffc0U)/4;
+    if (cbuf.mutate_between_reads && cbuf.reads>16 && word==0)
+        return 0x100U;
+    return cbuf.entries[word];
+}
+
 int main() {
     constexpr u32 pred_true=7u<<12;
     constexpr u32 exit_true=7u<<23;
@@ -366,6 +387,56 @@ int main() {
                 tail_reader,throwing_table) && bad_source.size()==source_motif.size(),
             "BRX throwing CBUF reader must roll back without publishing a shader");
 
+
+    // Exercise the real checked capture/lowerer handoff. The native shader
+    // has a tracked BRX at instruction 3, a first EXIT at 4, and a target
+    // after that EXIT. The executing CBUF value remains an original guest PC.
+    MappedMemory brx_memory{};
+    brx_memory.data.resize(0x80);
+    brx_memory.data[0]=0x38;
+    Push(brx_memory.data,pred_true|0x817U|(4U<<16),15U,0x03800000U);
+    Push(brx_memory.data,pred_true|0x819U|(5U<<16)|(4U<<24),2U,0x000006ffU);
+    Push(brx_memory.data,pred_true|0xb82U|(6U<<16)|(5U<<24),
+         (7U<<22)|(0xffc0U<<6),0x00000800U);
+    Push(brx_memory.data,pred_true|0x949U|(6U<<24),0xffffffc0U,0x0383ffffU);
+    Push(brx_memory.data,pred_true|0x94dU,0,exit_true);
+    for(u32 i=0;i<4;++i) Push(brx_memory.data,pred_true|0x918U);
+    Push(brx_memory.data,pred_true|0x94dU,0,exit_true);
+    brx_memory.mapped_bytes=brx_memory.data.size();
+    CbufFixture stable_cbuf{};
+    for(u32 i=0;i<stable_cbuf.entries.size();++i)
+        stable_cbuf.entries[i]=i&1 ? 0x100U : 0x80U;
+    const auto compiled_brx=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,Read,&brx_memory,ReadCheckedCbuf,&stable_cbuf);
+    Require(compiled_brx.Ready() &&
+            compiled_brx.captured_native_bytes==10*sizeof(Instruction) &&
+            compiled_brx.image.ValidForCompiler() &&
+            compiled_brx.image.TranslateNativeAddress(8*16).has_value() &&
+            stable_cbuf.reads>=3*stable_cbuf.entries.size(),
+            "checked graphics BRX captures post-EXIT target and lowers dispatch");
+    const auto no_cbuf_brx=CaptureNativeGraphicsShader(
+        brx_memory.base,4,Read,&brx_memory);
+    Require(no_cbuf_brx.status==NativeCaptureStatus::UnresolvedIndirectBranch,
+            "BRX without authenticated CBUF callback remains fail-closed");
+    stable_cbuf.reads=0;
+    stable_cbuf.mutate_between_reads=true;
+    const auto racing_brx=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,Read,&brx_memory,ReadCheckedCbuf,&stable_cbuf);
+    Require(!racing_brx.Ready() && racing_brx.image.code.empty(),
+            "CBUF remap between snapshot passes never publishes shader");
+    stable_cbuf.mutate_between_reads=false;
+    stable_cbuf.missing=true;
+    const auto unmapped_brx=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,Read,&brx_memory,ReadCheckedCbuf,&stable_cbuf);
+    Require(!unmapped_brx.Ready() && unmapped_brx.image.code.empty(),
+            "missing native CBUF bank prevents indirect shader publication");
+    stable_cbuf.missing=false;
+    stable_cbuf.throw_reader=true;
+    const auto throwing_brx=CaptureNativeGraphicsShaderChecked(
+        brx_memory.base,4,Read,&brx_memory,ReadCheckedCbuf,&stable_cbuf);
+    Require(!throwing_brx.Ready() && throwing_brx.image.code.empty(),
+            "throwing CBUF callback cannot escape GPU capture or expose partial image");
+    stable_cbuf.throw_reader=false;
 
     mem.data.resize(0x80);
     Push(mem.data,pred_true|0xfff);

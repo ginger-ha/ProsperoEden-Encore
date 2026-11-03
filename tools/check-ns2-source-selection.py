@@ -429,6 +429,11 @@ def main() -> int:
                 "BRX expected native PC must agree" in (
                     ROOT / "tools/ns2/test_ampere_lower_bridge.cpp").read_text() and
                 "MakeNativeIndirectBranchPlans" in native_branch_tables and
+                "compiled_brx.Ready()" in native_capture_fixture and
+                "stable_cbuf.mutate_between_reads" in native_capture_fixture and
+                "CaptureNativeGraphicsShaderChecked" in native_capture_core and
+                "ReadNs2GraphicsCbuf" in native_capture and
+                "IsFullyMappedRange(address, sizeof(u32))" in native_capture and
                 "dispatch_plans=MakeNativeIndirectBranchPlans" in native_capture_fixture and
                 "ResolveCaptureIndirectBranchesChecked" in native_branch_tables and
                 "snapshot_reads>16" in native_capture_fixture and
