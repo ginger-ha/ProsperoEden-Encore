@@ -166,7 +166,38 @@ assert "AcquireNativeSampler(" in cache_header
 assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in cache_header
 print("NS2_POST_F07_TYPED_CACHE_ABI_ISOLATION_PASS",
       f"new_native_headers={len(post_f07_ns2_typed_cache_owners)}")
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners-post_f07_ns2_typed_cache_owners
+# The four NUP v1 parser/adapter files were introduced after the frozen
+# 518-path F07 optimization audit. They are testable, read-only VFS sources,
+# but are NOT selected by the PS5 shipping target and have no native-runtime
+# performance review. Keep the historic ledger immutable and this debt
+# explicit; do not quietly classify new NUP code as F07-optimized.
+post_f07_nup_vfs_owners = {
+    "headless/nup_v1_vfs.h",
+    "headless/nup_v1_vfs.cpp",
+    "headless/nup_v1_native_vfs.h",
+    "headless/nup_v1_native_vfs.cpp",
+}
+assert post_f07_nup_vfs_owners <= all_owners, sorted(
+    post_f07_nup_vfs_owners - all_owners)
+assert not post_f07_nup_vfs_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners |
+    post_f07_native_vulkan_owners | post_f07_shared_compute_owners |
+    post_f07_launcher_handoff_owners | post_f07_ns2_typed_cache_owners
+)
+assert 'nup_v1_vfs.cpp' not in release_cmake
+assert 'nup_v1_native_vfs.cpp' not in release_cmake
+nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
+nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
+assert "Not wired into the PS5 loader or game catalogue." in nup_core
+assert "Deliberately NOT registered" in nup_adapter
+assert "AllowsVerifiedMemberCache() const override { return false; }" in (
+    ROOT / "headless/nup_v1_native_vfs.cpp").read_text()
+print("NUP_V1_POST_F07_OWNER_ISOLATION_PASS",
+      f"not_retroactive_F07={len(post_f07_nup_vfs_owners)}",
+      "shipping_selection=absent")
+
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners-post_f07_ns2_typed_cache_owners-post_f07_nup_vfs_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
