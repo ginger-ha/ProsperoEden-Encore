@@ -69,8 +69,13 @@ Loader::ResultStatus NupAppLoader::ValidateProgramIdentity(u64& program_id) cons
     }
     if (!declared) return Loader::ResultStatus::ErrorNoExeFS;
     program_id = metadata.GetTitleID();
-    if (FileSys::GetBaseTitleID(program_id) !=
-        FileSys::GetBaseTitleID(declared->title_id)) {
+    // A base package identifies the exact program, including its program
+    // index. A standalone update carries the update title ID, so only its
+    // common base-program family can be compared with the loaded NPDM.
+    if ((declared->kind == 0 && program_id != declared->title_id) ||
+        (declared->kind == 1 &&
+         FileSys::GetBaseTitleID(program_id) !=
+             FileSys::GetBaseTitleID(declared->title_id))) {
         return Loader::ResultStatus::ErrorBadNPDMHeader;
     }
     return Loader::ResultStatus::Success;
