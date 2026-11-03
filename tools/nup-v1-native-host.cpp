@@ -4,6 +4,7 @@
 #include "core/file_sys/vfs/vfs.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 class MemoryFile final : public FileSys::VfsFile {
@@ -74,6 +76,24 @@ int main(int argc, char** argv) {
     auto newest = effective->GetFile("state.bin");
     assert(newest && newest->GetContainingDirectory() == effective);
     assert(Read(newest) == "latest-v3");
+    // The native FileSys API can issue concurrent reads on the same member.
+    // The source adapter must serialize raw file access and preserve checksums.
+    std::atomic<bool> concurrent_ok{true};
+    std::vector<std::thread> workers;
+    for (int worker = 0; worker < 8; ++worker) {
+        workers.emplace_back([&] {
+            for (int iteration = 0; iteration < 100; ++iteration) {
+                u8 buffer[9]{};
+                if (newest->Read(buffer, sizeof(buffer), 0) != sizeof(buffer) ||
+                    std::string_view(reinterpret_cast<const char*>(buffer), sizeof(buffer))
+                        != "latest-v3") {
+                    concurrent_ok.store(false, std::memory_order_relaxed);
+                }
+            }
+        });
+    }
+    for (auto& worker : workers) worker.join();
+    assert(concurrent_ok.load());
     assert(!newest->Resize(1) && !newest->Rename("changed"));
     assert(newest->Write(reinterpret_cast<const u8*>("bad"), 3, 0) == 0);
     u8 out{};
