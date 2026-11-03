@@ -43,6 +43,12 @@ assert "case_media::FrontPaperAvailable(" in back_owner
 assert "c.textures.cover(*front, front_bucket).missing" in back_owner
 assert back_owner.index("case_media::FrontPaperAvailable(") < back_owner.index(
     "case_media::BackScenes("), "rear must exclude the actual selected front"
+assert "return !c.textures.cover(path, front_bucket).missing;" in back_owner
+ready_owner = renderer.split("bool composed_case_face_ready(", 1)[1].split(
+    "void Launcher::start_scan()", 1)[0]
+assert "return !textures.cover(path, paper_w).missing;" in ready_owner
+assert ready_owner.index("case_media::FrontPaperAvailable(") < ready_owner.index(
+    "case_media::BackScenes("), "readiness must match rendered front selection"
 assert 'textures.cover(*front, 704.0f).missing' in renderer
 assert 'constexpr std::array<std::string_view, 3> kSceneMarkers{' in header.read_text()
 assert 'const std::string marker =' not in header.read_text()
@@ -140,6 +146,17 @@ int main() {
     assert(actual_back[0] == &failed_hero[0]); // source still present but unavailable
     assert(actual_back[1] == &failed_hero[2]);
     assert(*actual_back[1] != *active_front);
+    const auto filtered_back = BackScenes(
+        *active_front, icon, failed_hero,
+        [](const std::string& path) { return path != "failed-hero.tga"; });
+    assert(filtered_back[0] == &failed_hero[2]);
+    assert(!filtered_back[1] && !filtered_back[2]);
+    const std::vector<std::string> indexed_failed{
+        "/cache/box-scene-1-BAD.tga", "/cache/box-scene-2-OK.tga"};
+    const auto filtered_indexed = BackScenes(
+        empty, icon, indexed_failed,
+        [](const std::string& path) { return path.find("-BAD.") == std::string::npos; });
+    assert(!filtered_indexed[0] && filtered_indexed[1] == &indexed_failed[1]);
     assert(FrontAlternate(hero, empty, {"hero.tga"}) == nullptr);
 
     // When a game only has a front icon/poster, the back stays plain ink.
