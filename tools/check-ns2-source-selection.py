@@ -412,7 +412,8 @@ def main() -> int:
         native_capture_core = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/capture.cpp").read_text()
         native_capture_fixture = (ROOT / "tools/ns2/test_ampere_gpu_capture.cpp").read_text()
         native_branch_tables = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/program_capture.h").read_text()
-        require("opcode == 0x949 || opcode == 0x958" in native_capture_core and
+        require("opcode == 0x958 || (opcode == 0x949 && !read_cbuf)" in native_capture_core and
+                "saw_indirect |= opcode == 0x949" in native_capture_core and
                 "if (bank >= 18 || (offset & 3U) ||" in native_branch_tables and
                 "offset > 0x10000U - entries * sizeof(u32)" in native_branch_tables and
                 "indirect_uniform.status==NativeCaptureStatus::UnresolvedIndirectBranch" in native_capture_fixture and
