@@ -61,6 +61,18 @@ assert frontend.count("glReadPixels(") == 2  # dev BMP capture + one production 
 assert "glReadPixels(0, 0, width, height, GL_RGBA,\n                                         GL_UNSIGNED_BYTE, snapshot.rgba.data());" in frontend
 assert frontend.count("LaunchHandoff::Publish(") == 1
 handoff_read = frontend.index("snapshot.rgba.data());")
+# The final GL readback must not inherit a pixel-pack buffer (the pointer
+# would be interpreted as a GPU offset) or nonzero row/skip (buffer overrun).
+# Verify every altered state is restored before EGL swaps the final jacket.
+pack_begin = frontend.index("glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &old_pack_buffer);")
+pack_end = frontend.index("static_cast<GLuint>(old_pack_buffer));", pack_begin)
+pack = frontend[pack_begin:pack_end]
+assert pack.index("glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);") < pack.index("glReadPixels(")
+assert pack.index("glReadPixels(") < pack.index("glPixelStorei(GL_PACK_ALIGNMENT, old_pack_alignment);")
+for pname in ("ALIGNMENT", "ROW_LENGTH", "SKIP_ROWS", "SKIP_PIXELS"):
+    assert f"glPixelStorei(GL_PACK_{pname}, 0);" in pack if pname != "ALIGNMENT" else "glPixelStorei(GL_PACK_ALIGNMENT, 1);" in pack
+    assert f"glPixelStorei(GL_PACK_{pname}, old_pack_{pname.lower()});" in pack
+assert pack_end < frontend.index("Eden::LaunchHandoff::Publish(", pack_begin)
 # The first swap is the legitimate startup splash. Verify the swap AFTER
 # the completed launcher readback, not the first swap in this source file.
 assert frontend.index("display.swap()") < frontend.index("batch.draw(list, viewport,")
