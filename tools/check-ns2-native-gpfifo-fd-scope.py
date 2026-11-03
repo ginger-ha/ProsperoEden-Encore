@@ -60,15 +60,20 @@ required_header = (
 # process before any command reads or GPU queue submission.
 kickoff = source.split("NvResult nvhost_gpu::SubmitGPFIFOBase1(", 1)[1].split(
     "NvResult nvhost_gpu::SubmitGPFIFOBase2(", 1)[0]
-kickoff_preflight = "session->process->GetMemory().IsValidVirtualAddressRange("
+kickoff_preflight = "NativeGpfifoGuestHeadersReadable("
 kickoff_read = "this->GetSessionMemory(fd).ReadBlock("
+guard = (ROOT / "vendor/encore-active/ns2-runtime/hle/core/hle/service/nvdrv/devices/native_gpu_submission.h").read_text()
 checks = [
     (kickoff_preflight in kickoff and kickoff_read in kickoff and
      kickoff.index(kickoff_preflight) < kickoff.index(kickoff_read) and
-     "UsesNativeAbi(fd) && params.num_entries != 0" in kickoff and
-     "static_cast<std::size_t>(params.num_entries) *" in kickoff and
-     "return NvResult::InvalidSize;" in kickoff,
-     "native kickoff validates every guest GPFIFO header before reading, leaving NS1 unchanged"),
+     "if (UsesNativeAbi(fd) &&" in kickoff and
+     "session->process->GetMemory().IsValidVirtualAddressRange(" in kickoff and
+     "return NvResult::InvalidSize;" in kickoff and
+     "if (count == 0) return true;" in guard and
+     "if (address == 0 || entry_size == 0 ||" in guard and
+     "count > std::numeric_limits<std::size_t>::max() / entry_size" in guard and
+     "address > std::numeric_limits<std::uint64_t>::max() - bytes" in guard,
+     "native kickoff maps every guest header with overflow-safe bounded helper, leaving NS1 unchanged"),
     (all(s in source for s in required_cpp), "native source uses exact caller FD"),
     (all(s in header for s in required_header), "native header exposes caller FD"),
     (all(s in native_puller for s in required_puller),
