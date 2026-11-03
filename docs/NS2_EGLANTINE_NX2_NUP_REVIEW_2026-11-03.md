@@ -126,7 +126,7 @@ Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin
 ### Encadrement des archives DLC sans programme
 
 - Une archive NUP contenant uniquement des DLC ne permet pas de déduire en sécurité l'identité de l'application qui la consomme. `ContentSet(mount)` ne livre désormais **aucun** DLC dans cette situation ; `ContentSet(mount, caller_program_id)` exige explicitement le programme appelant et applique l'identité de base du moteur commun pour ne renvoyer que les addons pertinents.
-- Le même paramètre explicite ne peut pas détourner un package `base`/update` déjà présent vers un autre programme : les DLC restent invisibles si le caller appartient à une autre famille. Test synthétique avec deux familles de titres et une RomFS distincte par DLC.
+- Le même paramètre explicite ne peut pas détourner un package `base`/`update` déjà présent vers un autre programme : les DLC restent invisibles si le caller appartient à une autre famille. Test synthétique avec deux familles de titres et une RomFS distincte par DLC.
 - Ce filtrage prépare le futur fournisseur AoC ; il **ne constitue pas** un raccordement au service `aoc:u`. Les conventions exactes de TitleID NS2 et la représentation des upgrade packs sont à qualifier avec des fixtures réelles avant toute activation.
 - Validation consolidée encore attendue : CI [#41580516560](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41580516560). Les runs plus anciens sont annulés par `concurrency.cancel-in-progress`, sans supprimer leurs commits ni leurs modifications.
 
