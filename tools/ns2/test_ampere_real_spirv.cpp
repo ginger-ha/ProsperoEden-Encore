@@ -82,6 +82,19 @@ static bool ReadGuest(void* ptr,u64 address,void* output,std::size_t count) {
 // These are not models of the metadata algorithm: Normalize inspects the
 // actual BasicBlock and OpCode/Value objects later passed to SPIR-V.
 static void CheckNativeQmdIndirectCbufIR() {
+    // This shader compiler is shared with NS1. An opt-in Ampere compilation
+    // must restore its thread-local mode on normal, nested and early return.
+    Require(!NativeSpirvCbufBoundsActive(), "native CBUF mode leaked into NS1");
+    {
+        NativeSpirvCbufBoundsScope native;
+        Require(NativeSpirvCbufBoundsActive(), "native CBUF mode not enabled");
+        {
+            NativeSpirvCbufBoundsScope nested;
+            Require(NativeSpirvCbufBoundsActive(), "nested native CBUF lost mode");
+        }
+        Require(NativeSpirvCbufBoundsActive(), "native CBUF nested scope leaked");
+    }
+    Require(!NativeSpirvCbufBoundsActive(), "native CBUF mode not restored");
     const auto run = [](u32 enabled_mask, bool indirect_bank, bool indirect_offset,
                         u32 bank, u32 byte_offset, bool expected_ok,
                         u32 expected_size) {

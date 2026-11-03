@@ -190,6 +190,7 @@ def main() -> int:
         # the native NS2 bridge. The original fourteen-bank source is kept.
         qmd_spirv = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
         native_direct_cbuf = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp").read_text()
+        native_graphics_cache = (ROOT / "vendor/encore-active/eden-vulkan/vk_pipeline_cache_cost.cpp").read_text()
         pristine_direct_cbuf = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/emit_spirv_context_get_set.cpp").read_text()
         qmd_indirect = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_indirect_cbuf.h").read_text()
         qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
@@ -209,6 +210,11 @@ def main() -> int:
                 'ctx.Const(0x10000U / element_size)' in native_direct_cbuf and
                 'if (offset.U32() >= 0x10000U)' in native_direct_cbuf and
                 'return ctx.ConstantNull(result_type);' in native_direct_cbuf and
+                'if (!Shader::Ampere::NativeSpirvCbufBoundsActive())' in native_direct_cbuf and
+                'const Id cond = ctx.OpULessThanEqual(ctx.TypeBool(), buffer_offset, ctx.Const(0xFFFFu));' in native_direct_cbuf and
+                'NativeSpirvCbufBoundsScope native_bounds;' in qmd_bridge and
+                'Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;' in native_graphics_cache and
+                'NativeSpirvCbufBoundsActive(), "native CBUF mode not enabled"' in ir_native_fixture and
                 'ctx.OpAccessChain(uniform_type, cbuf, ctx.u32_zero_value,' in native_direct_cbuf and
                 'if (offset.IsImmediate() || !ctx.profile.has_broken_robust)' in pristine_direct_cbuf and
                 'std::span{buf_labels}.first(bank_count)' in qmd_spirv and
