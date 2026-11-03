@@ -220,6 +220,19 @@ int main(int argc, char** argv) {
     FileSys::VirtualFile second_romfs;
     assert(app->ReadRomFS(second_romfs) == Loader::ResultStatus::Success);
     assert(romfs_result == second_romfs); // lazily built once per app
+    std::atomic<bool> romfs_stable{true};
+    std::vector<std::thread> romfs_workers;
+    for (int i = 0; i < 6; ++i) {
+        romfs_workers.emplace_back([&] {
+            FileSys::VirtualFile concurrent_romfs;
+            if (app->ReadRomFS(concurrent_romfs) != Loader::ResultStatus::Success ||
+                concurrent_romfs != romfs_result) {
+                romfs_stable.store(false, std::memory_order_relaxed);
+            }
+        });
+    }
+    for (auto& worker : romfs_workers) worker.join();
+    assert(romfs_stable.load());
     std::uint64_t program_id{};
     std::string app_title;
     assert(app->ReadProgramId(program_id) == Loader::ResultStatus::Success);
