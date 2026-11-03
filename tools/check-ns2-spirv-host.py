@@ -53,7 +53,16 @@ def main():
         r"(?:instructions/)?[^\s()/]+\.cpp", 18,
         ["sirit.cpp", "instructions/type.cpp"])
     overlay = ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere"
-    sources = [SHADER / name for name in shaders] + [
+    # P2.3 must compile the actual native QMD3 indirect-CBUF emitter, not
+    # Eden's fourteen-bank baseline. Keep every other pinned source intact.
+    native_cbuf_emitter = (
+        ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp"
+    )
+    emitter_owner = "backend/spirv/spirv_emit_context.cpp"
+    if shaders.count(emitter_owner) != 1:
+        raise RuntimeError("pinned SPIR-V emitter source changed")
+    sources = [native_cbuf_emitter if name == emitter_owner else SHADER / name
+               for name in shaders] + [
         overlay / (name + ".cpp") for name in
         ("ir_bridge", "renderer_spirv_bridge", "maxwell_environment", "maxwell_image", "lower_bridge", "probe")
     ] + [overlay / "capture.cpp",

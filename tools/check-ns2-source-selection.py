@@ -192,6 +192,7 @@ def main() -> int:
         qmd_indirect = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_indirect_cbuf.h").read_text()
         qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
         qmd_env = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h").read_text()
+        host_native_spirv = (ROOT / "tools/check-ns2-spirv-host.py").read_text()
         qmd_launch_capture = (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.cpp").read_text()
         qmd_spirv_header = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.h").read_text()
         pristine_spirv = (ROOT / "vendor/sources/eden/src/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
@@ -208,8 +209,10 @@ def main() -> int:
                 'enabled_cbuf_mask |= u32{1} << bank;' in qmd_launch_capture and
                 'qmd_enabled_cbuf_mask = 0xffU' in qmd_spirv_header and
                 'shader_info.constant_buffer_mask != declared_banks' in qmd_env and
-                'OpSwitch(binding, buf_labels[0], buf_literals, buf_labels);' in pristine_spirv,
-                "Sparse native QMD3 CBUF mask must match SPIR-V, QMD3 and real Vulkan layout")
+                'OpSwitch(binding, buf_labels[0], buf_literals, buf_labels);' in pristine_spirv and
+                'native_cbuf_emitter if name == emitter_owner else SHADER / name' in host_native_spirv and
+                'emitter_owner = "backend/spirv/spirv_emit_context.cpp"' in host_native_spirv,
+                "Sparse QMD3 CBUF source, native test selection, and Vulkan layout must agree")
         qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
         require("AcquireNativeQmdSession(" in engine_registry and
                 "qmd_sessions.erase(process)" in engine_registry and
