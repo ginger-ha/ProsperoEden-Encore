@@ -27,6 +27,7 @@ public:
     Mount& operator=(const Mount&) = delete;
 
     const std::vector<Eden::NupV1::Package>& Packages() const;
+    const Eden::NupV1::PackageMetadata* ApplicationMetadata() const;
     // ExeFS/RomFS views. Addons are NEVER merged into Effective().
     FileSys::VirtualDir Effective(ContentView view) const;
     FileSys::VirtualDir PackageView(std::size_t package_index, ContentView view) const;
