@@ -187,6 +187,64 @@ int main() {
     motif[2].words[1]=(18U<<22)|(0xffc0U<<6);
     Require(TrackCaptureIndirectBranches(motif).empty(),
             "BRX CBUF bank outside 18 reflected shader banks rejected");
+
+    // Exact native-PC -> emitted-Maxwell-PC map. No arithmetic 16:8
+    // assumption: a native instruction may expand and Maxwell has scheduler
+    // words. The actual captured image must resolve both entries.
+    CaptureIndirectResult captured_table{};
+    captured_table.tables.push_back({
+        .branch=0, .cbuf_index=7, .cbuf_offset=0xfff8U,
+        .values={0x80U,0x90U}, .targets={0,1}});
+    const auto mapped_header_table=TranslateCaptureIndirectTargets(
+        captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader);
+    Require(mapped_header_table && mapped_header_table->size()==1 &&
+            mapped_header_table->front().entries.size()==2 &&
+            mapped_header_table->front().cbuf_index==7 &&
+            mapped_header_table->front().cbuf_offset==0xfff8U &&
+            mapped_header_table->front().entries[0].native_code_offset==0 &&
+            mapped_header_table->front().entries[0].maxwell_byte_offset==
+                *ok.image.TranslateNativeAddress(0) &&
+            mapped_header_table->front().entries[1].native_code_offset==16 &&
+            mapped_header_table->front().entries[1].maxwell_byte_offset==
+                *ok.image.TranslateNativeAddress(16),
+            "BRX native shader-header table maps every PC through actual Maxwell image");
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::NativeCode),
+            "BRX must not interpret header-relative entries as code-relative");
+    captured_table.tables[0].values={0,16};
+    const auto mapped_code_table=TranslateCaptureIndirectTargets(
+        captured_table,ok.image,CaptureIndirectValueOrigin::NativeCode);
+    Require(mapped_code_table && mapped_code_table->front().entries[0].raw_value==0 &&
+            mapped_code_table->front().entries[0].maxwell_byte_offset==
+                *ok.image.TranslateNativeAddress(0),
+            "BRX zero is a valid code-relative target, not a missing entry");
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "code-relative zero must not become a graphics-header-relative PC");
+    captured_table.tables[0].values={0x80U,0x91U};
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "BRX misaligned entry invalidates complete target map");
+    captured_table.tables[0].values={0x80U,0xa0U};
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "BRX target beyond captured shader invalidates complete target map");
+    captured_table.tables[0].values={0x80U,0x90U};
+    captured_table.tables[0].cbuf_offset=0xfffcU;
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "BRX table that wraps 64 KiB CBUF must not map");
+    captured_table.tables[0].cbuf_offset=0xfff8U;
+    captured_table.tables[0].cbuf_index=18;
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "BRX table with invalid CBUF bank must not map");
+    captured_table.tables[0].cbuf_index=7;
+    captured_table.tables.push_back(captured_table.tables[0]);
+    Require(!TranslateCaptureIndirectTargets(
+                captured_table,ok.image,CaptureIndirectValueOrigin::GraphicsHeader),
+            "duplicate BRX index must not publish competing target tables");
+
     mem.data.resize(0x80);
     Push(mem.data,pred_true|0xfff);
     Push(mem.data,pred_true|0x94d,0,exit_true);
