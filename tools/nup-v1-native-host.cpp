@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
     // multiple separately addressed addons (never registered in AoC).
     auto executable_input = std::make_shared<MemoryFile>(Load(argv[3]));
     auto playable_mount = Eden::NupV1::Native::Mount::Open(executable_input, &error);
-    assert(playable_mount && playable_mount->Packages().size() == 5);
+    assert(playable_mount && playable_mount->Packages().size() == 7);
     Eden::NupV1::Native::ContentSet exec_content(playable_mount);
     assert(exec_content.HasExecutableMain());
     auto exefs = exec_content.ExeFS();
@@ -180,15 +180,19 @@ int main(int argc, char** argv) {
     assert(Read(sub->GetFile("base.dat")) == "base-only");
     assert(Read(sub->GetFile("update.dat")) == "update-only");
     assert(exec_content.AddOns().size() == 2);
-    assert(exec_content.AddOns()[0].package_index == 3);
+    assert(exec_content.AddOns()[0].package_index == 5);
     assert(exec_content.AddOns()[1].package_index == 4);
     assert(exec_content.AddOns()[0].title_id != exec_content.AddOns()[1].title_id);
-    assert(Read(exec_content.AddOns()[0].romfs->GetFile("addon.dat")) == "addon-one");
+    assert(exec_content.AddOns()[0].version == 2);
+    assert(exec_content.AddOns()[1].version == 0);
+    assert(Read(exec_content.AddOns()[0].romfs->GetFile("addon.dat")) == "addon-one-v2");
     assert(Read(exec_content.AddOns()[1].romfs->GetFile("addon.dat")) == "addon-two");
-    assert(Read(exec_content.CreateAddOnRomFS(3)) == "addon.dat=addon-one\n");
+    assert(Read(exec_content.CreateAddOnRomFS(5)) == "addon.dat=addon-one-v2\n");
     assert(Read(exec_content.CreateAddOnRomFS(4)) == "addon.dat=addon-two\n");
     assert(!exec_content.CreateAddOnRomFS(0)); // base
     assert(!exec_content.CreateAddOnRomFS(1)); // update
+    assert(!exec_content.CreateAddOnRomFS(3)); // replaced older addon
+    assert(!exec_content.CreateAddOnRomFS(6)); // unrelated game addon
     assert(!exec_content.CreateAddOnRomFS(500));
     assert(!effective_tree->GetFile("addon.dat"));
     // ExeFS handles remain valid after dropping the owning ContentSet/Mount.
