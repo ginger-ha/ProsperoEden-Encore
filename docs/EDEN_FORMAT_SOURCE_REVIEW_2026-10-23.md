@@ -15,7 +15,7 @@ fausse dette d'optimisation JIT/GPU.
 
 | Source | Git blob exact | Rôle et portée |
 | --- | --- | --- |
-| `headless/game_files.h` | `dd89d9f9c5c0cde824f41889918f665275c05bdc` | Sélection et validation des neuf extensions et de l'ExeFS; sélection de titre, pas du frame GPU |
+| `headless/game_files.h` | `0432c4c2651b2af22343f1401751b3222e30cdc4` | Neuf extensions historiques + `.nup` uniquement derrière le garde P5; ExeFS inchangé, aucune validation GPU |
 | `headless/ncz.cpp` | `7deff2ea1a82574b9e756ad9c2f0d869aa94612b` | Adaptateur de lecture NCZ et cache, sélectionné par CMake |
 | `headless/ncz.h` | `85ced3460d83be2a8011f189c0df406b4dd32b8c` | Décompression NCZ, limites et protection du cache |
 | `headless/ncz_check.cpp` | `65c9e5f4eb3625140add52ced2ea82e66bd224ab` | Harnais de vérification hôte; jamais un composant de rendu |
@@ -92,3 +92,7 @@ The loader's reviewed source is now blob `7943b817dfa8118b150c4970d6513ec179262a
 ### Revue complémentaire du 3 novembre 2026 — ExeFS mixte
 
 Le nouvel objet `headless/game_files.h` (`dd89d9f9c5c0cde824f41889918f665275c05bdc`) ne modifie que trois sélections d'`exefs`/`base` : reconnaissance insensible à la casse des noms de répertoires exacts (`ExeFS`, `BASE`), sans accepter des préfixes ou les répertoires de mise à jour/DLC comme titres de base. Les contrôles des segments, erreurs de système de fichiers et liens symboliques restent inchangés; `tools/check-exefs-directory-host.py` est le témoin hôte. Cet inventaire reste distinct d'une preuve de lancement PS5.
+
+### Revue complémentaire du 3 novembre 2026 — sélection NUP strictement P5
+
+L'objet source `headless/game_files.h` (`0432c4c2651b2af22343f1401751b3222e30cdc4`) ajoute seulement `IsNupFile()` et ses appels dans `IsGameFile`, `IsNestedGameFileSelection` et `FindNestedGamePackage`. Sans définition de compilation `EDEN_NUP_V1_RUNTIME`, `IsNupFile` renvoie **toujours false** : les neuf extensions historiques conservent leur comportement. En P5 uniquement, les chemins `.nup` deviennent candidats, mais la validation de signature, du VFS et du chargeur reste distincte. Le gate CMake est OFF par défaut et interdit en `EDEN_FINAL_RELEASE_PROFILE`; voir `tools/check-nup-v1-runtime-cmake.py` et `tools/check-nup-v1-game-discovery.py`. Les chemins updates/DLC, symlinks, ExeFS, classement et contrôles de niveaux n'ont pas été modifiés par cette révision. La qualification du sélecteur n'est **pas** une preuve d'exécution d'un jeu NUP sur PS5.
