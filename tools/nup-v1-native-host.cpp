@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 10);
+    assert(argc == 11);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -360,5 +360,12 @@ int main(int argc, char** argv) {
     Eden::NupV1::Native::ContentSet wrong_program(
         base_mounted_again, 0x0100123400002000ULL);
     assert(wrong_program.AddOns().empty());
+    // An oversized NPDM is rejected before any extracted-loader
+    // constructor can allocate from attacker-controlled NPDM fields.
+    error.clear();
+    auto oversized_input = std::make_shared<MemoryFile>(Load(argv[10]));
+    auto oversized = Eden::NupV1::Native::NupAppLoader::Open(
+        oversized_input, &error);
+    assert(!oversized && error == "NUP invalid NPDM program identity");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
