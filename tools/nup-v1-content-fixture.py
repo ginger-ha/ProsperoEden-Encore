@@ -261,3 +261,14 @@ def duplicate_locale_fixture() -> bytes:
          ])},
          "files": {"romfs/state.bin": b"duplicate-locale"}},
     ])
+
+
+def add_on_only_fixture() -> bytes:
+    """Two unrelated DLC families, neither implicitly owned by a program."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title + 0x1000, "version": 1, "kind": 2,
+         "files": {"romfs/addon.dat": b"family-one"}},
+        {"title_id": title + 0x3001, "version": 2, "kind": 2,
+         "files": {"romfs/addon.dat": b"family-two"}},
+    ])
