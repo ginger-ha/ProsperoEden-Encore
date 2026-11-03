@@ -65,11 +65,16 @@ def main():
         nacp_aoc.write_bytes(content_module.nacp_aoc_fixture())
         nacp_extracted = temp / "nacp-extracted.nup"
         nacp_extracted.write_bytes(content_module.nacp_aoc_fixture(extracted=True))
+        corrupt_nacp = temp / "nacp-corrupt.nup"
+        corrupt_nacp.write_bytes(content_module.corrupt_extracted_nacp_fixture())
+        short_nacp = temp / "nacp-short.nup"
+        short_nacp.write_bytes(content_module.short_extracted_nacp_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
                         str(executable), str(foreign_update), str(foreign_npdm),
                         str(sibling_npdm), str(malformed_meta), str(duplicate_locale),
                         str(addon_only), str(oversized_npdm), str(nacp_aoc),
-                        str(nacp_extracted)], check=True)
+                        str(nacp_extracted), str(corrupt_nacp),
+                        str(short_nacp)], check=True)
 
 if __name__ == "__main__":
     main()
