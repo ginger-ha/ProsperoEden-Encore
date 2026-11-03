@@ -314,6 +314,23 @@ int main(int argc, char** argv) {
     assert(program_id == 0x0100123400000000ULL);
     assert(app->ReadTitle(app_title) == Loader::ResultStatus::Success);
     assert(app_title == "Demo / Game");
+    std::string localized_title;
+    assert(app->ReadLocalizedTitle(localized_title, "fr-FR") ==
+           Loader::ResultStatus::Success);
+    assert(localized_title == "Démo / Jeu");
+    assert(app->ReadLocalizedTitle(localized_title, "en-US") ==
+           Loader::ResultStatus::Success);
+    assert(localized_title == "Demo Game (US)");
+    assert(app->ReadLocalizedTitle(localized_title, "de-DE") ==
+           Loader::ResultStatus::Success);
+    assert(localized_title == "Demo / Game");
+    std::vector<u8> localized_icon;
+    assert(app->ReadLocalizedIcon(localized_icon, "fr-FR") ==
+           Loader::ResultStatus::Success);
+    assert(localized_icon[0] == 0x89 && localized_icon[1] == 0x50);
+    assert(app->ReadLocalizedIcon(localized_icon, "de-DE") ==
+           Loader::ResultStatus::Success);
+    assert(localized_icon[0] == 0xff);
     std::vector<u8> app_icon;
     assert(app->ReadIcon(app_icon) == Loader::ResultStatus::Success);
     assert(app_icon.size() == metadata->default_icon.size());
