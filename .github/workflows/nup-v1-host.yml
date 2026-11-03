@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - tools/check-nup-v1-host.py
+      - tools/check-nup-v1-payload-host.py
       - .github/workflows/nup-v1-host.yml
   pull_request:
     paths:
       - tools/check-nup-v1-host.py
+      - tools/check-nup-v1-payload-host.py
       - .github/workflows/nup-v1-host.yml
   workflow_dispatch:
 
@@ -26,3 +28,5 @@ jobs:
           python-version: "3.12"
       - name: Validate NUP v1 structure and reject corrupted fixtures
         run: python3 tools/check-nup-v1-host.py --self-test
+      - name: Stream raw and zstd payloads and reject bad hashes / frames
+        run: python3 tools/check-nup-v1-payload-host.py --self-test
