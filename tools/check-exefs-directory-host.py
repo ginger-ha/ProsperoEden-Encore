@@ -165,6 +165,8 @@ int main() {
     std::ofstream(mixed / "wrapper" / "exefs" / "main.npdm") << "metadata";
     assert(Eden::FindDeconstructedGameMain(mixed) == "Base/ExeFS/main");
     assert(Eden::IsSafeDeconstructedGamePath(root, "Mixed Case/Base/ExeFS/main"));
+    // An extracted base keeps priority over any independently packaged input.
+    assert(Eden::FindGameFolderInput(mixed) == "Base/ExeFS/main");
     // Top-level content stores cannot surface as independent library games.
     const fs::path external_updates = root / "updates" / "458752" / "exefs";
     fs::create_directories(external_updates);
@@ -217,7 +219,8 @@ int main() {
     fs::create_directory(standalone);
     std::ofstream(standalone / "some-title.xci") << "game";
     assert(Eden::FindGameFolderInput(standalone) == "some-title.xci");
-    const auto mixed_case = root / "Mixed Case";
+    // Keep the package-only fixture separate from the extracted ExeFS fixture.
+    const auto mixed_case = root / "Mixed Case Packages";
     fs::create_directories(mixed_case / "Updates" / "v2");
     std::ofstream(mixed_case / "title.xci") << "base";
     std::ofstream(mixed_case / "Updates" / "v2" / "patch.nsp") << "patch";
