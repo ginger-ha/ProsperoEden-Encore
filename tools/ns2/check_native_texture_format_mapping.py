@@ -57,7 +57,7 @@ for filename in (
         ), (filename, name)
     assert "throw std::runtime_error{\"unsupported native Compute shader pixel format\"};" in native
     assert "return VideoCore::Surface::IsPixelFormatInteger(ReadNativePixelFormat(handle));" in native
-    assert "return false; // no unbacked image/sampler descriptor publication" in source
+    assert "if (native_images.size() != typed_descriptors->size())" in source
 
 print("NS2_NATIVE_TIC_PIXEL_FORMAT_MAP_PASS shared=95 rejected=10 explicit_depth=7"
       " ns1_vulkan_unchanged=1 no_native_image_binding_claim=1")
@@ -130,7 +130,7 @@ for filename in (
     admission = source.split("[this](const Tegra::Texture::TICEntry& tic) {", 1)[1]
     assert admission.index("PixelFormat::Invalid)") < admission.index(
         "const VideoCommon::ImageInfo info{tic};"), filename
-    assert "return false; // no unbacked image/sampler descriptor publication" in source
+    assert "if (native_images.size() != typed_descriptors->size())" in source
 
 # Legacy NS1 still uses its own 40-bit verification. It is not silently
 # widened without a corresponding Maxwell regression suite.
@@ -159,7 +159,7 @@ assert "PrepareImageView(pair->second, is_written, false)" in impl
 assert "return FindSampler(descriptor, true);" in impl
 assert "SamplerId TextureCache<P>::FindSampler(" in impl
 assert "ImageViewId TextureCache<P>::VisitImageView(" in impl
-assert "return false; // no unbacked image/sampler descriptor publication" in (
+assert "if (native_images.size() != typed_descriptors->size())" in (
     vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
 print("NS1_NS2_NATIVE_TEXTURE_CACHE_TYPED_OVERLAY_PASS owner=one"
       " upstream=immutable backports=immutable dispatch_images=closed")
@@ -232,7 +232,7 @@ for path in (
     guard = "NativeQmdImageLayoutMatches(*compiled.info, *resources)"
     assert owner.index(guard) < owner.index("tables.CaptureAdmissible("), path
 print("NS2_NATIVE_SPIRV_IMAGE_LAYOUT_OWNER_PASS order=4 rights=verified"
-      " unsound_wrap=refused native_image_dispatch=closed")
+      " unsound_wrap=refused image_dispatch=pin_guarded")
 
 # P2.2 native cache preflight uses the active GMMU and engine identity, not
 # merely a process ticket: never mix two GPU channels sharing TIC bytes.
@@ -252,10 +252,10 @@ for source_path in (
     caller = (vendor / source_path).read_text()
     assert "texture_cache.NativeChannelMatches(" in caller
     assert "std::scoped_lock lock{texture_cache.mutex};" in caller
-    before_close = caller.split("return false; // no unbacked image/sampler descriptor publication", 1)[0]
+    before_close = caller.split("if (native_images.size() != typed_descriptors->size())", 1)[0]
     assert "registry.IsComputeCurrent(kepler_compute, *ticket)" in before_close
 print("NS2_TEXTURE_CACHE_CHANNEL_GMMU_OWNER_PASS engine=exact gmmu=exact"
-      " both_native_cache_apis=guarded images_still_closed=1")
+      " both_native_cache_apis=guarded images_only_fence_owned=1")
 
 for path in (
     "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
@@ -266,7 +266,7 @@ for path in (
     assert locked.index("texture_cache.NativeChannelMatches(") < locked.index(
         "tables.MatchesSnapshot("), path
     assert locked.index("tables.MatchesSnapshot(") < locked.index(
-        "return false; // no unbacked image/sampler descriptor publication"), path
+        "if (native_images.size() != typed_descriptors->size())"), path
 print("NS2_TIC_TSC_LOCKED_SNAPSHOT_PASS same_channel=required snapshot=second_read"
       " before_publication=1")
 
@@ -286,9 +286,9 @@ for path in (
     bridge = (vendor / path).read_text()
     assert bridge.index("tables.CaptureAdmissible(") < bridge.index(
         "tables.DecodeAdmitted(") < bridge.index("tables.MatchesSnapshot("), path
-    assert "return false; // no unbacked image/sampler descriptor publication" in bridge
+    assert "if (native_images.size() != typed_descriptors->size())" in bridge
 print("NS2_TYPED_TIC_TSC_DECODE_PASS real_cache_ABI=1"
-      " retained_vk_objects=0 native_image_dispatch=closed")
+      " retained_vk_objects=1 image_dispatch=pin_guarded")
 
 assert "std::scoped_lock channel_lock{config_mutex};" in impl
 assert impl.index("std::scoped_lock channel_lock{config_mutex};") < impl.index(
@@ -410,7 +410,7 @@ for path in (
     # unsupported scattered backing before reading TIC/TSC table entries.
     assert bridge.index("ValidateGpuBufferMappings(") < bridge.index(
         "tables.CaptureAdmissible("), path
-    assert "return false; // no unbacked image/sampler descriptor publication" in bridge, path
+    assert "if (native_images.size() != typed_descriptors->size())" in bridge, path
 assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
     "null QMD CBUF address must fail before any GPU mapping callback"
 )
@@ -457,7 +457,7 @@ for path in (
     "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
 ):
     code = (vendor / path).read_text()
-    assert code.count("RetainNativeComputeUntilGpuTick(") == 2, path
+    assert code.count("RetainNativeComputeUntilGpuTick(") == 4, path
     assert "fence_manager.SignalFence([pipeline = std::move(pipeline)] {})" not in code
 print("NS2_NATIVE_COMPUTE_GPU_TICK_RETENTION_PASS no_immediate_release=1"
       " cancelled_submit=retained successful_submit=retained")
@@ -519,7 +519,43 @@ for site in ("void TextureCache<P>::InvalidateScale(", "void TextureCache<P>::De
     block = impl.split(site, 1)[1].split("\ntemplate <class P>", 1)[0]
     assert "runtime.RetireGpuImageView(" in block, site
 assert "runtime.RetireGpuImage(std::move(slot_images[image_id]));" in impl
-assert "return false; // no unbacked image/sampler descriptor publication" in (
+assert "if (native_images.size() != typed_descriptors->size())" in (
     vendor / "encore-active/eden-vulkan/vulkan_rasterizer.cpp").read_text()
 print("NS1_NS2_VULKAN_IMAGE_TIMELINE_RETIREMENT_SOURCE_PASS"
-      " views_before_images=1 OOM_fallback=wait_gpu native_image_dispatch=closed")
+      " views_before_images=1 OOM_fallback=wait_gpu image_dispatch=pin_guarded")
+
+# P2.2b: source-owner proof for the REAL cache-view and sampler GPU pins.
+# Retired resources must never be reclaimed on an old frame tick while a
+# QMD's fence callback still holds image/view/sampler owner references.
+assert "PinNativeImageView(ImageViewId id)" in header
+assert "PinNativeSampler(SamplerId id)" in header
+assert "image.PinNativeGpu()" in impl and "view.PinNativeGpu()" in impl
+assert "slot_samplers[id].PinNativeGpu()" in impl
+assert "pending.resource->CanRetireNativeGpu()" in vk_runtime
+native_cache_header = (vendor / (
+    "encore-active/ns2-astc/include/video_core/renderer_vulkan/vk_texture_cache.h"
+)).read_text()
+assert native_cache_header.count("bool CanRetireNativeGpu() const noexcept") == 2
+assert native_cache_header.count("std::shared_ptr<u8> PinNativeGpu()") == 3
+native_compute_header = (vendor / (
+    "encore-active/eden-vulkan/include/video_core/renderer_vulkan/vk_compute_pipeline.h"
+)).read_text()
+assert "struct NativeComputeImageBinding {" in native_compute_header
+assert "std::span<const NativeComputeImageBinding> images" in native_compute_header
+assert "guest_descriptor_queue.AddSampledImage(item.view, item.sampler);" in compute
+assert "guest_descriptor_queue.AddImage(item.view);" in compute
+assert "resources.StageVulkanBufferBindings(" in compute and "with_images);" in compute
+for path in (
+    "encore-active/eden-vulkan/vulkan_rasterizer.cpp",
+    "encore-active/eden-core/guest-bridge/vulkan_rasterizer.cpp",
+):
+    renderer = (vendor / path).read_text()
+    assert "texture_cache.AcquireNativeImageView(" in renderer, path
+    assert "texture_cache.PinNativeImageView(id)" in renderer, path
+    assert "texture_cache.AcquireNativeSampler(" in renderer, path
+    assert "texture_cache.PinNativeSampler(sid)" in renderer, path
+    assert "std::shared_ptr<NativeComputePinnedLifetime> pinned_lifetime" in renderer, path
+    assert "scheduler, fence_manager, std::move(pinned_lifetime)" in renderer, path
+    assert "tables.MatchesSnapshot(" in renderer, path
+print("NS2_NATIVE_VULKAN_TEXTURE_PIN_PASS cache=shared gpu_retire=leased"
+      " sampled=real storage=real ns1_path=unchanged")
