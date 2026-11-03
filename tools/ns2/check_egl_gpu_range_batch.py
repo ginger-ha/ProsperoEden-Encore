@@ -17,7 +17,22 @@ def once(t: str, old: str, new: str) -> str:
     return t.replace(old, new)
 
 t = OWNER.read_text()
-assert blob(t) == "c7923dbbef27a9088dbfcb33c162e3c7069679c1"
+# N51 shares the canonical GPU memory owner with P1.2 (cross-page scalar
+# accesses and physical-backing continuity). Keep an *exact* allowlist of
+# independently reviewed owner blobs: the original N51 integration and its
+# P1.2-protected successor. Never fall back to a substring-only audit.
+source_blob = blob(t)
+n51_original = "c7923dbbef27a9088dbfcb33c162e3c7069679c1"
+p12_protected = "7dba34b3e300515cd5b0a8579fe893072cb70b24"
+assert source_blob in (n51_original, p12_protected), (
+    "N51 GPU owner source drift (review before changing baseline)", source_blob)
+if source_blob == p12_protected:
+    assert '#include "native_paged_scalar.h"' in t
+    assert "Eden::GpuScalar::Read(addr, value" in t
+    assert "Eden::GpuScalar::Write(addr, data" in t
+    assert t.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4
+    assert "memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount)" in t
+    assert "memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount)" in t
 assert HELPER.is_file() and "class ChangedPageRuns" in HELPER.read_text()
 t = once(t,
     '#include "video_core/memory_manager.h"\n#ifdef EDEN_NS2_GPU_RANGE_BATCH\n'
@@ -46,7 +61,14 @@ for page in ("page_size", "big_page_size"):
 flush = "#ifdef EDEN_NS2_GPU_RANGE_BATCH\n    changed_runs.Flush(notify_changed);\n#endif\n"
 assert t.count(flush) == 2
 t = t.replace(flush, "")
-assert blob(t) == "f30099dfb5df01d9cd787d199e3e61f28205669a", "N51 changed unrelated PS5 GPU logic"
+# The legacy baseline after removing N51 stays byte-for-byte unchanged.
+# For the protected successor the exact pre-removal owner blob above, plus
+# single-occurrence N51 rewrites, prevents unrelated edits from being hidden.
+if source_blob == n51_original:
+    assert blob(t) == "f30099dfb5df01d9cd787d199e3e61f28205669a", "N51 changed unrelated PS5 GPU logic"
+else:
+    assert "EDEN_NS2_GPU_RANGE_BATCH" not in t
+
 assert "EDEN_NS2_GPU_RANGE_BATCH_EXPERIMENTAL OR" in CMAKE
 assert "EDEN_NS2_GPU_RANGE_BATCH=1" in CMAKE
 assert "EDEN_FINAL_RELEASE_PROFILE" in CMAKE
