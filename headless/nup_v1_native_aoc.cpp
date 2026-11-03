@@ -1,10 +1,53 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "nup_v1_native_aoc.h"
 #include <iterator>
+#include <mutex>
+#include <unordered_map>
 #include <utility>
 #include "core/file_sys/common_funcs.h"
 
 namespace Eden::NupV1::Native {
+namespace {
+struct ActiveRegistry {
+    std::mutex mutex;
+    std::unordered_map<const Loader::AppLoader*,
+                       std::shared_ptr<const AddOnIndex>> entries;
+};
+ActiveRegistry& Registry() {
+    static ActiveRegistry registry;
+    return registry;
+}
+} // namespace
+
+void PublishActiveAddOns(const Loader::AppLoader* loader,
+                         std::shared_ptr<const AddOnIndex> index) {
+    if (!loader || !index) return;
+    auto& registry = Registry();
+    std::lock_guard guard(registry.mutex);
+    registry.entries.insert_or_assign(loader, std::move(index));
+}
+
+void ForgetActiveAddOns(const Loader::AppLoader* loader) {
+    auto& registry = Registry();
+    std::lock_guard guard(registry.mutex);
+    registry.entries.erase(loader);
+}
+
+std::shared_ptr<const AddOnIndex> ActiveAddOnsForLoader(
+    const Loader::AppLoader* loader) {
+    if (!loader) return {};
+    auto& registry = Registry();
+    std::lock_guard guard(registry.mutex);
+    const auto found = registry.entries.find(loader);
+    return found == registry.entries.end() ? nullptr : found->second;
+}
+
+std::shared_ptr<const AddOnIndex> SoleActiveAddOns() {
+    auto& registry = Registry();
+    std::lock_guard guard(registry.mutex);
+    return registry.entries.size() == 1 ?
+           registry.entries.begin()->second : nullptr;
+}
 
 AddOnIndex::AddOnIndex(std::shared_ptr<Mount> mount,
                        std::uint64_t caller_program_id,
