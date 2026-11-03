@@ -99,12 +99,12 @@ static void CheckNativeQmdIndirectCbufIR() {
         Shader::IR::Value index_value{bank};
         Shader::IR::Value offset_value{byte_offset};
         if (indirect_bank) {
-            block.AppendNewInst(Shader::IR::Opcode::IAdd,
+            block.AppendNewInst(Shader::IR::Opcode::IAdd32,
                 {Shader::IR::Value{u32{0}}, Shader::IR::Value{u32{1}}});
             index_value = Shader::IR::Value{&block.back()};
         }
         if (indirect_offset) {
-            block.AppendNewInst(Shader::IR::Opcode::IAdd,
+            block.AppendNewInst(Shader::IR::Opcode::IAdd32,
                 {Shader::IR::Value{u32{0}}, Shader::IR::Value{u32{48}}});
             offset_value = Shader::IR::Value{&block.back()};
         }
