@@ -6515,6 +6515,15 @@ apply_reviewed_delta(
     "                    if (!bytes || bytes < minimum_bytes) return false;\n                    return Shader::Ampere::NativeQmdContiguousGpuSpan(",
     "NS2 image guest-size lower bound may not be truncated")
 
+# Audit exact generated source before replaying the new cache-retirement hunk.
+_probe = (output / "vk_texture_cache_cost.cpp").read_text()
+_probe_match = _probe.find("const auto ready =")
+_probe_retire = _probe.find("MIN_TEXTURE_RETIRE_FRAMES")
+print("P2_2B_GENERATOR_SOURCE", "ready=", _probe_match,
+      "retire=", _probe_retire, "size=", len(_probe),
+      "context=", repr(_probe[max(0, _probe_match-200):_probe_match+600])
+      if _probe_match >= 0 else "missing", file=sys.stderr)
+
 # P2.2b: a typed native GPU owner pins real shared-cache Vulkan images/views
 # across a concurrent guest eviction. The pinned cache runtime still retires
 # asynchronously after both the GPU timeline AND last native owner release.
