@@ -391,6 +391,10 @@ def main() -> int:
                 "const auto record = ReadStorageDescriptor(desc.cbuf_index, offset);" in qmd_environment.read_text() and
                 "A sparse GMMU unmap or failed CPU-backed span lookup" in qmd_environment.read_text() and
                 "const bool known_size = tag == 0 && bytes != 0" in qmd_environment.read_text() and
+                "NativeQmdGlobalMemoryLayoutMatches(" in qmd_environment.read_text() and
+                "result.global_layout_resolved = result.uses_global_memory;" in qmd_environment.read_text() and
+                "info.nvn_buffer_used.test(i)" in qmd_environment.read_text() and
+                "host_ssbo_alignment" in qmd_environment.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in qmd_api.read_text() and
                 "CompileCapturedNs2QmdComputeSpirv(" in pipeline_source.read_text() and
                 "CompileCapturedNs2QmdComputeSpirvWithResources(" in qmd_api.read_text() and
@@ -411,6 +415,10 @@ def main() -> int:
             "bool ComputePipeline::ConfigureNative(" in native_vk_pipeline and
             "resources.StageVulkanBufferBindings(" in native_vk_pipeline and
             "resources.ValidateGpuBufferMappings(mapped)" in native_vk_pipeline and
+            "Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(" in native_vk_pipeline and
+            "device.IsShaderInt64Supported()" in native_vk_pipeline and
+            "device.GetStorageBufferAlignment()" in native_vk_pipeline and
+            "NativeQmdGlobalMemoryLayoutMatches(" in native_vk_port and
             "buffer_cache.ObtainBuffer(" in native_vk_pipeline and
             "WriteDescriptorBuffer(device, descriptor_buffer_layout," in native_vk_pipeline and
             "bool ConfigureNative(" in native_vk_pipeline_h and
