@@ -170,9 +170,19 @@ int main() {
         d[33]|=1U<<17;
         assert(!Tegra::DecodeNativeComputeLaunch(d));
         d[33]&=~((1U<<8)|(1U<<17));
+        // Half-open QMD CBUF ranges may end at exactly 2^49. The
+        // final byte is still mapped; one 16-byte unit beyond must fail.
+        d[32]=0xffffffc0U;
+        d[33]=0x1ffffU|(4U<<19);
+        const auto exact_end=Tegra::DecodeNativeComputeLaunch(d);
+        assert(exact_end && exact_end->constant_buffers[0].enabled);
+        assert(exact_end->constant_buffers[0].gpu_address==
+               ((std::uint64_t{1}<<49)-64));
+        assert(exact_end->constant_buffers[0].size==64);
+        d[32]=0xffffffd0U;
+        assert(!Tegra::DecodeNativeComputeLaunch(d));
         // An enabled CBUF near the 49-bit limit may never wrap its size.
         d[32]=0xfffffff0U;
-        d[33]=0x1ffffU|(4U<<19);
         assert(!Tegra::DecodeNativeComputeLaunch(d));
         d[32]=0x12340000U;
         d[33]=5U|(4U<<19);
