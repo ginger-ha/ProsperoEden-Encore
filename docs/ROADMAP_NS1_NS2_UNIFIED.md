@@ -1,6 +1,6 @@
 # Eden Encore — roadmap suivable pour un moteur PS5 commun NS1 / NS2
 
-**Mise à jour : 2026-11-02 · branche unique : `main`**
+**Mise à jour : 2026-11-03 · branche unique : `main`**
 
 > **Suivi vivant à cases cochables : [GitHub Issue #15 — ROADMAP](https://github.com/niakw/ProsperoEden-Encore/issues/15)**
 > **Audit technique et preuves de boot : [GitHub Issue #14](https://github.com/niakw/ProsperoEden-Encore/issues/14)**
@@ -10,7 +10,7 @@
 
 Une seule application PS5 et un seul socle de moteur Vulkan, CPU/JIT, HLE, cache shaders, cache textures, buffer cache, ordonnanceur, services communs et UI. Les détails intrinsèquement différents (instructions Maxwell/Ampere, descripteurs QMD, capacités GPU, fréquences, services et formats firmware) sont sélectionnés automatiquement et vérifiés; **aucun réglage « expérimental » dans le profil final**. Cela ne signifie pas supprimer les contrôles de sécurité ni prétendre qu'une instruction Ampere est du Maxwell.
 
-Le mode sans build PS5 reste en vigueur. Les deux workflows de build complet et recherche sont désactivés, la CI hôte continue. Il faudra finalement un **build de qualification PS5 explicitement autorisé**, une fois les barrières hôte levées, car on ne peut pas prouver la compatibilité console sans exécuter le programme.
+**Verrou P5 imposé par le propriétaire : aucun build PS5 et aucun test console avant l'entrée formelle en P5, après traitement des jalons P0 à P4.** Jusqu'à cette frontière, seuls les changements source, contrôles Clang/GCC, tests host, analyses de parité et previews hors console sont permis. Les workflows natifs restent désactivés; leur réactivation et la qualification de vrais jeux requièrent une autorisation explicite en P5. Aucun jalon P0-P4 ne doit être maintenu artificiellement ouvert parce qu'il manque un essai console réservé à P5.
 
 ## État technique vérifié au départ
 
@@ -34,8 +34,8 @@ Le mode sans build PS5 reste en vigueur. Les deux workflows de build complet et 
 | **P1** | Boot / mémoire / HLE communs | Progression du PC invité traçable, 49-bit GMMU, NVMap/rollback, IPC exact, addons/keys/firmwares flexibles | Entrée GPU authentifiée et stable |
 | **P2** | GPU Vulkan complet partagé | TIC/TSC, images/UBO/SSBO, caches, graphics/compute Ampere, ASTC/sparse/VRAM, synchronisations, premier framebuffer invité | Première image réelle de MKW/Bananza |
 | **P3** | UI / rendu / NS1 sans régression | Jaquettes NS1/NS2 correctes, aucun rescan visible, chargement unique continu, FC27/BOTW non dégradés | Candidat d'installation |
-| **P4** | Préqualification sans console | Tests Clang/GCC, CI complets, mémoire/fences, source parity et négatifs, code de release sans chemins factices | Autorisation manuelle d'un build PS5 |
-| **P5** | Qualification PS5 et stabilisation | MKW + Bananza première image invitée, FC27 match sans crash, BOTW, gestion des ressources, comparaison performances | Release seulement si critères remplis |
+| **P4** | Préqualification strictement hôte | Tests Clang/GCC, CI complets, mémoire/fences simulées, source parity et négatifs, chemin de release sans faux succès | Dossier de décision d'entrée en P5; pas de build exécuté |
+| **P5** | Build PS5 contrôlé, qualification console et stabilisation | Autorisation explicite du build, puis MKW + Bananza première image invitée, FC27 match sans crash, BOTW, ressources et performances | Release seulement si critères console remplis |
 
 Ces jalons ne sont **pas** des estimations de délais; chacun se ferme uniquement sur preuve. Un test de traduction shader, une preview OpenGL ou une compilation native réussie ne remplace pas une image issue du GPU invité.
 
@@ -66,3 +66,11 @@ Le fournisseur Vulkan conserve désormais au plus **12 pipelines Compute Ampere*
 - **P4.2a — hôte validé :** nouveaux cas négatifs GMMU 49 bits, pages 4 KiB et translation physique disjointe [`155f633`](https://github.com/niakw/ProsperoEden-Encore/commit/155f633cb5b4ecce0115e3b5ad127dac48444bdf), [NS2 host #41525695461](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41525695461) réussi en Clang/GCC. OOM GPU, fences et consoles restent ouverts.
 
 **Dernier code observé lors de ce relevé :** parent `329b2b80d9b99bdb855f96b894fed32cfe092f06`, gitlink vendor `32a0ac1bbdea56c5daa19c077c0bd6792844f935`. Aucun build PS5 activé. Pour les statuts de CI et la checklist opposable, conserver l'[issue #15](https://github.com/niakw/ProsperoEden-Encore/issues/15) comme source vivante.
+
+
+## Frontière P2.2b/P2.2c et verrou P5 — 2026-11-03
+
+- **P2.2b (intégration source)** : l'acquisition réelle des vues TIC/TSC, des samplers et la rétention des ressources Vulkan doivent être cohérentes dans les deux variantes maintenues du cache commun. Les chemins NS1 et NUP ne doivent pas être modifiés pour déclarer le jalon terminé.
+- **P2.2c (qualification avant P5)** : finir les cas positifs/négatifs Clang/GCC, les vérifications de provenance et d'ABI C++ avec ASTC/Vulkan, et obtenir les CI hôte pertinentes vertes au même couple SHA main/vendor. Une CI en file d'attente n'est pas une preuve.
+- **P5 (qualification console uniquement après P0–P4)** : compilation native PS5 autorisée explicitement, installation, tests FC27/BOTW/MKW/Bananza, métriques GPU/CPU, première vraie image invitée et régressions console. Ces éléments ne sont **pas** des conditions de fermeture de P2.2c avant P5.
+- **État de source à ce jalon** : l'interface native ASTC/Vulkan a été alignée au [vendor `d213ec7`](https://github.com/niakw/Prospero.Eden-Encore-vendor/commit/d213ec7630d7fb4f3e4795f711da4c8359ec544c), épinglé depuis [main `b7a7ebe`](https://github.com/niakw/ProsperoEden-Encore/commit/b7a7ebe88ed144081587a9336db6cf01d080a5a5), et les contrôles Clang/GCC ASTC-prioritaires sont ajoutés au [`34007d5`](https://github.com/niakw/ProsperoEden-Encore/commit/34007d5a8e92b92d349f34a338e613d08b4577cf). La [CI #41579773499](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41579773499) était en attente lors du dernier contrôle; **P2.2b/P2.2c non encore fermés**.
