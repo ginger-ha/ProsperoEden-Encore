@@ -422,9 +422,127 @@ std::optional<std::size_t> Archive::FindEffectiveMember(
     if (newest_update) {
         if (const auto member = FindPackageMember(*newest_update, view, path))
             return member;
+        const auto& package = packages_[*newest_update];
+        const auto dir = view == ContentView::ExeFS ? package.exefs_dir : package.romfs_dir;
+        if (ShadowsPath(dir, path)) return std::nullopt;
     }
     if (base) return FindPackageMember(*base, view, path);
     return std::nullopt;
+}
+
+std::optional<std::uint32_t> Archive::WalkDirectory(
+    std::uint32_t dir, std::string_view path) const {
+    if (dir == NoDirectory || dir >= dirs_.size()) return std::nullopt;
+    if (path.empty()) return dir;
+    while (true) {
+        const auto end = path.find('/');
+        const auto part = path.substr(0, end);
+        if (!Utf8Name(part, false)) return std::nullopt;
+        const auto& parent = dirs_[dir];
+        std::optional<std::uint32_t> found;
+        for (std::uint32_t j = 0; j < parent.count; ++j) {
+            const auto node = children_[parent.first + j];
+            if (node < dirs_.size() && dirs_[node].name == part) {
+                found = node;
+                break;
+            }
+        }
+        if (!found) return std::nullopt;
+        dir = *found;
+        if (end == std::string_view::npos) return dir;
+        path.remove_prefix(end + 1);
+    }
+}
+
+bool Archive::ShadowsPath(std::uint32_t dir, std::string_view path) const {
+    if (dir == NoDirectory || dir >= dirs_.size() || path.empty()) return false;
+    while (true) {
+        const auto end = path.find('/');
+        const auto part = path.substr(0, end);
+        if (!Utf8Name(part, false)) return false;
+        const auto& parent = dirs_[dir];
+        std::optional<std::uint32_t> found;
+        for (std::uint32_t j = 0; j < parent.count; ++j) {
+            const auto node = children_[parent.first + j];
+            const auto& name = node < dirs_.size() ? dirs_[node].name
+                                                    : files_[node - dirs_.size()].name;
+            if (name == part) {
+                found = node;
+                break;
+            }
+        }
+        if (!found) return false;
+        // A file or directory with the exact path shadows the base. A file
+        // encountered midway blocks all descendant lookups, not just itself.
+        if (end == std::string_view::npos || *found >= dirs_.size()) return true;
+        dir = *found;
+        path.remove_prefix(end + 1);
+    }
+}
+
+std::optional<std::vector<DirEntry>> Archive::ListFromDir(
+    std::uint32_t root, std::string_view path) const {
+    const auto dir = WalkDirectory(root, path);
+    if (!dir) return std::nullopt;
+    const auto& parent = dirs_[*dir];
+    std::vector<DirEntry> entries;
+    entries.reserve(parent.count);
+    for (std::uint32_t j = 0; j < parent.count; ++j) {
+        const auto node = children_[parent.first + j];
+        if (node < dirs_.size()) {
+            entries.push_back({dirs_[node].name, true, std::nullopt});
+        } else {
+            const auto file = static_cast<std::size_t>(node - dirs_.size());
+            entries.push_back({files_[file].name, false, file});
+        }
+    }
+    return entries;
+}
+
+std::optional<std::vector<DirEntry>> Archive::ListPackageDirectory(
+    std::size_t pkg, ContentView view, std::string_view path) const {
+    if (pkg >= packages_.size()) return std::nullopt;
+    const auto& package = packages_[pkg];
+    const auto dir = view == ContentView::ExeFS ? package.exefs_dir : package.romfs_dir;
+    return ListFromDir(dir, path);
+}
+
+std::optional<std::vector<DirEntry>> Archive::ListEffectiveDirectory(
+    ContentView view, std::string_view path) const {
+    std::optional<std::size_t> base;
+    std::optional<std::size_t> newest_update;
+    for (std::size_t i = 0; i < packages_.size(); ++i) {
+        const auto& p = packages_[i];
+        if (p.kind == 0) base = i;
+        if (p.kind == 1 &&
+            (!newest_update || p.version > packages_[*newest_update].version))
+            newest_update = i;
+    }
+    const auto base_entries = base ? ListPackageDirectory(*base, view, path)
+                                   : std::optional<std::vector<DirEntry>>{};
+    const auto update_entries = newest_update ?
+        ListPackageDirectory(*newest_update, view, path)
+        : std::optional<std::vector<DirEntry>>{};
+    if (!base_entries && !update_entries) return std::nullopt;
+    if (!update_entries && newest_update) {
+        const auto& package = packages_[*newest_update];
+        const auto dir = view == ContentView::ExeFS ? package.exefs_dir : package.romfs_dir;
+        if (ShadowsPath(dir, path)) return std::nullopt;
+    }
+    struct ByteLess {
+        bool operator()(const std::string& a, const std::string& b) const {
+            return NameLess(a, b);
+        }
+    };
+    std::map<std::string, DirEntry, ByteLess> merged;
+    if (base_entries)
+        for (const auto& entry : *base_entries) merged.insert_or_assign(entry.name, entry);
+    if (update_entries)
+        for (const auto& entry : *update_entries) merged.insert_or_assign(entry.name, entry);
+    std::vector<DirEntry> result;
+    result.reserve(merged.size());
+    for (const auto& entry : merged) result.push_back(entry.second);
+    return result;
 }
 
 std::uint64_t Archive::MemberSize(std::size_t index) const {
