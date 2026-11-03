@@ -20,8 +20,18 @@ assert producer.count(early) == 1
 assert producer.index(early) < producer.index("std::unique_lock lock{producer.cv_mutex};")
 assert producer.index("if (stop_token.stop_requested()) return false;") < producer.index("const std::size_t pos")
 assert "producer.cv.wait(lock, stop_token" in producer
-assert producer.count("std::destroy_at(std::addressof(m_data[pos]));") == 1
-assert producer.count("std::construct_at(std::addressof(m_data[pos])") == 1
+# The canonical common queue uses uninitialised union slots. Producers may
+# construct a free slot only; the consumer destroys the moved-from command
+# before it publishes the slot as free. A legacy producer-side destroy would
+# destroy an object that is no longer alive.
+assert "union Slot {" in header
+assert "std::array<Slot, Capacity> m_data;" in header
+assert producer.count("std::construct_at(std::addressof(m_data[pos].value)") == 1
+assert "std::destroy_at(" not in producer
+consumer = header.split("bool Pop(T& t,", 1)[1].split("\n    union Slot {", 1)[0]
+assert consumer.count("std::destroy_at(std::addressof(m_data[pos].value));") == 1
+assert consumer.index("std::destroy_at(std::addressof(m_data[pos].value));") < consumer.index("++consumer.index")
+assert "std::destroy_at(std::addressof(m_data[cursor % Capacity].value));" in header
 
 cpp = r"""
 #include <array>
@@ -96,6 +106,29 @@ int main() {
         int value = 0;
         assert(!q.TryPop(value));
     }
+    {
+        // Nonempty shutdown must drain live slots; an already-popped slot
+        // must not be destroyed twice. Exercise shared ownership rather than
+        // relying on source-string checks alone.
+        auto resource = std::make_shared<int>(42);
+        {
+            Common::SPSCQueue<std::shared_ptr<int>, 2> q;
+            assert(q.TryEmplace(resource));
+            assert(resource.use_count() == 2);
+        }
+        assert(resource.use_count() == 1);
+        {
+            Common::SPSCQueue<std::shared_ptr<int>, 2> q;
+            assert(q.TryEmplace(resource));
+            std::shared_ptr<int> out;
+            assert(q.TryPop(out));
+            assert(out == resource);
+            assert(resource.use_count() == 2);
+            out.reset();
+            assert(resource.use_count() == 1);
+        }
+        assert(resource.use_count() == 1);
+    }
     std::puts("ENCORE_GPU_QUEUE_STOP_FASTPATH_PASS");
 }
 """
@@ -119,4 +152,4 @@ with tempfile.TemporaryDirectory(prefix="encore-gpu-spsc-") as tmp:
                    check=True, capture_output=True, text=True, timeout=90)
     result = subprocess.run([str(exe)], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, (result.stdout[-1000:], result.stderr[-2500:])
-print("NATIVE_GPU_QUEUE_STOP_FASTPATH_HOST_PASS source=active empty_fastpath=1 full_wait=1 cancelled=1 asan_ubsan=1")
+print("NATIVE_GPU_QUEUE_STOP_FASTPATH_HOST_PASS source=active empty_fastpath=1 full_wait=1 cancelled=1 live_slot_drain=1 popped_slot_once=1 asan_ubsan=1")
