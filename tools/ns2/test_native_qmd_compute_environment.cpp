@@ -1079,8 +1079,18 @@ int main() {
     memory.words[1]=0x20000U;
     assert(!env.BuildResourcePlan(shader_info)); // >49-bit target
     memory.words[1]=0x10000U;
+    // P2.3: after the reviewed IR normalizer, a dynamically selected
+    // CBUF may legitimately have a sparse QMD3 mask (only bank zero here).
+    // Bind exactly that physical bank, not the generic fourteen Maxwell
+    // slots. The earlier missing/duplicate/out-of-range bank negatives
+    // remain rejected before this normalized, one-bank positive case.
     shader_info.uses_cbuf_indirect=true;
-    assert(!env.BuildResourcePlan(shader_info)); // no invented indirect binding
+    const auto sparse_indirect_plan=env.BuildResourcePlan(shader_info);
+    assert(sparse_indirect_plan &&
+           sparse_indirect_plan->HasResolvedBufferBindings() &&
+           sparse_indirect_plan->uniform_buffers.size()==1 &&
+           sparse_indirect_plan->uniform_buffers[0].qmd_index==0 &&
+           sparse_indirect_plan->uniform_buffers[0].bytes==16);
     shader_info.uses_cbuf_indirect=false;
     memory.mapped=false;
     assert(!env.BuildResourcePlan(shader_info)); // no stale GMMU read
