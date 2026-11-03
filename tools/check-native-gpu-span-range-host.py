@@ -120,3 +120,91 @@ with tempfile.TemporaryDirectory(prefix="encore-gpu-span-range-") as scratch:
         subprocess.run(command,check=True,timeout=45)
         subprocess.run([str(exe)],check=True,timeout=45)
 print("NATIVE_GPU_SPAN_RANGE_HOST_PASS original_oob_pagewalk=2 original_zero_span=1 native_const_mutable=2 native_zero=1 overflow=1 past_end=1 normal_ranges=3")
+
+
+# P1.2: compile the *actual guard prefixes* from the maintained shared
+# GMMU owner. Out-of-VA and wrapping spans must be refused before ANY
+# PTE traversal, including callers that do not go through GetSpan.
+owner = maintained
+contracts = (
+    ("std::optional<DAddr> MemoryManager::GpuToCpuAddress(GPUVAddr addr, std::size_t size) const {",
+     "    size_t page_index{addr >> page_bits};",
+     "    ++page_probes;\n    return DAddr{0x1000};\n}"),
+    ("bool MemoryManager::IsContinuousRange(GPUVAddr gpu_addr, std::size_t size) const {",
+     "    std::optional<DAddr> old_page_addr{};",
+     "    ++page_probes;\n    return true;\n}"),
+    ("bool MemoryManager::IsFullyMappedRange(GPUVAddr gpu_addr, std::size_t size) const {",
+     "    bool result{true};",
+     "    ++page_probes;\n    return true;\n}"),
+)
+prefixes = []
+for signature, next_statement, continuation in contracts:
+    assert owner.count(signature) == 1, signature
+    at = owner.index(signature)
+    end_at = owner.index(next_statement, at)
+    prefix = owner[at:end_at]
+    assert "size == 0" in prefix, signature
+    assert "address_space_size" in prefix, signature
+    assert "size > address_space_size -" in prefix, signature
+    prefixes.append(prefix + continuation)
+
+unit_source = r"""
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <optional>
+#include <utility>
+using GPUVAddr = std::uint64_t;
+using DAddr = std::uint64_t;
+struct MemoryManager {
+    static constexpr GPUVAddr address_space_size = GPUVAddr{1} << 49;
+    static constexpr std::size_t page_bits = 12;
+    mutable unsigned page_probes{};
+    std::optional<DAddr> GpuToCpuAddress(GPUVAddr, std::size_t) const;
+    bool IsContinuousRange(GPUVAddr, std::size_t) const;
+    bool IsFullyMappedRange(GPUVAddr, std::size_t) const;
+};
+""" + "\n".join(prefixes) + r"""
+int main() {
+    MemoryManager gpu;
+    constexpr GPUVAddr limit = MemoryManager::address_space_size;
+    constexpr std::size_t huge = std::numeric_limits<std::size_t>::max();
+    const std::array<std::pair<GPUVAddr, std::size_t>, 8> bad{{
+        {0, 0}, {limit-1, 0}, {limit, 1}, {limit+1, 1},
+        {limit-1, 2}, {limit-4096, 4097},
+        {std::numeric_limits<GPUVAddr>::max(), 16}, {10, huge},
+    }};
+    for (const auto [addr, bytes] : bad) {
+        assert(!gpu.GpuToCpuAddress(addr, bytes));
+        assert(!gpu.IsContinuousRange(addr, bytes));
+        assert(!gpu.IsFullyMappedRange(addr, bytes));
+    }
+    assert(gpu.page_probes == 0); // No page-table read on any invalid span.
+    const std::array<std::pair<GPUVAddr, std::size_t>, 4> valid{{
+        {0, 1}, {4095, 2}, {limit - 4096, 4096}, {0, limit},
+    }};
+    for (const auto [addr, bytes] : valid) {
+        assert(gpu.GpuToCpuAddress(addr, bytes).has_value());
+        assert(gpu.IsContinuousRange(addr, bytes));
+        assert(gpu.IsFullyMappedRange(addr, bytes));
+    }
+    assert(gpu.page_probes == valid.size() * 3);
+}
+"""
+compilers = list(dict.fromkeys(path for name in ("clang++", "g++")
+                               if (path := shutil.which(name))))
+assert compilers, "At least one C++20 compiler required"
+with tempfile.TemporaryDirectory(prefix="encore-gmmu-bounds-") as directory:
+    cpp = Path(directory) / "gmmu_bounds.cpp"
+    cpp.write_text(unit_source)
+    for compiler in compilers:
+        for opt in ("-O0", "-O2"):
+            binary = Path(directory) / (Path(compiler).name + opt)
+            subprocess.run([compiler, "-std=c++20", opt, "-Wall", "-Wextra",
+                            "-Werror", "-fsanitize=undefined",
+                            "-fno-sanitize-recover=all", str(cpp), "-o",
+                            str(binary)], check=True, timeout=45)
+            subprocess.run([str(binary)], check=True, timeout=20)
+            print("P1_2_NATIVE_GMMU_BOUNDS_HOST_PASS", Path(compiler).name, opt)
