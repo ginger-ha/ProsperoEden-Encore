@@ -61,7 +61,11 @@ inline std::array<const std::string*, 3> BackScenes(
     // If there is no Hero, the front uses the first cached screenshot.
     // Exclude that *actual* front paper too: previously the same image
     // could be copied onto the rear panel as an independent scene.
-    const std::string* const front = FrontPaper(featured, cover, screenshots);
+    // The hero may exist as a file but fail decoding. Exclude the image
+    // actually admitted as front paper, not the raw first filename. The
+    // caller may supply the original hero or an already-resolved fallback.
+    const std::string* const front =
+        FrontPaperAvailable(featured, cover, screenshots, usable);
     const auto is_front = [&](const std::string& image) {
         return front && *front == image;
     };

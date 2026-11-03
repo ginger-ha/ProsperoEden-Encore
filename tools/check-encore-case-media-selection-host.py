@@ -151,6 +151,20 @@ int main() {
         [](const std::string& path) { return path != "failed-hero.tga"; });
     assert(filtered_back[0] == &failed_hero[2]);
     assert(!filtered_back[1] && !filtered_back[2]);
+    // A caller may give the ORIGINAL hero filename rather than the
+    // resolved front. When its decode fails, the back must still exclude
+    // the actual fallback front, not duplicate it as an independent scene.
+    const auto direct_fallback_back = BackScenes(
+        failed_hero[0], icon, failed_hero,
+        [](const std::string& path) { return path != "failed-hero.tga"; });
+    assert(direct_fallback_back == filtered_back);
+    const std::vector<std::string> no_hero_failed_first{
+        "unavailable-front.tga", "actual-front.tga", "rear-shot.tga"};
+    const auto clean_back = BackScenes(
+        empty, icon, no_hero_failed_first,
+        [](const std::string& path) { return path != "unavailable-front.tga"; });
+    assert(clean_back[0] == &no_hero_failed_first[2]);
+    assert(!clean_back[1] && !clean_back[2]);
     const std::vector<std::string> indexed_failed{
         "/cache/box-scene-1-BAD.tga", "/cache/box-scene-2-OK.tga"};
     const auto filtered_indexed = BackScenes(
