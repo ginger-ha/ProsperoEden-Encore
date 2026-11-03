@@ -46,8 +46,10 @@ def main():
         spec.loader.exec_module(content_module)
         executable = temp / "executable.nup"
         executable.write_bytes(content_module.executable_fixture())
+        foreign_update = temp / "foreign-update.nup"
+        foreign_update.write_bytes(content_module.foreign_update_fixture())
         subprocess.run([str(binary), str(addon), str(standalone),
-                        str(executable)], check=True)
+                        str(executable), str(foreign_update)], check=True)
 
 if __name__ == "__main__":
     main()
