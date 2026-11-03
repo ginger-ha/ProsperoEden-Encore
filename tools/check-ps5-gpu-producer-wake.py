@@ -3,7 +3,7 @@
 """Exercise PS5 stop-aware SPSC producer with full queue, cancellation and FIFO.
 
 The template method is the real one selected from the maintained GPU source.
-The host shim reproduces the pinned SPSC queue's indexes and CV protocols.
+The host shim reproduces the pinned SPSC queue's indexes, CV protocols and live union-slot lifetime.
 Native SDK compilation remains a separate PS5 build gate.
 """
 from pathlib import Path
@@ -31,6 +31,11 @@ assert "producer.cv.wait(lock, stop_token" in inc
 assert "consumer.index.load(std::memory_order_acquire)" in inc
 assert "std::construct_at" in inc
 assert "consumer.cv.notify_one()" in inc
+assert "union Slot {" in header
+assert "std::array<Slot, Capacity> m_data;" in header
+assert header.count("std::construct_at(std::addressof(m_data[pos].value)") == 2
+assert header.count("std::destroy_at(std::addressof(m_data[pos].value));") == 1
+assert "std::destroy_at(std::addressof(m_data[cursor % Capacity].value));" in header
 for worker in (quiet, dev):
     assert "state.queue.TryEmplace(std::move(command_data), fence, block)" in worker
     assert "state.queue.EmplaceWaitWithStopToken(stop_source.get_token()," in worker
@@ -45,6 +50,7 @@ cpp = r"""
 #include <atomic>
 #include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <condition_variable>
 #include <cstdio>
 #include <future>
@@ -52,16 +58,23 @@ cpp = r"""
 #include <mutex>
 #include <stop_token>
 #include <thread>
+#include <utility>
 #include <vector>
 
 template <typename T, size_t Capacity> class Queue {
-    static_assert((Capacity & (Capacity - 1)) == 0);
+    static_assert(Capacity != 0 && (Capacity & (Capacity - 1)) == 0);
 public:
+    ~Queue() {
+        const auto end = producer.index.load(std::memory_order_relaxed);
+        for (auto cursor = consumer.index.load(std::memory_order_relaxed);
+             cursor != end; ++cursor)
+            std::destroy_at(std::addressof(m_data[cursor % Capacity].value));
+    }
     template <typename... Args> bool TryEmplace(Args&&... args) noexcept {
         const auto write_index=producer.index.load(std::memory_order_relaxed);
         if (write_index-consumer.index.load(std::memory_order_acquire)==Capacity)
             return false;
-        std::construct_at(std::addressof(m_data[write_index%Capacity]),std::forward<Args>(args)...);
+        std::construct_at(std::addressof(m_data[write_index%Capacity].value),std::forward<Args>(args)...);
         ++producer.index;
         std::scoped_lock lock{consumer.cv_mutex}; consumer.cv.notify_one();
         return true;
@@ -69,14 +82,20 @@ public:
     bool TryPop(T& target) noexcept {
         const auto read_index=consumer.index.load(std::memory_order_relaxed);
         if (read_index==producer.index.load(std::memory_order_acquire)) return false;
-        target=std::move(m_data[read_index%Capacity]);
+        target=std::move(m_data[read_index%Capacity].value);
+        std::destroy_at(std::addressof(m_data[read_index%Capacity].value));
         ++consumer.index;
         std::scoped_lock lock{producer.cv_mutex}; producer.cv.notify_one();
         return true;
     }
 STOP_CODE
 private:
-    std::array<T,Capacity> m_data{};
+    union Slot {
+        Slot() noexcept {}
+        ~Slot() {}
+        T value;
+    };
+    std::array<Slot,Capacity> m_data;
     alignas(64) struct {
         std::atomic_size_t index{0};
         std::condition_variable_any cv;
@@ -206,6 +225,16 @@ int main() {
         for(int i=0;i<8;i++) { assert(q.TryPop(value) && value==i); }
         assert(!q.TryPop(value));
     }
+    {
+        auto resource = std::make_shared<int>(42);
+        {
+            Queue<std::shared_ptr<int>,2> q;
+            assert(q.TryEmplace(resource));
+            assert(resource.use_count() == 2);
+        }
+        // All live queue slots are destroyed when the queue is retired.
+        assert(resource.use_count() == 1);
+    }
     std::puts("PASS: exact native SPSC wait: 4096 base + 24576 bursty commands, 64 cancelled/full sessions");
 }
 """.replace("STOP_CODE", inc)
@@ -219,4 +248,4 @@ with tempfile.TemporaryDirectory(prefix="eden-ps5-gpu-cv-wake-") as tmp:
                     "-Wall","-Wextra","-Werror",
                     str(source),"-o",str(exe)], check=True)
     subprocess.run([str(exe)], check=True, timeout=30)
-print("HOST ONLY: console compiler/CMake generation/PS5 frame pacing not yet qualified")
+print("HOST ONLY: native producer method + live union-slot lifetime; console compiler/frame pacing not qualified")
