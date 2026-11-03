@@ -38,7 +38,7 @@ def layered_fixture(*, duplicate_version: bool = False) -> bytes:
     )
     toc = bytearray(0x2A0)
     names = b"romfsstate.bin"
-    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\\x01",
+    struct.pack_into("<4sIQQQQQ", toc, 0, b"TOC\x01",
                      len(packages), 6, 3, 0x288, len(names), 0)
     blob = bytearray()
     absolute = 0x320
@@ -62,7 +62,7 @@ def layered_fixture(*, duplicate_version: bool = False) -> bytes:
         absolute += len(data)
     toc[0x288:0x288 + len(names)] = names
     header = bytearray(0x80)
-    header[:4] = b"NUP\\x01"
+    header[:4] = b"NUP\x01"
     struct.pack_into("<HHQQ", header, 4, 0x80, 1, 0x80, len(toc))
     header[0x18:0x38] = hashlib.sha256(toc).digest()
     struct.pack_into("<QQII", header, 0x38, 0x320, absolute, len(packages), 0)
