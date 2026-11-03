@@ -80,7 +80,7 @@ std::string Read(const FileSys::VirtualFile& file) {
 }
 
 int main(int argc, char** argv) {
-    assert(argc == 13);
+    assert(argc == 15);
     auto input = std::make_shared<MemoryFile>(Load(argv[1]));
     std::string error;
     auto mount = Eden::NupV1::Native::Mount::Open(input, &error);
@@ -405,5 +405,18 @@ int main(int argc, char** argv) {
     assert(extracted_nacp_loader->SelectedAddOns()[0].package_index == 1);
     assert(Read(extracted_nacp_loader->SelectedAddOns()[0].romfs->GetFile("addon.dat")) ==
            "nacp-declared");
+    // The TOC can remain valid after corruption of a NACP member's data.
+    // The archive may mount, but its app loader must fail closed, not
+    // silently select unrelated DLC through the conventional AoC offset.
+    error.clear();
+    auto corrupted_nacp_source = std::make_shared<MemoryFile>(Load(argv[13]));
+    auto corrupted_nacp_loader = Eden::NupV1::Native::NupAppLoader::Open(
+        corrupted_nacp_source, &error);
+    assert(!corrupted_nacp_loader && error == "NUP control.nacp integrity failure");
+    error.clear();
+    auto short_nacp_source = std::make_shared<MemoryFile>(Load(argv[14]));
+    auto short_nacp_loader = Eden::NupV1::Native::NupAppLoader::Open(
+        short_nacp_source, &error);
+    assert(!short_nacp_loader && error == "NUP control.nacp has invalid size");
     std::cout << "NUP native VFS adapter: lifetime, overlay, AoC isolation, mutable hash checks OK\n";
 }
