@@ -6490,3 +6490,13 @@ apply_reviewed_delta(
     "            if (!resources->HasResolvedGpuBufferBindings())\n                return false;\n            const auto& regs = kepler_compute.regs;",
     "            if (!resources->ValidateGpuBufferMappings(\n                    [this](u64 address, u32 bytes) {\n                        return gpu_memory->IsFullyMappedRange(address, bytes);\n                    }))\n                return false;\n            const auto& regs = kepler_compute.regs;",
     "NS2 image shader CBUF and SSBO full GMMU mapped-range admission")
+
+# Refuse an image shader whose CBUF/SSBO cannot be staged by the SAME
+# active Vulkan BufferCache policy as buffer-only QMD3. Full mapping is
+# necessary but insufficient: the current descriptor staging expects a
+# contiguous CPU-backed span and must never silently alias a later page.
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    "            if (!resources->ValidateGpuBufferMappings(\n                    [this](u64 address, u32 bytes) {\n                        return gpu_memory->IsFullyMappedRange(address, bytes);\n                    }))\n                return false;",
+    "            // Match ConfigureNative's actual BufferCache admission:\n            // full 4 KiB GMMU coverage AND one contiguous CPU-backed span.\n            // IsFullyMappedRange alone is insufficient when later Vulkan\n            // staging requires a single real backing allocation.\n            if (!resources->ValidateGpuBufferMappings(\n                    [this](u64 address, u32 bytes) {\n                        return Shader::Ampere::NativeQmdContiguousGpuSpan(\n                            address, bytes, [this](u64 page) {\n                                return gpu_memory->GpuToCpuAddress(page);\n                            });\n                    }))\n                return false;",
+    "NS2 image CBUF/SSBO contiguous physical backing matches ConfigureNative")

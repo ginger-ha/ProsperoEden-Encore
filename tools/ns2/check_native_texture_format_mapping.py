@@ -397,16 +397,18 @@ for path in (
 ):
     bridge = (vendor / path).read_text()
     assert bridge.count("if (!resources->ValidateGpuBufferMappings(") == 1, path
-    assert "gpu_memory->IsFullyMappedRange(address, bytes)" in bridge, path
+    assert "Shader::Ampere::NativeQmdContiguousGpuSpan(" in bridge, path
+    assert "gpu_memory->GpuToCpuAddress(page)" in bridge, path
+    assert "gpu_memory->IsFullyMappedRange(address, bytes)" not in bridge, path
     assert bridge.index("if (!resources->ValidateGpuBufferMappings(") < (
         bridge.index("tables.CaptureAdmissible(")), (
         "image TIC read before QMD guest buffer mapping verification", path
     )
-    # The CBUF and SSBO spans can be virtually continuous without sharing
-    # one physical CPU allocation. Never use the stricter texture-only
-    # NativeQmdContiguousGpuSpan admission for ordinary guest buffers.
+    # Native ComputePipeline::ConfigureNative stages BufferCache spans
+    # through the SAME physically contiguous guest-memory policy. Refuse
+    # unsupported scattered backing before reading TIC/TSC table entries.
     assert bridge.index("ValidateGpuBufferMappings(") < bridge.index(
-        "NativeQmdContiguousGpuSpan("), path
+        "tables.CaptureAdmissible("), path
     assert "return false; // no unbacked image/sampler descriptor publication" in bridge, path
 assert "if (!cbuf.gpu_address || !cbuf.bytes) return false;" in native_env, (
     "null QMD CBUF address must fail before any GPU mapping callback"
