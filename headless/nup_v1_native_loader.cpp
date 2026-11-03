@@ -94,6 +94,9 @@ NupAppLoader::LoadResult NupAppLoader::Load(Kernel::KProcess& process,
 Loader::ResultStatus NupAppLoader::ReadRomFS(FileSys::VirtualFile& out_file) {
     out_file.reset();
     if (!content_) return Loader::ResultStatus::ErrorNoRomFS;
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
     std::scoped_lock guard(romfs_mutex_);
     if (!effective_romfs_) effective_romfs_ = content_->CreateRomFS();
     if (!effective_romfs_) return Loader::ResultStatus::ErrorNoRomFS;
@@ -102,6 +105,9 @@ Loader::ResultStatus NupAppLoader::ReadRomFS(FileSys::VirtualFile& out_file) {
 }
 
 Loader::ResultStatus NupAppLoader::ReadIcon(std::vector<u8>& out_buffer) {
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
     return extracted_loader_ ? extracted_loader_->ReadIcon(out_buffer)
                              : Loader::ResultStatus::ErrorNoIcon;
 }
@@ -114,11 +120,17 @@ Loader::ResultStatus NupAppLoader::ReadProgramId(u64& out_program_id) {
 }
 
 Loader::ResultStatus NupAppLoader::ReadTitle(std::string& out_title) {
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
     return extracted_loader_ ? extracted_loader_->ReadTitle(out_title)
                              : Loader::ResultStatus::ErrorNoControl;
 }
 
 Loader::ResultStatus NupAppLoader::ReadNSOModules(Modules& out_modules) {
+    u64 program_id{};
+    const auto status = ValidateProgramIdentity(program_id);
+    if (status != Loader::ResultStatus::Success) return status;
     return extracted_loader_ ? extracted_loader_->ReadNSOModules(out_modules)
                              : Loader::ResultStatus::ErrorNotInitialized;
 }
