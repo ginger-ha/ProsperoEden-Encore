@@ -422,13 +422,23 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
         // Preserve the legacy global content directory, but do not let an
         // absent directory prevent add-ons collocated with installed titles.
         const auto append_root = [&](const std::filesystem::path& path) {
-            if (!Eden::IsSafeExtractedDirectory(path)) return;
+            std::error_code status_error;
+            const auto status = std::filesystem::symlink_status(path, status_error);
+            // An optional directory may be absent, but an existing update
+            // root that cannot be read must invalidate the whole scan.
+            if (status_error == std::errc::no_such_file_or_directory) return true;
+            if (status_error) return false;
+            if (std::filesystem::is_symlink(status)) return true;
+            if (!std::filesystem::is_directory(status) ||
+                !Eden::IsSafeExtractedDirectory(path)) return false;
             if (auto dir = vfs.OpenDirectory(path.string(), FileSys::OpenMode::Read)) {
                 add_on_roots.push_back(std::move(dir));
                 scan_paths.push_back(path.string());
+                return true;
             }
+            return false;
         };
-        append_root(updates_dir);
+        if (!append_root(updates_dir)) return;
         if (roms_dir && Eden::IsSafeExtractedDirectory(roms_dir)) {
             // Enumerate immediate game roots; scan each for named add-on
             // containers with a bounded traversal. Never recursively open
@@ -449,14 +459,14 @@ void eden_scan_addons(const char* updates_dir, const char* keys_dir, const char*
                 const auto path = it->path();
                 if (!Eden::IsSafeExtractedDirectory(path)) continue;
                 if (Eden::IsAddOnContainerName(path.filename().string())) {
-                    append_root(path); // /roms/updates or /roms/dlc
+                    if (!append_root(path)) return; // /roms/updates or /roms/dlc
                     continue;
                 }
                 bool complete = false;
                 const auto roots = Eden::FindAddOnContentDirectories(path, &complete);
                 if (!complete) return;
                 for (const auto& directory : roots)
-                    append_root(directory);
+                    if (!append_root(directory)) return;
             }
             // No publish on permission errors or bounded traversal. Readers
             // may retry; never misrepresent unscanned DLC as absent.
