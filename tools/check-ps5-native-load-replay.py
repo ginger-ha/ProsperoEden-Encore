@@ -63,8 +63,16 @@ begin = queue_header.index(method_start)
 end_method = queue_header.index(method_end, begin)
 method = queue_header[begin:end_method].strip()
 assert "producer.cv.wait(lock, stop_token" in method
-assert "std::destroy_at(std::addressof(m_data[pos]))" in method
-assert "std::construct_at(std::addressof(m_data[pos])" in method
+# The maintained queue constructs only after acquiring a free slot. Pop
+# destroys the moved-from value before publishing that slot as reusable:
+# destroying it again in the producer is a double-destruction bug.
+assert "std::construct_at(std::addressof(m_data[pos].value)" in method
+assert "std::destroy_at(" not in method
+assert "union Slot {" in queue_header
+assert "std::destroy_at(std::addressof(m_data[pos].value));" in queue_header
+assert "std::destroy_at(std::addressof(m_data[cursor % Capacity].value));" in queue_header
+assert "std::construct_at(std::addressof(m_data[write_index%Capacity].value)" in cpp
+assert "std::destroy_at(std::addressof(m_data[read_index%Capacity].value));" in cpp
 queue_source = cpp.split("int main() {")[0].replace("STOP_CODE", method)
 assert "STOP_CODE" not in queue_source
 

@@ -24,8 +24,16 @@ def expected_files() -> dict[str, bytes]:
     present = {str(p.relative_to(TARGET)) for p in TARGET.rglob('*') if p.is_file()}
     assert present == set(names), (present - set(names), set(names) - present)
     result = {name: (TARGET / name).read_bytes() for name in names}
-    assert result['include/common/bounded_threadsafe_queue.h'].count(
-        b'std::destroy_at(std::addressof(m_data[pos]));') == 2
+    queue = result['include/common/bounded_threadsafe_queue.h']
+    assert b'union Slot {' in queue
+    assert b'std::array<Slot, Capacity> m_data;' in queue
+    assert queue.count(
+        b'std::construct_at(std::addressof(m_data[pos].value)') == 2
+    assert queue.count(
+        b'std::destroy_at(std::addressof(m_data[pos].value));') == 1
+    assert queue.count(
+        b'std::destroy_at(std::addressof(m_data[cursor % Capacity].value));') == 1
+    assert b'std::destroy_at(std::addressof(m_data[pos]));' not in queue
     return result
 
 
