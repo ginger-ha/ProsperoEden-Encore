@@ -8,7 +8,6 @@
 #include <string>
 #include <utility>
 
-#include "common/logging.h"
 #include "core/file_sys/common_funcs.h"
 #include "core/loader/loader.h"
 
@@ -34,16 +33,12 @@ std::unique_ptr<AppLoader> GetLoader(
     std::string error;
     auto loader = Eden::NupV1::Native::NupAppLoader::Open(
         std::move(file), &error);
-    if (!loader) {
-        LOG_WARNING(Loader, "Rejected NUP v1 container: {}", error);
-        return nullptr;
-    }
+    if (!loader) return nullptr;
     u64 actual_program_id{};
     if (loader->ReadProgramId(actual_program_id) != ResultStatus::Success ||
         (program_id != 0 &&
          FileSys::GetBaseTitleID(program_id) !=
              FileSys::GetBaseTitleID(actual_program_id))) {
-        LOG_WARNING(Loader, "NUP program identity does not match request");
         return nullptr;
     }
     return loader;
