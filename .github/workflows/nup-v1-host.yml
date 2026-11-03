@@ -16,6 +16,10 @@ on:
       - headless/nup_v1_native_content.cpp
       - headless/nup_v1_native_aoc.h
       - headless/nup_v1_native_aoc.cpp
+      - headless/nup_v1_aoc_service.cpp
+      - headless/nup_v1_romfs_factory.cpp
+      - headless/metadata_bridge.cpp
+      - tools/check-nup-v1-service-parity-host.py
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
@@ -46,6 +50,10 @@ on:
       - headless/nup_v1_native_content.cpp
       - headless/nup_v1_native_aoc.h
       - headless/nup_v1_native_aoc.cpp
+      - headless/nup_v1_aoc_service.cpp
+      - headless/nup_v1_romfs_factory.cpp
+      - headless/metadata_bridge.cpp
+      - tools/check-nup-v1-service-parity-host.py
       - headless/nup_v1_native_loader.h
       - headless/nup_v1_native_loader.cpp
       - headless/nup_v1_loader_route.cpp
@@ -98,3 +106,5 @@ jobs:
         run: python3 tools/check-nup-v1-runtime-cmake.py
       - name: Compile library discovery with NUP OFF and P5 ON
         run: python3 tools/check-nup-v1-game-discovery.py
+      - name: Check maintained AoC and RomFS source parity (no full core build)
+        run: python3 tools/check-nup-v1-service-parity-host.py
