@@ -412,7 +412,13 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
     std::size_t visited = 0;
     bool incomplete = false;
     const auto scan = [&](const auto& self, const fs::path& dir, unsigned depth) -> void {
-        if (incomplete || depth > 5) return;
+        if (incomplete) return;
+        // A depth cap must never silently publish only the add-ons encountered
+        // in shallower siblings: discard the whole incomplete discovery.
+        if (depth > 5) {
+            incomplete = true;
+            return;
+        }
         if (++visited > MaxVisited || found.size() > MaxRoots) {
             incomplete = true;
             return;
@@ -421,7 +427,7 @@ inline std::vector<std::filesystem::path> FindAddOnContentDirectories(
         std::vector<fs::path> subdirs;
         bool loose_add_on = false;
         std::size_t examined = 0;
-        for (fs::directory_iterator it{dir, fs::directory_options::skip_permission_denied, error},
+        for (fs::directory_iterator it{dir, fs::directory_options::none, error},
                                     end;
              !error && it != end; it.increment(error)) {
             if (++examined > MaxEntriesPerDirectory) {
