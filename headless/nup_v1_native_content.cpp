@@ -31,6 +31,15 @@ FileSys::VirtualFile ContentSet::CreateRomFS() const {
                      : FileSys::VirtualFile{};
 }
 
+FileSys::VirtualFile ContentSet::CreateAddOnRomFS(std::size_t package_index) const {
+    for (const auto& addon : addons_) {
+        if (addon.package_index == package_index && addon.romfs) {
+            return FileSys::CreateRomFS(addon.romfs, nullptr);
+        }
+    }
+    return {};
+}
+
 bool ContentSet::HasExecutableMain() const {
     const auto exefs = ExeFS();
     return exefs && exefs->GetFile("main") && exefs->GetFile("main.npdm");
