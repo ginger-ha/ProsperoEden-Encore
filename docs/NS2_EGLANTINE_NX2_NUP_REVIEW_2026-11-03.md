@@ -75,4 +75,12 @@ Conditions d'intégration NUP dans le binaire commun, **sans** activer un chemin
 - **Performance restante** : ajouter avant tout raccordement PS5 une preuve de source immuable pendant la session (ou une invalidation sur changement), un éventuel cache zstd borné, des tests de contention et des benchmarks sur données volumineuses. La CI hôte de l'optimisation est verte : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41560577238.
 - CI hôte des vues et des listes de répertoires : https://github.com/niakw/ProsperoEden-Encore/actions/runs/41560322257 (réussie, C++ compilé et exécuté). **Aucun titre NUP lancé ni test PS5 effectué.**
 
+### Adaptateur FileSys natif inactif — jalon hôte du 3 novembre
+
+- Nouveaux fichiers `headless/nup_v1_native_vfs.{h,cpp}`, non enregistrés dans le loader, sans CMake PS5 ni changement vendor. Ils exposent des `FileSys::VirtualFile` et `VirtualDir` en lecture seule pour ExeFS/RomFS, la vue effective et chaque package (notamment DLC).
+- La source `VirtualFile` et l'archive sont retenues dans un état partagé par les fichiers/dossiers enfants; les handles restent lisibles après destruction du `Mount`. Les chemins et index restent ceux déjà validés par le noyau VFS.
+- Le moteur NUP offre `AllowsVerifiedMemberCache()`. Pour les sources natives `VfsFile`, il retourne **false** : une propriété `IsWritable() == false` ne garantit pas qu'un fichier externe reste immuable. Donc **SHA-256 complet à chaque lecture**, coûteux mais correct tant qu'aucune politique d'immuabilité n'a été démontrée.
+- Tests avec interface native VFS simulée : overlays, update autonome, addon distinct, entrée inexistante, lecture seule, corruption entre deux lectures, durée de vie de la source. CI verte : [#41562364228](https://github.com/niakw/ProsperoEden-Encore/actions/runs/41562364228). Un test de lectures concurrentes a également été ajouté ensuite et doit être validé par sa propre CI.
+- **Non prouvé** : compilation/link contre les vrais en-têtes et bibliothèques PS5, coût des SHA répétés sur de grands jeux, synchronisation avec les chargements NS1/NS2, montage ExeFS ou AoC réel, lancement NUP. Aucun indicateur de jouabilité ne doit être exposé.
+
 **Limite actuelle : NUP n'est PAS lancé par Encore.** Les contrôles ajoutés sont un prérequis sûr, pas un port complet. P2.2/Vulkan continue indépendamment. Ne fermer aucun jalon GPU ou loader sur une simple réussite du préflight.
