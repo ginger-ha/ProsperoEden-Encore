@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <utility>
 #include "shader_recompiler/frontend/ampere/native_qmd_compute_environment.h"
+#include "shader_recompiler/frontend/ampere/native_indirect_cbuf.h"
 
 struct TextureMetadata final : Shader::Environment {
     TextureMetadata() { stage=Shader::Stage::Compute; }
@@ -251,6 +252,38 @@ int main() {
             }
             assert(scheduler.waited == 2 && destroyed == 1);
         }
+    }
+    {
+        // P2.3: native QMD3 may expose only eight real banks, even though
+        // Maxwell's generic indirect LDC collector lists fourteen.
+        Shader::Info reflected{};
+        reflected.uses_cbuf_indirect = true;
+        for (u32 bank = 0; bank < Shader::Info::MAX_INDIRECT_CBUFS; ++bank) {
+            reflected.constant_buffer_mask |= (1U << bank);
+            reflected.constant_buffer_used_sizes[bank] = 0x10000U;
+            reflected.constant_buffer_descriptors.push_back({bank, 1});
+        }
+        auto malformed = reflected;
+        malformed.constant_buffer_descriptors[8].index = 7;
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(malformed));
+        malformed = reflected;
+        malformed.constant_buffer_descriptors.pop_back();
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(malformed));
+        malformed = reflected;
+        malformed.constant_buffer_mask |= (1U << 14);
+        malformed.constant_buffer_descriptors.push_back({14, 1});
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(malformed));
+        assert(Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(reflected));
+        assert(reflected.constant_buffer_mask == 0xffU &&
+               reflected.constant_buffer_descriptors.size() == 8);
+        for (u32 bank = 0; bank < 8; ++bank) {
+            assert(reflected.constant_buffer_descriptors[bank].index == bank);
+            assert(reflected.constant_buffer_used_sizes[bank] == 0x10000U);
+        }
+        for (u32 bank = 8; bank < Shader::Info::MAX_INDIRECT_CBUFS; ++bank)
+            assert(reflected.constant_buffer_used_sizes[bank] == 0);
+        // Re-normalization fails rather than silently loosening the contract.
+        assert(!Shader::Ampere::NormalizeNativeQmdIndirectCbufMetadata(reflected));
     }
     Tegra::NativeQmdScheduler::Descriptor qmd{};
     qmd[8]=0x80;

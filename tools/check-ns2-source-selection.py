@@ -186,6 +186,21 @@ def main() -> int:
                 "TraceNs2WorkerResult(" in gpu_worker_source and
                 "EDEN_NS2_IPC owner=vi2" in supervisor_source,
                 "NS2 boot trace must record guest-visible GPU worker IPC results")
+        # P2.3 must select a complete maintained SPIR-V emitter only in
+        # the native NS2 bridge. The original fourteen-bank source is kept.
+        qmd_spirv = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/backend/spirv/spirv_emit_context.cpp").read_text()
+        qmd_indirect = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_indirect_cbuf.h").read_text()
+        qmd_bridge = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/renderer_spirv_bridge.cpp").read_text()
+        qmd_env = (ROOT / "vendor/encore-active/ns2-runtime/ampere/shader_recompiler/frontend/ampere/native_qmd_compute_environment.h").read_text()
+        require('set(EDEN_NS2_QMD_CBUF_SPIRV' in CMAKE and
+                'list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/spirv_emit_context.cpp")' in CMAKE and
+                'list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_SPIRV}")' in CMAKE and
+                'std::span{buf_labels}.first(bank_count)' in qmd_spirv and
+                'OpReturnValue(ConstantNull(buffer_type))' in qmd_spirv and
+                'NormalizeNativeQmdIndirectCbufIR(ir)' in qmd_bridge and
+                'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
+                'shader_info.constant_buffer_descriptors.size() != 8' in qmd_env,
+                "Native QMD3 indirect CBUF lowering must match SPIR-V and real eight-slot binding")
         qmd_header = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_qmd.h").read_text()
         require("AcquireNativeQmdSession(" in engine_registry and
                 "qmd_sessions.erase(process)" in engine_registry and

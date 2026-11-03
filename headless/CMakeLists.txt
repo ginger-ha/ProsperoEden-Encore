@@ -2780,6 +2780,24 @@ if(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)
        NOT EXISTS "${PORT_ROOT}/vendor/encore-active/ns2-runtime/ampere/video_core/ns2_shader_spirv_compile.h")
         message(FATAL_ERROR "Missing verified NS2 GMMU-to-SPIR-V pipeline entrypoint")
     endif()
+    # P2.3: SPIR-V indirect CBUF dispatch uses exactly the reflected native
+    # QMD3 banks, never the generic 14-bank Maxwell switch. Select the
+    # complete tracked source only when the NS2 shader bridge is enabled.
+    set(EDEN_NS2_QMD_CBUF_SPIRV
+        "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/backend/spirv/spirv_emit_context.cpp")
+    if(NOT EXISTS "${EDEN_NS2_QMD_CBUF_SPIRV}" OR
+       NOT EXISTS "${EDEN_NS2_AMPERE_ROOT}/shader_recompiler/frontend/ampere/native_indirect_cbuf.h")
+        message(FATAL_ERROR "Missing reviewed native QMD3 indirect CBUF compiler")
+    endif()
+    get_target_property(eden_ns2_shader_sources shader_recompiler SOURCES)
+    list(FIND eden_ns2_shader_sources
+        "backend/spirv/spirv_emit_context.cpp" eden_ns2_spirv_source_idx)
+    if(eden_ns2_spirv_source_idx LESS 0)
+        message(FATAL_ERROR "Pinned SPIR-V emitter owner changed: audit QMD3 CBUF selection")
+    endif()
+    list(REMOVE_ITEM eden_ns2_shader_sources "backend/spirv/spirv_emit_context.cpp")
+    list(APPEND eden_ns2_shader_sources "${EDEN_NS2_QMD_CBUF_SPIRV}")
+    set_property(TARGET shader_recompiler PROPERTY SOURCES "${eden_ns2_shader_sources}")
     target_sources(video_core PRIVATE "${EDEN_NS2_VULKAN_SHADER_BRIDGE}")
     target_sources(video_core PRIVATE "${EDEN_NS2_NATIVE_GPU_SPIRV_CAPTURE}")
     target_include_directories(video_core BEFORE PRIVATE "${PORT_ROOT}/vendor/encore-active/ns2-runtime/hle")
