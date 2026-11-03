@@ -191,11 +191,10 @@ assert "python3 -B tools/ns2/check_paged_gpu_scalar_host.py" in (
     ROOT / ".github/workflows/encore-core-preflight.yml").read_text()
 print("NS1_NS2_SHARED_GPU_SCALAR_F07_ISOLATION_PASS",
       f"post_snapshot_reviewed={len(post_f07_shared_gpu_scalar_owners)}")
-# The NUP v1 parser/adapter/loader files were introduced after the frozen
-# 518-path F07 optimization audit. They are testable, read-only VFS sources,
-# but are NOT selected by the PS5 shipping target and have no native-runtime
-# performance review. Keep the historic ledger immutable and this debt
-# explicit; do not quietly classify new NUP code as F07-optimized.
+# NUP v1 parser/adapter/loader/router additions came after the frozen
+# 518-path F07 optimization audit. Their native CMake gate is OFF by default,
+# forbidden in the final profile, and has no PS5 runtime proof. Keep this
+# exact staged-source inventory separate from historical optimized owners.
 post_f07_nup_vfs_owners = {
     "headless/nup_v1_vfs.h",
     "headless/nup_v1_vfs.cpp",
@@ -205,6 +204,9 @@ post_f07_nup_vfs_owners = {
     "headless/nup_v1_native_content.cpp",
     "headless/nup_v1_native_loader.h",
     "headless/nup_v1_native_loader.cpp",
+    "headless/nup_v1_native_aoc.h",
+    "headless/nup_v1_native_aoc.cpp",
+    "headless/nup_v1_loader_route.cpp",
 }
 assert post_f07_nup_vfs_owners <= all_owners, sorted(
     post_f07_nup_vfs_owners - all_owners)
@@ -219,6 +221,21 @@ assert 'nup_v1_native_vfs.cpp' not in release_cmake
 assert 'nup_v1_native_content.cpp' not in release_cmake
 assert 'nup_v1_native_loader.cpp' not in release_cmake
 assert 'nup_v1_native_loader.h' not in release_cmake
+assert 'nup_v1_native_aoc.cpp' not in release_cmake
+assert 'nup_v1_loader_route.cpp' not in release_cmake
+# The separate host/qualification route must never silently become a default
+# final-release source. Verify *selection* as well as the staged file count.
+nup_select = (ROOT / "headless/CMakeLists.txt").read_text()
+assert 'option(EDEN_NUP_V1_RUNTIME' in nup_select
+assert 'route verified NUP containers to shared loader" OFF)' in nup_select
+assert 'if(EDEN_NUP_V1_RUNTIME)' in nup_select
+assert 'if(EDEN_FINAL_RELEASE_PROFILE)' in nup_select
+for selected in (
+    "nup_v1_vfs.cpp", "nup_v1_native_vfs.cpp",
+    "nup_v1_native_content.cpp", "nup_v1_native_aoc.cpp",
+    "nup_v1_native_loader.cpp", "nup_v1_loader_route.cpp",
+):
+    assert '"${EDEN_PORT_DIR}/' + selected + '"' in nup_select
 nup_core = (ROOT / "headless/nup_v1_vfs.h").read_text()
 nup_adapter = (ROOT / "headless/nup_v1_native_vfs.h").read_text()
 assert "Not wired into the PS5 loader or game catalogue." in nup_core
