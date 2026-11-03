@@ -113,4 +113,28 @@ with tempfile.TemporaryDirectory(prefix="encore-ns2-release-gate-") as temporary
     run_release_cache("EDEN_NS2_FUTURE_UNREVIEWED_EXPERIMENTAL")
 print("NS2_RELEASE_CMAKE_FAIL_CLOSED_PASS", len(declared), "plus future flag")
 
+# P5 owner gate: source and host testing may complete P0-P4, but neither
+# workflow is permitted to compile or package PS5 before an explicit P5
+# authorization. A manual workflow_dispatch or [full-build] marker is not
+# permission to bypass this hard job-level stop.
+native_workflows = (
+    (root / ".github/workflows/build-040-zbic.yml", "build"),
+    (root / ".github/workflows/ns2-native-ps5-research.yml", "compile-native-ps5"),
+)
+for native_workflow, native_job in native_workflows:
+    workflow_text = native_workflow.read_text()
+    marker = f"  {native_job}:\n"
+    assert workflow_text.count(marker) == 1, (
+        "PS5 job declaration drifted; review P5 lock", native_workflow
+    )
+    # Only the exact unconditional expression counts: branch filters and
+    # optional workflow inputs must not silently authorize a native build.
+    declaration = workflow_text.split(marker, 1)[1].split(
+        "    runs-on:", 1
+    )[0]
+    assert re.search(r"(?m)^    if: \$\{\{ false \}\}\s*$", declaration), (
+        "PS5 native compilation unlocked before P5", native_workflow
+    )
+print("P5_OWNER_BUILD_LOCK_PASS native_workflows=2 host_only_before_P5=1")
+
 print(f"PASS: {len(declared)} native NS2 CMake selectors; opt-in research; release fail-closed")
