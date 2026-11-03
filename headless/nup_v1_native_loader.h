@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "nup_v1_native_content.h"
@@ -34,6 +35,12 @@ public:
     Loader::ResultStatus ReadControlData(FileSys::NACP& out_control) override;
     Loader::ResultStatus ReadProgramId(u64& out_program_id) override;
     Loader::ResultStatus ReadTitle(std::string& out_title) override;
+    // Explicit locale APIs for the launcher. Core AppLoader keeps using the
+    // existing default title/icon contract without a per-game special case.
+    Loader::ResultStatus ReadLocalizedTitle(
+        std::string& out_title, std::string_view language);
+    Loader::ResultStatus ReadLocalizedIcon(
+        std::vector<u8>& out_icon, std::string_view language);
     Loader::ResultStatus ReadNSOModules(Modules& out_modules) override;
     // NUP has already applied its highest-version directory overlay.
     bool IsRomFSUpdatable() const override { return false; }
