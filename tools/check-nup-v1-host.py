@@ -94,10 +94,14 @@ def check(path: Path) -> dict:
     require(slot_count <= MAX_NODES * 2, "excessive child references")
     require(slots_start + 4 * slot_count <= pool_offset, "children overlap string pool")
     slots = record(toc, slots_start, f"<{slot_count}I") if slot_count else ()
+    slot_owners = [0] * slot_count
     for directory_name, first, number in dirs:
         require(first <= slot_count and number <= slot_count - first, "bad child span")
         child_names = []
-        for node in slots[first:first + number]:
+        for slot in range(first, first + number):
+            require(slot_owners[slot] == 0, "child slot has multiple owners")
+            slot_owners[slot] = 1
+            node = slots[slot]
             require(node < dirs_count + files_count, "child node out of bounds")
             if node < dirs_count:
                 child_names.append(dirs[node][0])
@@ -108,6 +112,7 @@ def check(path: Path) -> dict:
         require(child_names == sorted(set(child_names), key=lambda s: s.encode("utf-8")),
                 "unsorted or duplicate child names")
 
+    require(all(owner == 1 for owner in slot_owners), "unowned directory child slot")
     # A cyclic directory graph would recurse forever in a mounted VFS.
     # Topological traversal handles very deep trees without Python recursion.
     incoming = [0] * dirs_count
@@ -115,6 +120,10 @@ def check(path: Path) -> dict:
         for node in slots[first:first + number]:
             if node < dirs_count:
                 incoming[node] += 1
+    for i, count in enumerate(incoming):
+        require(count <= 1, "directory has multiple parents")
+        if count:
+            require(bool(dirs[i][0]), "empty nested directory name")
     pending = deque(i for i, count in enumerate(incoming) if count == 0)
     visited = 0
     while pending:
