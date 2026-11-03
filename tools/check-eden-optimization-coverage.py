@@ -166,6 +166,31 @@ assert "AcquireNativeSampler(" in cache_header
 assert "#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)" in cache_header
 print("NS2_POST_F07_TYPED_CACHE_ABI_ISOLATION_PASS",
       f"new_native_headers={len(post_f07_ns2_typed_cache_owners)}")
+# P1.2 shared GPU scalar fix is newer than the immutable F07 518 owners.
+# Its exact native owner and Clang/GCC witness are tracked separately, not
+# misclassified as a completed historical optimization or opt-in NS2 path.
+post_f07_shared_gpu_scalar_owners = {
+    "vendor/encore-active/eden-core/src/video_core/native_paged_scalar.h",
+}
+assert post_f07_shared_gpu_scalar_owners <= all_owners, sorted(
+    post_f07_shared_gpu_scalar_owners - all_owners)
+assert not post_f07_shared_gpu_scalar_owners & (
+    research_owners | hygiene_owners | ns2_shared_release_owners |
+    ns2_shared_audio_owners | ns2_shared_gpu_access_owners |
+    post_f07_native_vulkan_owners | post_f07_shared_compute_owners |
+    post_f07_launcher_handoff_owners | post_f07_ns2_typed_cache_owners
+)
+native_scalar_owner = (
+    ROOT / "vendor/encore-active/eden-core/src/video_core/memory_manager.cpp"
+).read_text()
+assert '#include "native_paged_scalar.h"' in native_scalar_owner
+assert "Eden::GpuScalar::Read(addr, value," in native_scalar_owner
+assert "Eden::GpuScalar::Write(addr, data," in native_scalar_owner
+assert "tools/ns2/check_paged_gpu_scalar_host.py" in tracked
+assert "python3 -B tools/ns2/check_paged_gpu_scalar_host.py" in (
+    ROOT / ".github/workflows/encore-core-preflight.yml").read_text()
+print("NS1_NS2_SHARED_GPU_SCALAR_F07_ISOLATION_PASS",
+      f"post_snapshot_reviewed={len(post_f07_shared_gpu_scalar_owners)}")
 # The four NUP v1 parser/adapter files were introduced after the frozen
 # 518-path F07 optimization audit. They are testable, read-only VFS sources,
 # but are NOT selected by the PS5 shipping target and have no native-runtime
@@ -202,7 +227,7 @@ print("NUP_V1_POST_F07_OWNER_ISOLATION_PASS",
       f"not_retroactive_F07={len(post_f07_nup_vfs_owners)}",
       "shipping_selection=absent")
 
-owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners-post_f07_ns2_typed_cache_owners-post_f07_nup_vfs_owners
+owners=all_owners-research_owners-hygiene_owners-ns2_shared_release_owners-ns2_shared_audio_owners-ns2_shared_gpu_access_owners-post_f07_native_vulkan_owners-post_f07_shared_compute_owners-post_f07_launcher_handoff_owners-post_f07_ns2_typed_cache_owners-post_f07_shared_gpu_scalar_owners-post_f07_nup_vfs_owners
 print("ENCORE_EXTRACTED_AOC_F07_OWNER_PASS", f"post_snapshot_reviewed={len(extracted_aoc_owners)}")
 assert len(owners)==518, ("F07 reviewed shipping source owner drift",len(owners))
 assert "headless/ns2_title_catalog.h" in owners, "new NS2 title owner unaccounted for"
