@@ -24,7 +24,7 @@ AddOnIndex::AddOnIndex(std::shared_ptr<Mount> mount,
         (*nacp_aoc_base_id & FileSys::AOC_TITLE_ID_MASK))
         return;
     aoc_base_id_ = nacp_aoc_base_id.value_or(
-        FileSys::GetAOCBaseTitleID(caller_program_id));
+        owner_base_id_ + FileSys::AOC_TITLE_ID_OFFSET);
     content_ = std::make_unique<ContentSet>(
         std::move(mount), caller_program_id, nacp_aoc_base_id);
     for (const auto& addon : content_->AddOns()) {
