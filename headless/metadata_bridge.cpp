@@ -1,5 +1,9 @@
 #include "metadata_bridge.h"
 #include "game_files.h"
+#ifdef EDEN_NUP_V1_RUNTIME
+#include "nup_v1_native_loader.h"
+#include "nup_v1_native_vfs.h"
+#endif
 #include "extracted_npdm_identity.h"
 #include "firmware_zip_import.h"
 #include "../vendor/encore-active/eden-core/src/core/file_sys/extracted_aoc_paths.h"
@@ -25,10 +29,15 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <string_view>
 
 #include <stb_image.h>
 
 #include "common/fs/path_util.h"
+#ifdef EDEN_NUP_V1_RUNTIME
+#include "common/settings.h"
+#include "core/file_sys/vfs/vfs_vector.h"
+#endif
 #include "core/file_sys/card_image.h"
 #include "core/file_sys/common_funcs.h"
 #include "core/file_sys/content_archive.h"
@@ -44,6 +53,24 @@
 #include "core/loader/loader.h"
 
 namespace {
+#ifdef EDEN_NUP_V1_RUNTIME
+std::string_view PreferredNupLocale() {
+    switch (Settings::values.language_index.GetValue()) {
+    case Settings::Language::French: return "fr";
+    case Settings::Language::FrenchCanadian: return "fr-CA";
+    case Settings::Language::Spanish: return "es";
+    case Settings::Language::SpanishLatin: return "es-419";
+    case Settings::Language::German: return "de";
+    case Settings::Language::Italian: return "it";
+    case Settings::Language::Portuguese: return "pt";
+    case Settings::Language::PortugueseBrazilian: return "pt-BR";
+    case Settings::Language::Japanese: return "ja";
+    case Settings::Language::Korean: return "ko";
+    case Settings::Language::EnglishBritish: return "en-GB";
+    default: return "en-US";
+    }
+}
+#endif
 constexpr std::array<const char*, 18> language_names{
     "AmericanEnglish", "BritishEnglish", "Japanese", "French", "German",
     "LatinAmericanSpanish", "Spanish", "Italian", "Dutch", "CanadianFrench",
@@ -220,6 +247,14 @@ uint64_t eden_game_title_id(const char* rom_path) {
     }
     const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
     if (!file) return 0;
+#ifdef EDEN_NUP_V1_RUNTIME
+    if (Eden::NupV1::Native::HasNupV1Header(file)) {
+        const auto loader = Eden::NupV1::Native::NupAppLoader::Open(file);
+        u64 id{};
+        return loader && loader->ReadProgramId(id) == Loader::ResultStatus::Success
+               ? id : 0;
+    }
+#endif
     std::string path = rom_path;
     std::transform(path.begin(), path.end(), path.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -252,6 +287,32 @@ int eden_extract_game_metadata(const char* rom_path, const char* keys_dir,
     }
     const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
     if (!file) return 0;
+#ifdef EDEN_NUP_V1_RUNTIME
+    if (Eden::NupV1::Native::HasNupV1Header(file)) {
+        auto loader = Eden::NupV1::Native::NupAppLoader::Open(file);
+        if (!loader) return 0;
+        int mask = 0;
+        std::string nup_title;
+        if (loader->ReadLocalizedTitle(nup_title, PreferredNupLocale()) ==
+                Loader::ResultStatus::Success && !nup_title.empty()) {
+            std::snprintf(title, title_capacity, "%s", nup_title.c_str());
+            mask |= EDEN_METADATA_TITLE;
+        }
+        std::vector<u8> icon_bytes;
+        if (loader->ReadLocalizedIcon(icon_bytes, PreferredNupLocale()) ==
+                Loader::ResultStatus::Success &&
+            !icon_bytes.empty() && icon_bytes.size() <= 4U * 1024U * 1024U) {
+            const auto memory = std::make_shared<FileSys::VectorVfsFile>(
+                std::move(icon_bytes));
+            if (WriteTga(memory, cover_tga_path))
+                mask |= EDEN_METADATA_COVER;
+        }
+        FileSys::NACP control;
+        if (loader->ReadControlData(control) == Loader::ResultStatus::Success)
+            GameLanguages()[rom_path] = control.GetSupportedLanguages();
+        return mask;
+    }
+#endif
     std::string path = rom_path;
     std::transform(path.begin(), path.end(), path.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -281,6 +342,16 @@ uint32_t eden_game_supported_languages(const char* rom_path, const char* keys_di
         FileSys::RealVfsFilesystem vfs;
         const auto file = vfs.OpenFile(rom_path, FileSys::OpenMode::Read);
         if (!file) return 0;
+#ifdef EDEN_NUP_V1_RUNTIME
+        if (Eden::NupV1::Native::HasNupV1Header(file)) {
+            const auto loader = Eden::NupV1::Native::NupAppLoader::Open(file);
+            FileSys::NACP control;
+            if (!loader || loader->ReadControlData(control) !=
+                               Loader::ResultStatus::Success)
+                return 0;
+            return GameLanguages()[rom_path] = control.GetSupportedLanguages();
+        }
+#endif
         std::string path = rom_path;
         std::transform(path.begin(), path.end(), path.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
