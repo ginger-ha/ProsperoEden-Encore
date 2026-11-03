@@ -71,6 +71,46 @@ bool Utf8Name(std::string_view value, bool root) {
     return true;
 }
 
+// Metadata strings may contain slashes (unlike path components) but must
+// remain valid, printable UTF-8. These limits prevent unbounded UI strings.
+bool Utf8Metadata(std::string_view value, std::size_t limit) {
+    if (value.empty() || value.size() > limit) return false;
+    for (std::size_t i = 0; i < value.size();) {
+        const auto first = static_cast<std::uint8_t>(value[i]);
+        if (first < 0x20 || first == 0x7f) return false;
+        if (first < 0x80) { ++i; continue; }
+        std::size_t following = 0;
+        if (first >= 0xC2 && first <= 0xDF) following = 1;
+        else if (first >= 0xE0 && first <= 0xEF) following = 2;
+        else if (first >= 0xF0 && first <= 0xF4) following = 3;
+        else return false;
+        if (following >= value.size() - i) return false;
+        const auto second = static_cast<std::uint8_t>(value[i + 1]);
+        if (second < 0x80 || second > 0xBF) return false;
+        if ((first == 0xE0 && second < 0xA0) ||
+            (first == 0xED && second > 0x9F) ||
+            (first == 0xF0 && second < 0x90) ||
+            (first == 0xF4 && second > 0x8F)) return false;
+        for (std::size_t j = 2; j <= following; ++j) {
+            const auto following_byte = static_cast<std::uint8_t>(value[i + j]);
+            if (following_byte < 0x80 || following_byte > 0xBF) return false;
+        }
+        i += following + 1;
+    }
+    return true;
+}
+
+bool ImageSignature(std::span<const std::uint8_t> bytes) {
+    const bool jpeg = bytes.size() >= 3 &&
+        bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff;
+    const bool png = bytes.size() >= 8 &&
+        bytes[0] == 0x89 && bytes[1] == 0x50 &&
+        bytes[2] == 0x4e && bytes[3] == 0x47 &&
+        bytes[4] == 0x0d && bytes[5] == 0x0a &&
+        bytes[6] == 0x1a && bytes[7] == 0x0a;
+    return jpeg || png;
+}
+
 bool NameLess(const std::string& a, const std::string& b) {
     return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(),
         [](unsigned char x, unsigned char y) { return x < y; });
@@ -292,6 +332,7 @@ void Archive::Parse() {
         if (p.kind != 1) Check(flags == 0, "standalone flag on non-update");
         const auto meta_at = ReadLe<std::uint64_t>(toc, at + 0x20);
         const auto meta_size = ReadLe<std::uint32_t>(toc, at + 0x28);
+        PackageMetadata package_meta;
         if (!meta_size) Check(meta_at == 0, "zero metadata with nonzero address");
         else {
             Check(meta_size <= MaxMeta && meta_at >= blob_at &&
@@ -305,9 +346,29 @@ void Archive::Parse() {
                 const auto length = ReadLe<std::uint32_t>(meta, pos + 4);
                 Check(ReadLe<std::uint16_t>(meta, pos + 2) == 0 &&
                       length <= meta.size() - pos - 8, "invalid metadata TLV");
+                const auto kind = ReadLe<std::uint16_t>(meta, pos);
+                const auto payload = std::span<const std::uint8_t>(
+                    meta.data() + pos + 8, length);
+                if (kind == 0x0003 && package_meta.default_icon.empty()) {
+                    // Icons can be large but the UI never needs an unbounded
+                    // blob. Ignore unknown encodings instead of mislabeling.
+                    Check(length <= 4 * 1024 * 1024, "NUP icon metadata too large");
+                    if (ImageSignature(payload))
+                        package_meta.default_icon.assign(payload.begin(), payload.end());
+                } else if (kind == 0x0004 || kind == 0x0005 || kind == 0x0006) {
+                    const auto text = std::string_view(
+                        reinterpret_cast<const char*>(payload.data()), payload.size());
+                    const auto max_length = kind == 0x0004 ? 128U : 4096U;
+                    Check(Utf8Metadata(text, max_length), "invalid NUP UTF-8 metadata");
+                    auto& target = kind == 0x0004 ? package_meta.display_version :
+                                   kind == 0x0005 ? package_meta.title :
+                                                    package_meta.publisher;
+                    if (target.empty()) target.assign(text);
+                }
                 pos += 8 + length;
             }
         }
+        package_metadata_.push_back(std::move(package_meta));
 
         // ExeFS/RomFS directory references must be reachable beneath the
         // advertised package root; never trust arbitrary cross-package trees.
@@ -379,6 +440,18 @@ void Archive::Parse() {
         Check(it == regions.end() || it->first >= meta.second,
               "metadata overlaps file payload");
     }
+}
+
+const PackageMetadata* Archive::MetadataOf(std::size_t index) const {
+    return index < package_metadata_.size() ? &package_metadata_[index] : nullptr;
+}
+
+const PackageMetadata* Archive::ApplicationMetadata() const {
+    for (std::size_t i = 0; i < packages_.size(); ++i)
+        if (packages_[i].kind == 0) return MetadataOf(i);
+    for (std::size_t i = 0; i < packages_.size(); ++i)
+        if (packages_[i].kind == 1) return MetadataOf(i);
+    return nullptr; // add-on-only archives do not represent an application.
 }
 
 std::optional<std::size_t> Archive::FindFile(std::size_t pkg, std::string_view path) const {
