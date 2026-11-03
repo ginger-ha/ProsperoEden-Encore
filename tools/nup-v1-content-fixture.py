@@ -115,6 +115,22 @@ def build(packages: list[dict]) -> bytes:
         toc[file_at + 0x20:file_at + 0x40] = sha256(data).digest()
         blobs.extend(data)
 
+    # Optional raw NUP per-package TLVs are placed after the file payloads
+    # (never overlapping a member extent); every record is size-delimited.
+    for i, package in enumerate(packages):
+        values = package.get("metadata", {})
+        if not values:
+            continue
+        meta = bytearray()
+        for kind, payload in sorted(values.items()):
+            assert isinstance(kind, int) and isinstance(payload, bytes)
+            meta += struct.pack("<HHI", kind, 0, len(payload)) + payload
+        aligned = (blob_at + len(blobs) + 15) & ~15
+        blobs.extend(bytes(aligned - (blob_at + len(blobs))))
+        struct.pack_into("<QI", toc, 0x30 + i * 0x40 + 0x20,
+                         blob_at + len(blobs), len(meta))
+        blobs.extend(meta)
+
     header = bytearray(0x80)
     header[:4] = b"NUP\x01"
     struct.pack_into("<HHQQ", header, 4, 0x80, 1, 0x80, toc_size)
@@ -128,13 +144,23 @@ def build(packages: list[dict]) -> bytes:
 def executable_fixture() -> bytes:
     title = 0x0100123400000000
     return build([
-        {"title_id": title, "version": 1, "kind": 0, "files": {
+        {"title_id": title, "version": 1, "kind": 0,
+         "metadata": {
+             0x0003: b"\\xff\\xd8\\xff" + b"synthetic-jpeg",
+             0x0004: b"3.0.0",
+             0x0005: b"Demo / Game",
+             0x0006: b"Example Publisher",
+             0x8000: b"unknown-type-is-ignored",
+         },
+         "files": {
             "exefs/main": b"base-main",
             "exefs/main.npdm": b"base-npdm",
             "romfs/state.bin": b"base-v1",
             "romfs/sub/base.dat": b"base-only",
         }},
-        {"title_id": title + 0x800, "version": 3, "kind": 1, "files": {
+        {"title_id": title + 0x800, "version": 3, "kind": 1,
+         "metadata": {0x0005: b"Wrong update title"},
+         "files": {
             "exefs/main": b"latest-main",
             "exefs/main.npdm": b"latest-npdm",
             "romfs/state.bin": b"latest-v3",
@@ -195,4 +221,14 @@ def sibling_npdm_fixture() -> bytes:
             "exefs/main.npdm": b"sibling-npdm",
             "romfs/state.bin": b"data",
         }},
+    ])
+
+
+def bad_metadata_fixture() -> bytes:
+    """A well-formed TLV length carrying forbidden, overlong UTF-8."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0,
+         "metadata": {0x0005: b"\xC0\xAF"},
+         "files": {"romfs/state.bin": b"metadata-error"}},
     ])
