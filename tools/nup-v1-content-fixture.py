@@ -172,3 +172,15 @@ def foreign_update_fixture() -> bytes:
             "romfs/state.bin": b"foreign-hijack",
         }},
     ])
+
+
+def mismatched_npdm_fixture() -> bytes:
+    """Valid NUP package record and hashes with a foreign NPDM identity."""
+    title = 0x0100123400000000
+    return build([
+        {"title_id": title, "version": 1, "kind": 0, "files": {
+            "exefs/main": b"synthetic-main",
+            "exefs/main.npdm": b"foreign-npdm",
+            "romfs/state.bin": b"data",
+        }},
+    ])
