@@ -315,6 +315,20 @@ def main() -> int:
                 "return !invalid_compute_register_read;" in puller and
                 'fail("compute MME interpreter or register access rejected");' in puller,
                 "Untrusted Ampere MME register reads must fail closed before QMD publication")
+        mme_state = (ROOT / "vendor/encore-active/ns2-runtime/gpu_dispatch/video_core/native_ampere_macro_state.h").read_text()
+        require("Result ExecuteStaged(" in mme_state and
+                "const auto old_dram = dram;" in mme_state and
+                "dram = old_dram;" in mme_state and
+                "shadow[address] = value;" in mme_state and
+                "pending.emplace_back(address, value);" in mme_state and
+                "for (const auto& [address, value] : pending)" in mme_state and
+                "commit(address, value);" in mme_state and
+                "MaxPendingMethods = 65536" in mme_state and
+                "native_3d->ExecuteStaged(" in puller and
+                "native_compute->ExecuteStaged(" in puller and
+                "return !bad_read;" in puller and
+                "return !invalid_compute_register_read;" in puller,
+                "P2.4 native TU104 macros must stage all emissions and restore DRAM on failure")
         require("BindGraphicsEngine(" in puller and
                 "UnbindGraphicsSubchannel(" in puller and
                 "CaptureGraphicsTicket(" in engine_registry and
