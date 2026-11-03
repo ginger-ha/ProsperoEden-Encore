@@ -1515,7 +1515,11 @@ void Launcher::draw_library(Canvas &c)
                 theme::kHeading, theme::kTitle, 980.0f);
     text_shrink(c, tr("Select a game to begin"), 72.0f, baseline(176.0f, 24.0f, 18.0f),
                 18.0f, theme::kMeta, 1200.0f);
-    text(c, list_position(count > 0 ? library_.selected + 1 : 0, count), 1848.0f,
+    // A pending/retired selection can outlive the previously indexed game
+    // while a background scan atomically replaces the library snapshot.
+    // Never turn -1 into an unchecked size_t or render a stale detail card.
+    const bool selected_valid = library_.selected >= 0 && library_.selected < count;
+    text(c, list_position(selected_valid ? library_.selected + 1 : 0, count), 1848.0f,
          baseline(150.0f, 32.0f, theme::kSmall), theme::kSmall, theme::kLimePale, Align::right);
 
     // Five authentic portrait flat covers on a continuous shelf; no square
@@ -1541,7 +1545,8 @@ void Launcher::draw_library(Canvas &c)
         text(c, tr("No ROM files found."), 960.0f, baseline(240.0f, 190.0f, theme::kText24),
              theme::kText24, theme::kCopy, Align::center);
     } else {
-        const int first = std::clamp(library_.selected - slots / 2, 0, std::max(0, count - slots));
+        const int first = std::clamp(selected_valid ? library_.selected - slots / 2 : 0,
+                                     0, std::max(0, count - slots));
         const int last = std::min(count, first + slots);
         for (int index = first; index < last; ++index) {
             const int slot = index - first;
@@ -1576,7 +1581,8 @@ void Launcher::draw_library(Canvas &c)
     }
 
     // ---- selected game: one clean detail surface, no hidden left/right setting changes ----
-    const Game* game = count > 0 ? &games_[static_cast<std::size_t>(library_.selected)] : nullptr;
+    const Game* game = selected_valid
+        ? &games_[static_cast<std::size_t>(library_.selected)] : nullptr;
     // Give the large cover row, its captions and the details panel three
     // distinct bands instead of letting the bottom of the jackets touch glass.
     const Rect detail{72.0f, 620.0f, 1776.0f, 276.0f};
