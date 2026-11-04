@@ -1573,26 +1573,62 @@ if gpu_actual != gpu_expected:
     # device-backed block fallbacks and scalar paging are preserved. This is
     # an exact blob admission, never a general substring-based exception.
     p12_bounded_sha = "b5caf9fa5b0477b005249d4b87bac89934bf4c50"
-    assert owner_sha in (n51_sha, p12_sha, p12_bounded_sha), (
+    p12_walk_guarded_sha = "836c0653652957a996db89ba7a7d5c48db1350a8"
+    assert owner_sha in (n51_sha, p12_sha, p12_bounded_sha, p12_walk_guarded_sha), (
         "unreviewed changed-PTE/P1.2 GPU source drift", owner_sha)
     assert "#ifdef EDEN_NS2_GPU_RANGE_BATCH" in gpu_actual
-    if owner_sha in (p12_sha, p12_bounded_sha):
+    if owner_sha in (p12_sha, p12_bounded_sha, p12_walk_guarded_sha):
         assert '#include "native_paged_scalar.h"' in gpu_actual
         assert "Eden::GpuScalar::Read(addr, value" in gpu_actual
         assert "Eden::GpuScalar::Write(addr, data" in gpu_actual
         assert gpu_actual.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4
         assert "memory.ReadBlockUnsafe(dev_addr_base, dest_buffer, copy_amount)" in gpu_actual
         assert "memory.WriteBlockUnsafe(dev_addr_base, src_buffer, copy_amount)" in gpu_actual
-        if owner_sha == p12_bounded_sha:
+        if owner_sha in (p12_bounded_sha, p12_walk_guarded_sha):
             assert gpu_actual.count("size > address_space_size -") >= 7
             assert "const size_t page_last{((addr + size - 1) >> page_bits) + 1};" in gpu_actual
             assert "GetSubmappedRangeImpl<true>(gpu_addr, size, result);" in gpu_actual
+    if owner_sha == p12_walk_guarded_sha:
+        # Not just a new allowlist entry: remove precisely the three audited
+        # range guards and prove the complete previous owner blob reappears.
+        # Any other code mutation would break this replay even if someone
+        # inadvertently updated an opaque hash in the inventory.
+        exact_guards = (
+            """    // Every mapped/unmapped guest region traverses this common PTE walker.
+    // Neither a wrapped 64-bit range nor a span past the configured 40/49-bit
+    // guest VA limit may probe the backing page table, even via SafeRead.
+    if (size == 0 || gpu_src_addr >= address_space_size ||
+        size > address_space_size - gpu_src_addr) return;
+""",
+            """    // Invalid GPU command spans follow the existing unmapped-read contract:
+    // return zero bytes without visiting an out-of-range PTE or stale page.
+    if (size == 0) return;
+    if (gpu_src_addr >= address_space_size ||
+        size > address_space_size - gpu_src_addr) {
+        std::memset(dest_buffer, 0, size);
+        return;
+    }
+""",
+            """    // A refused write must not queue a dirty interval with a wrapping address.
+    if (size == 0 || gpu_dest_addr >= address_space_size ||
+        size > address_space_size - gpu_dest_addr) return;
+""",
+        )
+        previous_owner = gpu_actual
+        for guard in exact_guards:
+            assert previous_owner.count(guard) == 1, "missing P1.2 walker guard"
+            previous_owner = previous_owner.replace(guard, "")
+        assert git_blob_id(previous_owner) == p12_bounded_sha, (
+            "P1.2 GPU PTE walker mutation exceeds exactly reviewed guards")
+        walker_test = root / "tools/ns2/check_native_gpu_memory_walker_bounds_host.py"
+        assert walker_test.is_file() and "MemoryOperation" in walker_test.read_text()
     # N51's independent source-normalisation witness must also pin both
     # complete blobs and recheck all batching operands after removing N51.
     n51_guard = (root / "tools/ns2/check_egl_gpu_range_batch.py").read_text()
     assert f'n51_original = "{n51_sha}"' in n51_guard
     assert f'p12_protected = "{p12_sha}"' in n51_guard
     assert f'p12_bounded = "{p12_bounded_sha}"' in n51_guard
+    assert f'p12_walk_guarded = "{p12_walk_guarded_sha}"' in n51_guard
     assert 't.count("memory.GetSpan(dev_addr_base, copy_amount)") == 4' in n51_guard
 
 assert 'list(APPEND video_sources "${EDEN_NATIVE_GPU_MEMORY_MANAGER}")' in c
