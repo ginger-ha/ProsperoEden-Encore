@@ -214,6 +214,12 @@ int main() {
                      (7U<<22)|(0xffc0U<<6),0x00000800U,0}},
         Instruction{{pred_true|0x949U|(6U<<24),0xffffffc0U,0x0383ffffU,0}},
     };
+    auto single_motif=motif;
+    single_motif[0].words[1]=0; // IMNMX bounds the selector to [0,0]
+    const auto single_table=TrackCaptureIndirectBranches(single_motif);
+    Require(single_table.size()==1 && single_table[0].entries==1 &&
+            single_table[0].cbuf_index==7 && single_table[0].cbuf_offset==0xffc0U,
+            "canonical BRX with one exact CBUF target is a valid dispatch");
     auto table=TrackCaptureIndirectBranches(motif);
     Require(table.size()==1 && table[0].index==3 &&
             table[0].cbuf_index==7 && table[0].cbuf_offset==0xffc0U &&
@@ -468,6 +474,38 @@ int main() {
     for(u32 i=0;i<4;++i) Push(brx_memory.data,pred_true|0x918U);
     Push(brx_memory.data,pred_true|0x94dU,0,exit_true);
     brx_memory.mapped_bytes=brx_memory.data.size();
+    // A canonical IMNMX clamp-to-zero also encodes a valid ONE-entry
+    // indirect CBUF table. The original two-entry minimum erroneously
+    // refused this legitimate degenerate switch; the checked BRX still
+    // compares the guest native PC and never jumps to its raw byte offset.
+    auto single_brx_memory=brx_memory;
+    // Instruction 0 IMNMX immediate bound changes from 15 to zero.
+    for(u32 byte=0;byte<4;++byte)
+        single_brx_memory.data[0x80+4+byte]=0;
+    CbufFixture single_brx_cbuf{};
+    single_brx_cbuf.entries[0]=0xc0U; // header-relative native EXIT at index 4
+    const auto single_brx=CaptureNativeGraphicsShaderChecked(
+        single_brx_memory.base,4,Read,&single_brx_memory,
+        ReadCheckedCbuf,&single_brx_cbuf);
+    Require(single_brx.Ready() && single_brx.image.ValidForCompiler() &&
+            single_brx.image.TranslateNativeAddress(4*16).has_value() &&
+            single_brx_cbuf.reads>=3,
+            "single-entry BRX table uses checked native PC and real lowered target");
+    // A CBUF unmap must refuse the same shader; no bare Maxwell indirect
+    // branch may run as a fallback for the missing one-element table.
+    single_brx_cbuf.missing=true;
+    const auto missing_single=CaptureNativeGraphicsShaderChecked(
+        single_brx_memory.base,4,Read,&single_brx_memory,
+        ReadCheckedCbuf,&single_brx_cbuf);
+    Require(!missing_single.Ready() && missing_single.image.code.empty(),
+            "single-entry BRX refuses missing CBUF mapping");
+    single_brx_cbuf.missing=false;
+    single_brx_cbuf.entries[0]=0xc1U;
+    const auto unaligned_single=CaptureNativeGraphicsShaderChecked(
+        single_brx_memory.base,4,Read,&single_brx_memory,
+        ReadCheckedCbuf,&single_brx_cbuf);
+    Require(!unaligned_single.Ready() && unaligned_single.image.code.empty(),
+            "single-entry BRX refuses misaligned guest native PC");
     CbufFixture stable_cbuf{};
     for(u32 i=0;i<stable_cbuf.entries.size();++i)
         stable_cbuf.entries[i]=i&1 ? 0x100U : 0x80U;
