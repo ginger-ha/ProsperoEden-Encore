@@ -240,6 +240,13 @@ def main()->int:
     assert vsync_owner.index('m_vsync->events.pop_back();') < vsync_owner.index(
         'm_context.CloseEvent(event);')
     assert (ROOT / 'tools/ns2/check_native_vi2_vsync_oom_host.py').is_file()
+    present = text.split('void Present(HLERequestContext& ctx) {',1)[1].split(
+        'void Cancel(HLERequestContext& ctx) {',1)[0]
+    assert present.index('if(result.IsSuccess() && !m_poll){') < present.index(
+        'c->producer->QueueBuffer(')
+    assert 'm_poll=std::move(timer);' in present
+    assert 'catch (const std::bad_alloc&)' in present
+    assert (ROOT / 'tools/ns2/check_native_vi2_present_release_order_host.py').is_file()
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text
