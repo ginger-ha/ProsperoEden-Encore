@@ -223,6 +223,14 @@ def main()->int:
         'for (const auto& [image_id, image] : m_native_images.Records())',
     ):
         assert snippet in text, "Missing native image NVMap ownership: " + snippet
+    worker = (ROOT / 'vendor/encore-active/ns2-runtime/gpu_session/core/hle/service/am/service/gpu_worker.cpp').read_text()
+    dense = worker.split('Result IGpuWorker::BackGpuOnlyRegion(',1)[1].split(
+        'bool IGpuWorker::RetireGpuOnlyRegion(',1)[0]
+    assert dense.index('pending_region.try_emplace(') < dense.index(
+        'memory.AllocateAndOpen(') < dense.index('RemapNativeSparse(') < dense.index(
+        'm_dense_regions.merge(pending_region);')
+    assert 'm_dense_regions.emplace(' not in dense
+    assert (ROOT / 'tools/ns2/check_native_dense_ledger_oom_host.py').is_file()
     assert 'GpuContextReady()' in text
     assert 'ResultNotImplemented.raw' in text
     assert 'ResultInvalidCurrentMemory' in text

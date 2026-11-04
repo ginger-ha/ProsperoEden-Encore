@@ -852,6 +852,8 @@ jobs:
         run: python3 tools/check-ns2-graphics-hle-host.py
       - name: P1.3/P4.2 verify real VI2 NVMap handle rollback under allocation failures
         run: python3 -B tools/ns2/check_native_vi2_oom_host.py
+      - name: P1.2/P4.2 verify dense GPU-only 214 ledger rollback before GMMU mapping
+        run: python3 -B tools/ns2/check_native_dense_ledger_oom_host.py
       - name: Run actual ProgramMetadata parser against synthetic Switch 1/2 NPDM
         shell: bash
         run: |
