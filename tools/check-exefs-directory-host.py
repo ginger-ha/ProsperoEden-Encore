@@ -200,6 +200,25 @@ int main() {
     std::ofstream(deeper / "base" / "some" / "path" / "exefs" / "main") << "code";
     std::ofstream(deeper / "base" / "some" / "path" / "exefs" / "main.npdm") << "meta";
     assert(Eden::FindDeconstructedGameMain(deeper) == "base/some/path/exefs/main");
+    // Noncanonical paths have no safe preference between two independent
+    // extracted programs: do not launch the first directory by sort order.
+    const auto ambiguous_extract = root / "Ambiguous ExeFS";
+    fs::create_directories(ambiguous_extract / "wrapperA" / "exefs");
+    fs::create_directories(ambiguous_extract / "wrapperB" / "exefs");
+    for (const auto* wrapper : {"wrapperA", "wrapperB"}) {
+        const auto dir = ambiguous_extract / wrapper / "exefs";
+        std::ofstream(dir / "main") << "code";
+        std::ofstream(dir / "main.npdm") << "metadata";
+    }
+    assert(Eden::FindDeconstructedGameMain(ambiguous_extract).empty());
+    const auto hidden_extract = root / "Hidden Deep ExeFS";
+    fs::create_directories(hidden_extract / "quick" / "exefs");
+    fs::create_directories(hidden_extract / "slow/a/b/c/d/e/f/exefs");
+    std::ofstream(hidden_extract / "quick/exefs/main") << "code";
+    std::ofstream(hidden_extract / "quick/exefs/main.npdm") << "metadata";
+    std::ofstream(hidden_extract / "slow/a/b/c/d/e/f/exefs/main") << "code";
+    std::ofstream(hidden_extract / "slow/a/b/c/d/e/f/exefs/main.npdm") << "metadata";
+    assert(Eden::FindDeconstructedGameMain(hidden_extract).empty());
     // A flood of unrelated files cannot hide the canonical base dump or
     // force an unbounded directory walk. Noncanonical oversized folders
     // fail closed instead of exposing a partial, order-dependent result.

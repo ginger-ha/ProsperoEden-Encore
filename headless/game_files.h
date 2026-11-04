@@ -178,31 +178,50 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
         }
     }
     std::size_t visited = 0;
+    bool incomplete = false;
+    std::vector<std::string> candidates;
     const auto search = [&](const auto& self, const fs::path& dir,
-                            const std::string& relative, unsigned depth) -> std::string {
-        if (depth > 6 || ++visited > 128) return {};
+                            const std::string& relative, unsigned depth) -> void {
+        if (incomplete) return;
+        if (depth > 6 || ++visited > 128 || candidates.size() > 1) {
+            incomplete = true;
+            return;
+        }
         if (const auto leaf = dir.filename().string();
-            leaf.size() == 5 && EndsWithNoCase(leaf, "exefs") && IsDeconstructedGameDirectory(dir))
-            return relative + "/main";
+            leaf.size() == 5 && EndsWithNoCase(leaf, "exefs") && IsDeconstructedGameDirectory(dir)) {
+            candidates.push_back(relative + "/main");
+            return;
+        }
         std::error_code error;
         std::vector<fs::path> subdirs;
         std::size_t examined = 0;
-        for (fs::directory_iterator it{dir, fs::directory_options::skip_permission_denied, error},
+        for (fs::directory_iterator it{dir, fs::directory_options::none, error},
                                     end;
              !error && it != end; it.increment(error)) {
-            // Invalid/unrelated files previously escaped the directory limit:
-            // a large folder could stall the library scan indefinitely.
-            // Refuse partial wrapper results rather than select an accidental
-            // ExeFS from an unsorted subset of an oversized directory.
-            if (++examined > 512 || subdirs.size() >= 128) return {};
+            // An incomplete wrapper walk cannot prove that an ExeFS is
+            // unique. A second hidden base might otherwise get ignored.
+            if (++examined > 512 || subdirs.size() >= 128) {
+                incomplete = true;
+                return;
+            }
             const auto path = it->path();
             const auto name = path.filename().string();
             if (name.empty() || name.front() == '.' ||
-                (name.size() == 5 && EndsWithNoCase(name, "romfs")) || IsAddOnContainerName(name))
-                continue;
-            if (IsSafeExtractedDirectory(path)) subdirs.push_back(path);
+                (name.size() == 5 && EndsWithNoCase(name, "romfs")) ||
+                IsAddOnContainerName(name)) continue;
+            std::error_code status_error;
+            const auto status = fs::symlink_status(path, status_error);
+            if (status_error) {
+                incomplete = true;
+                return;
+            }
+            if (!fs::is_symlink(status) && fs::is_directory(status))
+                subdirs.push_back(path);
         }
-        // Prefer base, then exefs, then other nested extraction folders.
+        if (error) {
+            incomplete = true;
+            return;
+        }
         std::sort(subdirs.begin(), subdirs.end(), [](const fs::path& a, const fs::path& b) {
             const auto rank = [](const fs::path& p) {
                 const auto name = p.filename().string();
@@ -213,14 +232,14 @@ inline std::string FindDeconstructedGameMain(const std::filesystem::path& title)
             return a.filename().string() < b.filename().string();
         });
         for (const auto& path : subdirs) {
+            if (incomplete) return;
             const auto segment = path.filename().string();
             const auto next = relative.empty() ? segment : relative + "/" + segment;
-            if (const auto found = self(self, path, next, depth + 1); !found.empty())
-                return found;
+            self(self, path, next, depth + 1);
         }
-        return {};
     };
-    return search(search, title, "", 0);
+    search(search, title, "", 0);
+    return !incomplete && candidates.size() == 1 ? candidates.front() : std::string{};
 }
 
 inline bool IsSafeDeconstructedGamePath(const std::filesystem::path& roms_root,
