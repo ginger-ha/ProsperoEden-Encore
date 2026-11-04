@@ -860,6 +860,10 @@ jobs:
         run: python3 -B tools/ns2/check_native_vi2_present_release_order_host.py
       - name: P1.2/P4.2 verify dense GPU-only 214 ledger rollback before GMMU mapping
         run: python3 -B tools/ns2/check_native_dense_ledger_oom_host.py
+      - name: P1.2 verify GPU 211/214 staged ledger node ownership
+        run: python3 -B tools/ns2/check_gpu_worker_staged_ledger_host.py
+      - name: P1.2 prevent TIPC 111 registration allocation after NVMap lock
+        run: python3 -B tools/ns2/check_gpu_worker_registered_handles_oom_host.py
       - name: Run actual ProgramMetadata parser against synthetic Switch 1/2 NPDM
         shell: bash
         run: |

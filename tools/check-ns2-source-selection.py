@@ -885,6 +885,8 @@ def main() -> int:
                 '{211, &IGpuWorker::NormalMapGpuMemory4K' in worker_hle_cpp and
                 '{212, &IGpuWorker::NormalModifyGpuMemory4K' in worker_hle_cpp and
                 '{213, &IGpuWorker::NormalUnmapGpuMemory4K' in worker_hle_cpp and
+                'm_memory.reserve(MaxOwnedGpuMemoryHandles);' in worker_hle_cpp and
+                (ROOT / 'tools/ns2/check_gpu_worker_registered_handles_oom_host.py').is_file() and
                 'm_mappings.PrepareMapped(*request, staged_ledger)' in worker_hle_cpp and
                 'm_mappings.CommitPrepared(staged_ledger)' in worker_hle_cpp and
                 'm_mappings.RecordUnmapped(*request)' in worker_hle_cpp and
