@@ -29,7 +29,7 @@ assert "if (!session || !session->process)" in method
 assert "std::memcpy(entries.command_lists.data(), commands.data()" in method
 # Ioctl2 supplies a separate inline-input span and has its own copy path.
 # It too must handle a fence-only zero-entry submission without memcpy(0).
-end_base2 = "\\nNvResult nvhost_gpu::GetWaitbase("
+end_base2 = "\nNvResult nvhost_gpu::GetWaitbase("
 assert OWNER.count(end_base2) == 1
 method2 = OWNER[OWNER.index(end) + 1:OWNER.index(end_base2)]
 assert "if (params.num_entries != 0)" in method2
@@ -70,7 +70,20 @@ struct GuestRam {
         std::memcpy(out,src.data(),bytes);
     }
 };
-struct StubProcess {};
+struct StubMemory {
+    bool IsValidVirtualAddressRange(std::uint64_t address, std::size_t bytes) const {
+        return address == 0x1000 && bytes == 3 * sizeof(Tegra::CommandListHeader);
+    }
+};
+struct StubProcess { StubMemory memory; const StubMemory& GetMemory() const { return memory; } };
+template <typename Mapped>
+bool NativeGpfifoGuestHeadersReadable(std::uint64_t address, std::size_t count,
+                                     std::size_t size, Mapped&& mapped) {
+    if (count == 0) return true;
+    if (!address || count > (UINT64_MAX / size)) return false;
+    const auto bytes = count * size;
+    return address <= UINT64_MAX - bytes && mapped(address, bytes);
+}
 struct StubSession { StubProcess* process{}; };
 struct StubCore {
     StubProcess process;
@@ -79,6 +92,7 @@ struct StubCore {
 };
 class nvhost_gpu {
 public:
+    bool UsesNativeAbi(DeviceFD) const { return true; }
     GuestRam memory;
     StubCore core;
     std::unordered_map<DeviceFD,int> sessions{{42,1}};
