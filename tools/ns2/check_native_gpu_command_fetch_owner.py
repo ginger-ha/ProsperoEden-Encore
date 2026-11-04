@@ -30,6 +30,12 @@ for file in ("dma_pusher.cpp", "dma_pusher_dev.cpp"):
     assert "GpuGuestMemory<Tegra::CommandHeader," in step
     assert "GuestMemoryFlags::SafeRead" in step
     assert "GuestMemoryFlags::UnsafeRead" in step
+    assert "#ifdef EDEN_NS2_NATIVE_GPU_DISPATCH" in step
+    assert 'NativeGpuChannelRegistry::Instance().IsNative(&channel_state);' in step
+    assert step.index('NativeGpuChannelRegistry::Instance().IsNative(&channel_state);') < step.index(
+        'GpuGuestMemory<Tegra::CommandHeader,')
+    assert 'target_compile_definitions(video_core PRIVATE EDEN_NS2_NATIVE_GPU_DISPATCH=1)' in cmake
+    assert 'const bool use_safe =' not in step
     assert step.index("dma_state.dma_get = header.addr;") < step.index(
         "GpuGuestMemory<Tegra::CommandHeader,"
     ) < step.index("ProcessCommands(headers);")

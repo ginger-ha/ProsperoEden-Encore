@@ -2579,6 +2579,10 @@ if(EDEN_NS2_NVDRV_EXPERIMENTAL OR EDEN_SHARED_NS2_NVDRV_CAPS)
     target_include_directories(video_core BEFORE PRIVATE
         "${EDEN_NS2_GPU_DISPATCH_ROOT}"
         "${EDEN_NS2_NVDRV_GPU_ROOT}" "${EDEN_NS2_NVDRV_ROOT}")
+    # The live GPFIFO owner may require GPU-produced command cache flushes.
+    # Gate this fetch policy on the actual NS2 research source selection;
+    # normal PS5/NS1 builds retain the exact historical user DMA setting.
+    target_compile_definitions(video_core PRIVATE EDEN_NS2_NATIVE_GPU_DISPATCH=1)
     endif()
 endif()
 

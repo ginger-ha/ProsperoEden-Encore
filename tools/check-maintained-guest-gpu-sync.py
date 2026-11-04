@@ -57,6 +57,24 @@ def expected(kind, dev):
                      "        ::Eden::Performance::gpu_puller_semaphore_active_since_ns,\n"
                      "        word != value && !dma_pusher.system.IsShuttingDown());\n" + SEM)
             source = once(source, SEM, timer)
+    if kind == "dma":
+        inc = '#include "video_core/guest_memory.h"\n'
+        source = once(source, inc, inc +
+            '#ifdef EDEN_NS2_NATIVE_GPU_DISPATCH\n'
+            '#include "core/hle/service/nvdrv/devices/native_gpu_channel_registry.h"\n'
+            '#endif\n')
+        policy = ('        const bool use_safe = Settings::IsDMALevelDefault() ? '
+                  'Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe();')
+        native = '''        bool use_safe = Settings::IsDMALevelDefault() ? Settings::IsGPULevelHigh() : Settings::IsDMALevelSafe();
+#ifdef EDEN_NS2_NATIVE_GPU_DISPATCH
+        // P2.7: C7x0 native GPFIFO command words can have been produced by
+        // an earlier GPU dispatch. A guest setting for UNSAFE DMA must never
+        // bypass GPU cache coherency for an authenticated NS2 channel.
+        // SafeRead flushes the actual guest GPU region before consuming the
+        // live words, including the non-contiguous backing fallback.
+        use_safe |= Service::Nvidia::Devices::NativeGpuChannelRegistry::Instance().IsNative(&channel_state);
+#endif'''
+        source = once(source, policy, native)
     if dev:
         source = '#include "performance.h"\n' + source
     return "#include <chrono>\n" + source
