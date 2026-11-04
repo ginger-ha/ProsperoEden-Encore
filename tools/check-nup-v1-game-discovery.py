@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 header = (ROOT / "headless/game_files.h").read_text()
 scan = header.split("FindAddOnContentDirectories(", 1)[1]
 assert "if (entry_error) {" in scan
-assert "incomplete = true;\\n                return;" in scan
+assert "incomplete = true;\n                return;" in scan
 assert "entry_error != std::errc::no_such_file_or_directory" not in scan
 CODE = r"""
 #include "game_files.h"
