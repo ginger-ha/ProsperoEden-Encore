@@ -889,6 +889,7 @@ def main() -> int:
                 (ROOT / 'tools/ns2/check_gpu_worker_teardown_gpu_drain_host.py').is_file() and
                 'm_memory.reserve(MaxOwnedGpuMemoryHandles);' in worker_hle_cpp and
                 (ROOT / 'tools/ns2/check_gpu_worker_registered_handles_oom_host.py').is_file() and
+                (ROOT / 'tools/ns2/check_gpu_worker_source_syntax_host.py').is_file() and
                 'm_mappings.PrepareMapped(*request, staged_ledger)' in worker_hle_cpp and
                 'm_mappings.CommitPrepared(staged_ledger)' in worker_hle_cpp and
                 'm_mappings.RecordUnmapped(*request)' in worker_hle_cpp and
