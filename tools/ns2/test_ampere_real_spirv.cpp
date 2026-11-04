@@ -142,7 +142,8 @@ static void CheckNativeQmdIndirectCbufIR() {
     };
     constexpr u32 sparse = (1U << 0) | (1U << 3) | (1U << 7);
     run(sparse, true, false, 0, 28, true, 32);
-    run(sparse, true, false, 0, 0xffff, true, 0x10000);
+    run(sparse, true, false, 0, 0xfffc, true, 0x10000);
+    run(sparse, true, false, 0, 0xffff, false, 0); // U32 overreads 64 KiB
     run(sparse, true, true, 0, 0, true, 0x10000);
     run(sparse, false, false, 1, 28, false, 0);
     run(sparse, true, false, 0, 0x10000, false, 0);
