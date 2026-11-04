@@ -24,6 +24,15 @@ assert "IsDeconstructedGameSelection(name)" in actual_validator
 assert "c == '/' && !exefs" in actual_validator
 assert 'FindDeconstructedGameMain(entry.path())' in library
 assert 'FindNestedGamePackage(entry.path())' in library
+# P3.4: a status failure while scanning a competing base input is not
+# evidence of an empty directory. The discovery must reject partial output.
+package_scan = (root / "headless/game_files.h").read_text().split(
+    "inline std::string FindNestedGamePackage(", 1)[1].split(
+    "inline std::string FindGameFolderInput(", 1)[0]
+assert "if (entry_error) {" in package_scan
+assert "// A package can be removed" in package_scan
+assert "incomplete = true;" in package_scan
+assert "if (entry_error || fs::is_symlink(status)) continue;" not in package_scan
 assert 'FindGameFolderInput(entry.path())' in library
 assert 'IsNestedGameFileSelection(name)' in settings
 assert 'IsSafeNestedGameFilePath(selected_root, relative)' in main
@@ -163,10 +172,16 @@ int main() {
     std::ofstream(mixed / "Base" / "ExeFS" / "main.npdm") << "metadata";
     std::ofstream(mixed / "wrapper" / "exefs" / "main") << "decoy";
     std::ofstream(mixed / "wrapper" / "exefs" / "main.npdm") << "metadata";
-    assert(Eden::FindDeconstructedGameMain(mixed) == "Base/ExeFS/main");
+    const auto mixed_discovered = Eden::FindDeconstructedGameMain(mixed);
+    assert(mixed_discovered == "Base/ExeFS/main" ||
+           // Case-insensitive macOS volumes may resolve the first canonical
+           // probe (base/exefs) to the on-disk Base/ExeFS. Check identical
+           // filesystem identity rather than assuming a Linux volume.
+           (mixed_discovered == "base/exefs/main" &&
+            fs::equivalent(mixed / "base/exefs", mixed / "Base/ExeFS")));
     assert(Eden::IsSafeDeconstructedGamePath(root, "Mixed Case/Base/ExeFS/main"));
     // An extracted base keeps priority over any independently packaged input.
-    assert(Eden::FindGameFolderInput(mixed) == "Base/ExeFS/main");
+    assert(Eden::FindGameFolderInput(mixed) == mixed_discovered);
     // Top-level content stores cannot surface as independent library games.
     const fs::path external_updates = root / "updates" / "458752" / "exefs";
     fs::create_directories(external_updates);
@@ -193,7 +208,10 @@ int main() {
     fs::create_directories(large / "BASE" / "ExeFS");
     std::ofstream(large / "BASE" / "ExeFS" / "main") << "exec";
     std::ofstream(large / "BASE" / "ExeFS" / "main.npdm") << "meta";
-    assert(Eden::FindDeconstructedGameMain(large) == "BASE/ExeFS/main");
+    const auto large_discovered = Eden::FindDeconstructedGameMain(large);
+    assert(large_discovered == "BASE/ExeFS/main" ||
+           (large_discovered == "base/exefs/main" &&
+            fs::equivalent(large / "base/exefs", large / "BASE/ExeFS")));
     const auto oversized = root / "Oversized Noncanonical";
     fs::create_directory(oversized);
     for (int i = 0; i < 520; ++i)

@@ -306,7 +306,14 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
             // subsequent file probe both called symlink_status for every NSP.
             std::error_code entry_error;
             const auto status = fs::symlink_status(path, entry_error);
-            if (entry_error || fs::is_symlink(status)) continue;
+            if (entry_error) {
+                // A package can be removed or a ROM volume can disappear
+                // between directory iteration and stat. Do not silently
+                // choose another candidate from an incomplete library.
+                incomplete = true;
+                return;
+            }
+            if (fs::is_symlink(status)) continue;
             if (fs::is_directory(status)) {
                 subdirs.push_back(path);
                 continue;
