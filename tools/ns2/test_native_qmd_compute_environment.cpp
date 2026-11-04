@@ -627,7 +627,22 @@ int main() {
         memory.words[3] = 0;
         auto stores_only = global;
         stores_only.uses_global_memory = false;
-        assert(!env.BuildResourcePlan(stores_only));
+        // A shader that only STORES through global memory is a genuine
+        // NVN SPIR-V writer, not an absent read-side dependency. Its real
+        // QMD descriptor must still be writable and sized.
+        const auto write_plan = env.BuildResourcePlan(stores_only);
+        assert(write_plan && write_plan->global_layout_resolved &&
+               write_plan->HasResolvedGpuBufferBindings());
+        assert(Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            stores_only, *write_plan, 64));
+        auto not_writable = *write_plan;
+        not_writable.storage_buffers[0].is_written = false;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            stores_only, not_writable, 64));
+        auto not_enabled = stores_only;
+        not_enabled.stores_global_memory = false;
+        assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(
+            not_enabled, *write_plan, 64));
         auto array = global;
         array.storage_buffers_descriptors[0].count = 2;
         assert(!Shader::Ampere::NativeQmdGlobalMemoryLayoutMatches(array, *gp, 64));
