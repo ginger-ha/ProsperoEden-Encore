@@ -100,6 +100,23 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // Trace instrumentation must never cause a GPU callback to unwind
+    // after submission but before publishing its accepted-state bit.
+    {
+        Fixture f;const Address addr=0xae000;
+        auto qmd=EmptyGrid();qmd[12]=qmd[13]=qmd[14]=1;
+        SetRelease(qmd,24,0x2000,17);
+        f.descriptors[addr]=qmd;
+        unsigned trace_calls{};
+        f.qmd.trace=[&](std::string_view,Address,std::int32_t) {
+            ++trace_calls;
+            throw std::runtime_error("diagnostic sink unavailable");
+        };
+        assert(f.signal(addr,3).empty());
+        assert(f.dispatched==1 && f.released.size()==1 && trace_calls>=2);
+        assert(f.signal(addr,2).empty());
+        assert(f.dispatched==1 && f.released.size()==1);
+    }
     // P4.2: invalid memory callbacks must fail as typed errors, not escape
     // into a partially mutated GPU worker. A read exception is retryable
     // because no Vulkan work or semaphore was accepted yet.
