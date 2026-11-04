@@ -864,6 +864,8 @@ jobs:
         run: python3 -B tools/ns2/check_gpu_worker_staged_ledger_host.py
       - name: P1.2 prevent TIPC 111 registration allocation after NVMap lock
         run: python3 -B tools/ns2/check_gpu_worker_registered_handles_oom_host.py
+      - name: P2.7 verify NS2 GPU worker teardown fence on all live GPU objects
+        run: python3 -B tools/ns2/check_gpu_worker_teardown_gpu_drain_host.py
       - name: Run actual ProgramMetadata parser against synthetic Switch 1/2 NPDM
         shell: bash
         run: |
