@@ -837,6 +837,10 @@ def main() -> int:
         worker_header = ROOT / "vendor/encore-active/ns2-runtime/hle/core/hle/service/am/service/gpu_worker_protocol.h"
         worker_cpp = worker_header.read_text()
         require("class MappingLedger" in worker_cpp and
+                "LedgerStatus PrepareMapped" in worker_cpp and
+                "LedgerStatus PrepareSparse" in worker_cpp and
+                "LedgerStatus CommitPrepared" in worker_cpp and
+                "mappings.merge(pending);" in worker_cpp and
                 "LedgerStatus RecordMapped" in worker_cpp and
                 "LedgerStatus RecordUnmapped" in worker_cpp and
                 "DecodeMap(" in worker_cpp and "DecodeUnmap(" in worker_cpp and
@@ -881,7 +885,8 @@ def main() -> int:
                 '{211, &IGpuWorker::NormalMapGpuMemory4K' in worker_hle_cpp and
                 '{212, &IGpuWorker::NormalModifyGpuMemory4K' in worker_hle_cpp and
                 '{213, &IGpuWorker::NormalUnmapGpuMemory4K' in worker_hle_cpp and
-                'm_mappings.RecordMapped(*request)' in worker_hle_cpp and
+                'm_mappings.PrepareMapped(*request, staged_ledger)' in worker_hle_cpp and
+                'm_mappings.CommitPrepared(staged_ledger)' in worker_hle_cpp and
                 'm_mappings.RecordUnmapped(*request)' in worker_hle_cpp and
                 'as->MapNative4K(' in worker_hle_cpp and
                 'as->UnmapNative4K(' in worker_hle_cpp and
@@ -895,7 +900,8 @@ def main() -> int:
                 'm_shared->events[request->notification]->Signal(kernel)' in worker_hle_cpp and
                 'as->ReserveNativeSparse4K(' in worker_hle_cpp and
                 'as->ReleaseNativeSparse4K(' in worker_hle_cpp and
-                'm_mappings.RecordSparse(' in worker_hle_cpp and
+                'm_mappings.PrepareSparse(' in worker_hle_cpp and
+                (ROOT / 'tools/ns2/check_gpu_worker_staged_ledger_host.py').is_file() and
                 'm_mappings.RecordReleasedSparse(' in worker_hle_cpp,
                 "Native GPU worker IPC must reject unsupported mappings")
         # GSV must be able to resolve a registered, live guest AS FD to the
