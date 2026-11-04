@@ -18,6 +18,7 @@ struct MockScheduler {
     u64 waited{};
     unsigned finishes{};
     bool fail_flush_after_submit{};
+    bool fail_wait_once{};
 
     u64 Flush() {
         ++tick;
@@ -27,6 +28,10 @@ struct MockScheduler {
         return tick;
     }
     void Wait(u64 target) {
+        if (fail_wait_once) {
+            fail_wait_once = false;
+            throw std::runtime_error{"GPU timeline Wait transient failure"};
+        }
         assert(target != 0 && target <= tick && target <= completed);
         waited = std::max(waited, target);
     }
@@ -191,6 +196,27 @@ int main() {
                test.scheduler.waited == 1 && image.expired() &&
                test.destroyed == 3);
     }
+    {
+        // Deferred retirement differs from registration failure: the
+        // callback already belongs to the fence manager and Wait itself can
+        // fail. The image/sampler/pipeline must survive until Finish drains.
+        Witness test;
+        test.scheduler.fail_wait_once = true;
+        auto owners = test.NewOwners();
+        std::weak_ptr<Resource> view = owners->image_view;
+        RetainNativeComputeUntilGpuTick(test.scheduler, test.fences, owners);
+        owners.reset();
+        assert(!view.expired() && test.destroyed == 0 &&
+               test.scheduler.finishes == 0);
+        auto retire = std::move(test.fences.pending.front());
+        test.fences.pending.clear();
+        retire();
+        assert(!view.expired() && test.scheduler.finishes == 1 &&
+               test.scheduler.waited == 1);
+        retire = {};
+        assert(view.expired() && test.destroyed == 3);
+    }
     std::puts("NS2_NATIVE_TEXTURE_GPU_OWNERS_PASS normal=1 reversed=1 "
-              "registration_failure=1 signal_failure=1 flush_failure=1");
+              "registration_failure=1 signal_failure=1 flush_failure=1 "
+              "deferred_timeline_failure=1");
 }
