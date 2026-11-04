@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 #include <tuple>
+#include <stdexcept>
 #include "video_core/native_qmd.h"
 
 // Overflow and underflow must refuse malformed cross-channel PCAS counts
@@ -34,9 +35,23 @@ struct Fixture {
     std::vector<std::tuple<Address,std::uint32_t,std::uint32_t>> released;
     unsigned dispatched{};
     bool allow_dispatch{true};
+    bool throw_read_once{};
+    unsigned throw_read_on_call{};
+    unsigned read_calls{};
+    bool throw_dispatch_after_submit_once{};
+    unsigned throw_release_after_count{};
     // Fail one release callback before it queues any guest-visible write.
     std::unordered_map<Address, unsigned> transient_release_failures;
     bool read(Address address, Descriptor& out) {
+        ++read_calls;
+        if (throw_read_on_call == read_calls) {
+            throw_read_on_call = 0;
+            throw std::runtime_error("GPU QMD second snapshot fault");
+        }
+        if (throw_read_once) {
+            throw_read_once = false;
+            throw std::runtime_error("GPU QMD snapshot fault");
+        }
         const auto it=descriptors.find(address);
         if(it==descriptors.end())return false;
         out=it->second;
@@ -49,9 +64,21 @@ struct Fixture {
             return false;
         }
         released.emplace_back(address,value,flags);
+        if (throw_release_after_count &&
+            released.size() == throw_release_after_count) {
+            throw_release_after_count = 0;
+            throw std::runtime_error("GPU fence queued then callback failed");
+        }
         return true;
     }
-    bool dispatch(const Descriptor&) { ++dispatched;return allow_dispatch; }
+    bool dispatch(const Descriptor&) {
+        ++dispatched;
+        if (throw_dispatch_after_submit_once) {
+            throw_dispatch_after_submit_once = false;
+            throw std::runtime_error("Vulkan dispatch queued then callback failed");
+        }
+        return allow_dispatch;
+    }
     std::string_view signal(Address address,std::uint32_t action) {
         return qmd.Signal(address,action,
             [this](Address p,Descriptor& d){return read(p,d);},
@@ -73,6 +100,58 @@ static void SetRelease(Descriptor& d,unsigned slot,Address address,unsigned payl
     d[slot+2]=payload;
 }
 int main() {
+    // P4.2: invalid memory callbacks must fail as typed errors, not escape
+    // into a partially mutated GPU worker. A read exception is retryable
+    // because no Vulkan work or semaphore was accepted yet.
+    {
+        Fixture f;const Address addr=0xaf000;
+        f.descriptors[addr]=EmptyGrid();
+        f.throw_read_once=true;
+        assert(f.signal(addr,3)=="QMD read exception");
+        assert(f.dispatched==0 && f.released.empty());
+        assert(f.signal(addr,3).empty());
+    }
+    // Dispatch and semaphore callbacks are different: an exception can be
+    // thrown AFTER recording irreversible GPU work. Poison this QMD until a
+    // new process epoch instead of retrying its shader or atomic reduction.
+    {
+        Fixture f;const Address addr=0xaf100;
+        auto qmd=EmptyGrid();qmd[12]=qmd[13]=qmd[14]=1;
+        SetRelease(qmd,24,0x2100,7,true);
+        f.descriptors[addr]=qmd;
+        f.throw_dispatch_after_submit_once=true;
+        assert(f.signal(addr,3)=="QMD dispatch exception");
+        assert(f.dispatched==1 && f.released.empty());
+        assert(f.signal(addr,2)=="QMD transaction poisoned");
+        assert(f.signal(addr,3)=="QMD transaction poisoned");
+        assert(f.dispatched==1 && f.released.empty());
+    }
+    {
+        Fixture f;const Address addr=0xaf200;
+        auto qmd=EmptyGrid();qmd[12]=qmd[13]=qmd[14]=1;
+        SetRelease(qmd,24,0x2300,13,true);
+        f.descriptors[addr]=qmd;
+        SetRelease(qmd,28,0x2400,14);
+        f.descriptors[addr]=qmd;
+        // First release already queued successfully, second release may
+        // enqueue a fence then throw. Neither may be published twice.
+        f.throw_release_after_count=2;
+        assert(f.signal(addr,3)=="QMD release exception");
+        assert(f.dispatched==1 && f.released.size()==2);
+        assert(f.signal(addr,2)=="QMD transaction poisoned");
+        assert(f.signal(addr,3)=="QMD transaction poisoned");
+        assert(f.dispatched==1 && f.released.size()==2);
+    }
+    {
+        Fixture f;const Address addr=0xaf300;
+        f.descriptors[addr]=EmptyGrid();
+        f.throw_read_on_call=2;
+        assert(f.signal(addr,3)=="QMD read exception");
+        assert(f.read_calls==2 && f.dispatched==0 && f.released.empty());
+        // The uncommitted second snapshot can be retried without poisoning.
+        assert(f.signal(addr,2).empty());
+        assert(f.read_calls==3 && f.released.empty());
+    }
     // P2.7: before native shader submission, all enabled QMD release
     // targets must be mapped and aligned. The target index is entirely
     // guest-controlled; one invalid slot must reject the whole dispatch.
