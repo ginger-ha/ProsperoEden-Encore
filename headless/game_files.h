@@ -281,7 +281,14 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
     bool incomplete = false;
     const auto scan = [&](const auto& self, const fs::path& directory,
                           const std::string& relative, unsigned depth) -> void {
-        if (incomplete || depth > 6) return;
+        if (incomplete) return;
+        // Ignoring deeper wrapper branches can select a shallow package
+        // while hiding a competing base/update in the same title. A capped
+        // walk is an unknown library, not proof of a unique candidate.
+        if (depth > 6) {
+            incomplete = true;
+            return;
+        }
         if (++visited > 128 || candidates.size() > 64) {
             incomplete = true;
             return;
@@ -289,7 +296,7 @@ inline std::string FindNestedGamePackage(const std::filesystem::path& title) {
         std::error_code error;
         std::vector<fs::path> subdirs;
         std::size_t examined = 0;
-        for (fs::directory_iterator it{directory, fs::directory_options::skip_permission_denied, error},
+        for (fs::directory_iterator it{directory, fs::directory_options::none, error},
                                     end;
              !error && it != end; it.increment(error)) {
             // Never select a base from a truncated, iteration-order-dependent

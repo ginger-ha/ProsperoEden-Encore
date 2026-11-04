@@ -33,6 +33,8 @@ assert "if (entry_error) {" in package_scan
 assert "// A package can be removed" in package_scan
 assert "incomplete = true;" in package_scan
 assert "if (entry_error || fs::is_symlink(status)) continue;" not in package_scan
+assert "fs::directory_options::none" in package_scan
+assert "if (depth > 6) {" in package_scan
 assert 'FindGameFolderInput(entry.path())' in library
 assert 'IsNestedGameFileSelection(name)' in settings
 assert 'IsSafeNestedGameFilePath(selected_root, relative)' in main
@@ -325,6 +327,13 @@ int main() {
                       ("asset_" + std::to_string(i) + ".bin")) << "resource";
     std::ofstream(incomplete_packages / "base.xci") << "base";
     assert(Eden::FindNestedGamePackage(incomplete_packages).empty());
+    // A shallow candidate cannot be accepted when an unexamined wrapper
+    // branch exceeds the bounded recursive discovery depth.
+    const auto hidden_deep = root / "Hidden Deep Package";
+    fs::create_directories(hidden_deep / "a/b/c/d/e/f/g");
+    std::ofstream(hidden_deep / "base.xci") << "base";
+    std::ofstream(hidden_deep / "a/b/c/d/e/f/g/other.xci") << "other";
+    assert(Eden::FindNestedGamePackage(hidden_deep).empty());
     // Any wrapper name works; content metadata will establish Update/AOC.
     const auto arbitrary = root / "Arbitrary Folders";
     fs::create_directories(arbitrary / "base");
