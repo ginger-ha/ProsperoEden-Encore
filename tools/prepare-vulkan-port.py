@@ -6748,3 +6748,20 @@ apply_reviewed_delta(
     '        main_pools.ReleaseContents();\n        auto pipeline = CreateGraphicsPipeline(\n',
     '        main_pools.ReleaseContents();\n        // The graphics builder emits SPIR-V synchronously on this thread,\n        // including the merged VertexA/B stage. Native-only bounds must not\n        // leak into later Switch 1 draws or unrelated compiler workers.\n        Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;\n        auto pipeline = CreateGraphicsPipeline(\n',
     "P2.4 graphics stage, CBUF and channel epoch source replay hunk 12")
+
+# P2.2b: preserve GPU-coherent TIC/TSC readback under the native cache lock.
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    'namespace {\nstruct DrawParams {',
+    'namespace {\n#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n// A native TIC/TSC snapshot can read GPU memory while holding the common\n// TextureCache mutex. GPU ReadBlock flushes registered image pages through\n// RasterizerVulkan::FlushRegion, which must not lock that same mutex twice.\n// Thread-local scope is armed only after the outer mutex is acquired.\nthread_local const RasterizerVulkan* native_texture_read_lock_owner{};\nstruct NativeTextureReadLockScope {\n    const RasterizerVulkan* previous;\n    explicit NativeTextureReadLockScope(const RasterizerVulkan* owner) noexcept\n        : previous{native_texture_read_lock_owner} {\n        native_texture_read_lock_owner = owner;\n    }\n    ~NativeTextureReadLockScope() {\n        native_texture_read_lock_owner = previous;\n    }\n    NativeTextureReadLockScope(const NativeTextureReadLockScope&) = delete;\n    NativeTextureReadLockScope& operator=(const NativeTextureReadLockScope&) = delete;\n};\n#endif\nstruct DrawParams {',
+    'native P2.2b texture read scope owner')
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    '                std::scoped_lock lock{texture_cache.mutex};\n                same_cache_channel = texture_cache.NativeChannelMatches(',
+    '                std::scoped_lock lock{texture_cache.mutex};\n                // A reentrant GMMU read can flush this same image cache.\n                // Keep ownership until ALL TIC/TSC checks and leases finish.\n                NativeTextureReadLockScope native_texture_read_scope{this};\n                same_cache_channel = texture_cache.NativeChannelMatches(',
+    'native P2.2b live cache read owner')
+apply_reviewed_delta(
+    "vulkan_rasterizer.cpp",
+    '    if (True(which & VideoCommon::CacheType::TextureCache) &&\n        !::Eden::ImagePages::NeverHeld(addr, size)) {\n        std::scoped_lock lock{texture_cache.mutex};\n        texture_cache.DownloadMemory(addr, size);\n    }',
+    '    if (True(which & VideoCommon::CacheType::TextureCache) &&\n        !::Eden::ImagePages::NeverHeld(addr, size)) {\n#if defined(PS5_NATIVE) && defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n        if (native_texture_read_lock_owner == this) {\n            // Our caller already holds texture_cache.mutex. Preserve the\n            // exact GPU-dirty readback, but never recursively lock a\n            // non-recursive shared cache mutex on a native TIC/TSC read.\n            texture_cache.DownloadMemory(addr, size);\n        } else\n#endif\n        {\n            std::scoped_lock lock{texture_cache.mutex};\n            texture_cache.DownloadMemory(addr, size);\n        }\n    }',
+    'native P2.2b non-recursive flush lock ordering')

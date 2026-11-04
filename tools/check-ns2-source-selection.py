@@ -233,11 +233,13 @@ def main() -> int:
                 'NormalizeNativeQmdIndirectCbufIR(ir, qmd_enabled_cbuf_mask)' in qmd_bridge and
                 'kNativeQmdIndirectCbufBanks = 8' in qmd_indirect and
                 'info.constant_buffer_mask = enabled_mask;' in qmd_indirect and
-                'return declared_mask == program.info.constant_buffer_mask;' in qmd_indirect and
+                '(referenced_mask & ~declared_mask)' in qmd_indirect and
                 'Reflection without uses_cbuf_indirect' in qmd_indirect and
                 'non_indirect(true,false,0,0,1,false)' in ir_native_fixture and
                 '!(enabled_mask & bit)' in qmd_indirect and
-                'NativeQmdStaticCbufReadExtent(offset.U32())' in qmd_indirect and
+                'NativeQmdStaticCbufReadExtent(inst.GetOpcode(),offset.U32())' in qmd_indirect and
+                'program.info.constant_buffer_used_sizes[bank]' in qmd_indirect and
+                (ROOT / 'tools/ns2/check_native_qmd_direct_cbuf_host.py').is_file() and
                 'all_offsets_static' in qmd_indirect and
                 'info.uses_global_memory || info.stores_global_memory' in qmd_indirect and
                 'bank_indices[bank_count] = bank;' in qmd_spirv and

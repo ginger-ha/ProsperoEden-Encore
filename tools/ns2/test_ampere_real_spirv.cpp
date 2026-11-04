@@ -179,6 +179,13 @@ static void CheckNativeQmdIndirectCbufIR() {
                             {bank_arg,offset_arg});
         Require(NormalizeNativeQmdIndirectCbufIR(program,enabled_mask)==accepted,
                 "non-indirect reflection must match actual CBUF selector and 64-KiB bounds");
+        if (accepted) {
+            const u32 expected=dynamic_offset ? 0x10000U : NativeQmdStaticCbufReadExtent(offset);
+            if (program.info.constant_buffer_used_sizes[0] != expected)
+                std::fprintf(stderr, "CBUF bank=%u offset=%x dynamic=%d actual=%u expected=%u\n", bank,offset,dynamic_offset,program.info.constant_buffer_used_sizes[0],expected);
+            Require(program.info.constant_buffer_used_sizes[0]==expected,
+                    "direct QMD3 CBUF read must require the real source extent");
+        }
     };
     non_indirect(false,false,0,0,1,true);
     non_indirect(false,true,0,0,1,true);
@@ -186,6 +193,10 @@ static void CheckNativeQmdIndirectCbufIR() {
     non_indirect(false,false,8,0,1,false);
     non_indirect(false,false,0,0x10000U,1,false);
     non_indirect(false,false,0,0,2,false);
+    non_indirect(false,false,1,0,3,false); // enabled, but NOT reflected
+    non_indirect(false,false,0,0xfffc,1,true); // last aligned U32
+    non_indirect(false,false,0,0xffff,1,false); // U32 crosses 64-KiB
+    non_indirect(false,false,1,16,1,false); // unreflected bank
     std::puts("NS2 QMD3 real IR CBUF sparse/static/dynamic admission: PASS");
 }
 int main(int argc,char** argv) {

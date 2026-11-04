@@ -36,6 +36,8 @@ jobs:
           fetch-depth: 1
       - name: P2.2 reject invalid TIC texture format aliases (source/host)
         run: python3 -B tools/ns2/check_native_texture_format_mapping.py
+      - name: P2.2b prevent reentrant TextureCache readback deadlock in native TIC snapshots
+        run: python3 -B tools/ns2/check_native_texture_readback_lock_host.py
       - name: Host Boost headers
         run: |
           sudo apt-get update -qq
@@ -463,6 +465,8 @@ jobs:
               -o "build-ns2-a64/native-qmd3-${cxx//+/}"
             "build-ns2-a64/native-qmd3-${cxx//+/}"
           done
+      - name: P2.3 prove real QMD3 direct CBUF IR bank/extent admission
+        run: python3 -B tools/ns2/check_native_qmd_direct_cbuf_host.py
       - name: Validate QMD3 native Compute shader environment (Clang/GCC UBSan)
         shell: bash
         run: |
