@@ -423,13 +423,14 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     n56_file.write_text(n56_baseline)
     normalized_expected[n56_name] = n56_file
     # N3m: the opt-in NS2 GPU pipeline is now reproduced exactly by the
-    # maintained Vulkan generator. Retain the three pinned source hashes as
-    # independent proof, then compare the COMPLETE generated C++ byte-for-byte
+    # maintained Vulkan generator, including four additional exact graphics
+    # epoch/CBUF guards. Pin the three principal blocks separately, then
+    # compare the COMPLETE generated C++ byte-for-byte
     # against the vendor (after the separate N56 driver-cache normalization).
     # Never strip these source blocks from parity: doing so would mask drift.
     n3m = normalized_expected[n56_name].read_text()
     n3m_flag = '#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n'
-    assert n3m.count(n3m_flag) == 3, 'NS2 pipeline compile gates drifted'
+    assert n3m.count(n3m_flag) == 7, 'NS2 pipeline compile gates drifted'
     def n3m_hash(data):
         value = 0xcbf29ce484222325
         for byte in data.encode('ascii'):
@@ -441,9 +442,9 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
         n3m.index(n3m_flag, n3m.index('std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline()')),
     )
     marker_hashes = (
-        '6d290bcca80076a4',
-        'e124d0c26db95140',
-        'ce14a0542e3f0a56',
+        '1b1b58fefba74616',
+        '54ed1159ce55e1f0',
+        '76dda4bc269244f6',
     )
     pinned = []
     for start, digest in zip(marker_positions, marker_hashes):
@@ -460,7 +461,7 @@ with tempfile.TemporaryDirectory(prefix='eden-vulkan-fork-compare-') as d:
     # The generator owns the guarded NS2 blocks as well as NS1; every byte
     # must match the pinned vendor after only the existing N56 normalization.
     generated_n3m = actual[n56_name].read_text()
-    assert generated_n3m.count(n3m_flag) == 3, 'NS2 generator gates missing'
+    assert generated_n3m.count(n3m_flag) == 7, 'NS2 generator gates missing'
     native_compute_guard = "ComputePipeline* PipelineCache::CurrentComputePipeline() {\n#if defined(EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL)\n    // An authenticated Ampere compute engine must never enter the legacy\n    // Maxwell ShaderCache::ComputeShader() path: those 128-bit instructions\n    // need the new QMD-scoped native SPIR-V pipeline and resource binding.\n    // Until the renderer owns that real pipeline and submits the dispatch,\n    // reject instead of compiling native bytes as Switch 1 Maxwell.\n    if (Service::Nvidia::Devices::NativeGpuChannelRegistry::Instance()\n            .CaptureComputeTicket(kepler_compute))\n        return nullptr;\n#endif\n\n"
     assert n3m.count(native_compute_guard) == 1, (
         'Native Compute cache admission gate missing from pinned vendor')

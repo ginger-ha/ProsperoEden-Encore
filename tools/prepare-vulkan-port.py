@@ -6672,3 +6672,79 @@ apply_reviewed_delta(
     "    if (!ready || staged.size() != num_descriptor_entries)\n        return false;",
     "    // Staging covers CBUF/SSBO only. Image descriptors are independently\n    // pinned and appended below, so comparing buffers to the full reflected\n    // descriptor count would reject every valid native image shader.\n    if (!ready || staged.size() != num_descriptor_entries - images.size())\n        return false;",
     "P2.2b native buffer count excludes pinned image descriptors")
+
+# P2.4 maintained N3m graphics source reconstruction. These twelve reviewed
+# and single-occurrence edits preserve the real CBUF context, stage policy,
+# channel epoch validation and local SPIR-V scope in the generator.
+# Never normalize them away in the source parity oracle.
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '#include "shader_recompiler/frontend/ampere/maxwell_environment.h"\n#include "shader_recompiler/stage.h"\n',
+    '#include "shader_recompiler/frontend/ampere/maxwell_environment.h"\n#include "shader_recompiler/frontend/ampere/native_indirect_cbuf.h"\n#include "shader_recompiler/frontend/ampere/native_graphics_stage_policy.h"\n#include "shader_recompiler/stage.h"\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 1")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '    if (native) {\n        stages_valid = true;\n',
+    '    if (native) {\n        // Before any GMMU shader reads, reject unsupported stage\n        // combinations. In particular VertexA alone cannot generate a\n        // Vulkan vertex module: it must be merged with VertexB.\n        u32 configured_stages{};\n        for (std::size_t i = 0; i < graphics_key.unique_hashes.size(); ++i) {\n            if (maxwell3d->regs.IsShaderConfigEnabled(i) &&\n                (i != 5 || maxwell3d->regs.rasterize_enable))\n                configured_stages |= u32{1} << i;\n        }\n        if (!Shader::Ampere::NativeGraphicsStageMaskSupported(configured_stages)) {\n            current_pipeline = nullptr;\n            return nullptr;\n        }\n        stages_valid = true;\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 2")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '                Shader::StageFromIndex(i - 1);\n            const auto captured = VideoCommon::CaptureNs2GraphicsShaderFromGpu(\n',
+    '                Shader::StageFromIndex(i - 1);\n            const VideoCommon::Ns2GraphicsCbufContext cbuf_context{\n                gpu_memory, maxwell3d, i == 5 ? 4U : 0U};\n            const auto captured = VideoCommon::CaptureNs2GraphicsShaderFromGpu(\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 3")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '                *gpu_memory, base + offset, static_cast<u32>(stage),\n                native_translation_cache.get());\n            if (!captured.Ready() || !captured.image.diagnostic_cache_key ||\n',
+    '                *gpu_memory, base + offset, static_cast<u32>(stage),\n                native_translation_cache.get(), &cbuf_context);\n            if (!captured.Ready() || !captured.image.diagnostic_cache_key ||\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 4")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '    eden_static_vertex_input_bound = static_vertex_input;\n\n    if (current_pipeline) {\n        GraphicsPipeline* const next{current_pipeline->Next(graphics_key)};\n',
+    '    eden_static_vertex_input_bound = static_vertex_input;\n\n#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n    // A GPU channel may unbind/rebind between the last mapped instruction\n    // and the graphics cache lookup. Every native draw, including an LRU or\n    // immediate Next(key) hit, must authenticate its original engine epoch.\n    const auto native_session_current = [&]() {\n        return !native || Service::Nvidia::Devices::NativeGpuChannelRegistry::\n                   Instance().IsGraphicsCurrent(maxwell3d, *native_ticket);\n    };\n    if (!native_session_current()) {\n        current_pipeline = nullptr;\n        return nullptr;\n    }\n#endif\n    if (current_pipeline) {\n        GraphicsPipeline* const next{current_pipeline->Next(graphics_key)};\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 5")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '            current_pipeline = next;\n            return BuiltPipeline(current_pipeline);\n',
+    '            current_pipeline = next;\n#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n            if (!native_session_current()) {\n                current_pipeline = nullptr;\n                return nullptr;\n            }\n#endif\n            return BuiltPipeline(current_pipeline);\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 6")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '    }\n    return CurrentGraphicsPipelineSlowPath();\n}\n',
+    '    }\n    GraphicsPipeline* selected = CurrentGraphicsPipelineSlowPath();\n#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\n    if (!native_session_current()) {\n        current_pipeline = nullptr;\n        return nullptr;\n    }\n#endif\n    return selected;\n}\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 7")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '    return nullptr;\n}\n\nstd::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline() {\n',
+    '    return nullptr;\n}\n#ifdef EDEN_NS2_VULKAN_SHADER_BRIDGE_EXPERIMENTAL\ncatch (const std::exception& exception) {\n    // Native Ampere lowerers, GMMU adapters and SPIR-V helpers may reject\n    // unimplemented guest instruction forms with std::runtime_error rather\n    // than Shader::Exception. A failed guest draw must not escape the GPU\n    // owner thread. The RAII native scope belongs to the outer call and\n    // remains active throughout this synchronous translation.\n    // Do not swallow or change the historical Switch 1 error path.\n    if (!Shader::Ampere::NativeSpirvCbufBoundsActive())\n        throw;\n    LOG_WARNING(Render_Vulkan, "NS2 native graphics shader rejected: {}",\n                exception.what());\n    return nullptr;\n}\n#endif\n\nstd::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline() {\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 8")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '        if (!native_translation_cache) return nullptr;\n        const auto base = maxwell3d->regs.program_region.Address();\n',
+    '        if (!native_translation_cache) return nullptr;\n        // A stale key or program reconfiguration must not bypass the\n        // pre-capture stage guard. Check the exact stages in this key.\n        u32 keyed_stages{};\n        for (std::size_t i = 0; i < graphics_key.unique_hashes.size(); ++i) {\n            if (graphics_key.unique_hashes[i])\n                keyed_stages |= u32{1} << i;\n        }\n        if (!Shader::Ampere::NativeGraphicsStageMaskSupported(keyed_stages))\n            return nullptr;\n        const auto base = maxwell3d->regs.program_region.Address();\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 9")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '                static_cast<Maxwell::ShaderType>(i), base, offset);\n            auto adapted = VideoCommon::CreateNs2GraphicsShaderEnvironment(\n',
+    '                static_cast<Maxwell::ShaderType>(i), base, offset);\n            const VideoCommon::Ns2GraphicsCbufContext cbuf_context{\n                gpu_memory, maxwell3d, i == 5 ? 4U : 0U};\n            auto adapted = VideoCommon::CreateNs2GraphicsShaderEnvironment(\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 10")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '                *gpu_memory, std::move(original), base + offset,\n                static_cast<u32>(stage), native_translation_cache.get());\n            if (!adapted || !Service::Nvidia::Devices::NativeGpuChannelRegistry::\n',
+    '                *gpu_memory, std::move(original), base + offset,\n                static_cast<u32>(stage), native_translation_cache.get(),\n                &cbuf_context);\n            if (!adapted || !Service::Nvidia::Devices::NativeGpuChannelRegistry::\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 11")
+
+apply_reviewed_delta(
+    "vk_pipeline_cache_cost.cpp",
+    '        main_pools.ReleaseContents();\n        auto pipeline = CreateGraphicsPipeline(\n',
+    '        main_pools.ReleaseContents();\n        // The graphics builder emits SPIR-V synchronously on this thread,\n        // including the merged VertexA/B stage. Native-only bounds must not\n        // leak into later Switch 1 draws or unrelated compiler workers.\n        Shader::Ampere::NativeSpirvCbufBoundsScope native_bounds;\n        auto pipeline = CreateGraphicsPipeline(\n',
+    "P2.4 graphics stage, CBUF and channel epoch source replay hunk 12")
