@@ -133,7 +133,7 @@ def main()->int:
         'c->retained[slot]=buffer',
         'backing_handle->Duplicate(true)',
         'image->size>backing_handle->orig_size-offset',
-        'backing_session->process!=m_process',
+        'backing_session->process != m_process',
         'FreeHandle(*id,true)',
         'syncpoints.HasSyncpointExpired(point.id,point.value)',
         '{111,&IVi2Session::OpenEndpoint,"OpenEndpoint"}',
@@ -198,6 +198,22 @@ def main()->int:
     assert '!image->window_pool' in text
     for command, method in ((429,"CreateNativeImage"), (430,"DestroyNativeImage")):
         assert '{'+str(command)+', &IGraphicsSupervisor::'+method in text
+    # Native present can fail allocations before or after its NVMap dupe.
+    # A later shared_ptr control-block OOM must release the duplicate and
+    # the service must return a refused image instead of throwing into IPC.
+    vi2_lease = text.split('IGraphicsSupervisor::GetPresentImage(u32 id) {', 1)[1].split(
+        'void IGraphicsSupervisor::InitializeDisplayContext(', 1)[0]
+    assert vi2_lease.index('std::make_unique<u32>(backing)') < vi2_lease.index(
+        'backing_handle->Duplicate(true)') < vi2_lease.index('lease_token.release()')
+    assert vi2_lease.count('catch (const std::bad_alloc&)') == 2
+    image_create = text.split('void IGraphicsSupervisor::CreateNativeImage(', 1)[1].split(
+        'void IGraphicsSupervisor::ConfigureNativeWindowImagePool(', 1)[0]
+    assert 'catch (const std::bad_alloc&)' in image_create
+    assert image_create.index('m_native_images.Create(') < image_create.index(
+        'catch (const std::bad_alloc&)') < image_create.index(
+        'result = Kernel::ResultOutOfResource;',
+        image_create.index('catch (const std::bad_alloc&)'))
+    assert (ROOT / 'tools/ns2/check_native_vi2_oom_host.py').is_file()
     for snippet in (
         'm_native_images.Create(',
         'm_native_images.Destroy(packet[2])',

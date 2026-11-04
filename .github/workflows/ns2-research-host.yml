@@ -850,6 +850,8 @@ jobs:
           build-ns2-a64/ns2-content-format-test
       - name: Compile and run Switch 2 graphics HLE protocol fixtures
         run: python3 tools/check-ns2-graphics-hle-host.py
+      - name: P1.3/P4.2 verify real VI2 NVMap handle rollback under allocation failures
+        run: python3 -B tools/ns2/check_native_vi2_oom_host.py
       - name: Run actual ProgramMetadata parser against synthetic Switch 1/2 NPDM
         shell: bash
         run: |
