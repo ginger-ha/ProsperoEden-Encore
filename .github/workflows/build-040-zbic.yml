@@ -39,10 +39,8 @@ concurrency:
 
 jobs:
   build:
-    # Owner hard stop: no full PS5 compile/package until NS1/NS2 are
-    # complete, optimized, and console-validated with one jacket loader.
-    # Explicitly re-enable after the acceptance gates are satisfied.
-    if: ${{ false }}
+    # Fork-only: allow a deliberate workflow_dispatch native build.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     env:
