@@ -35,7 +35,12 @@ for file in ("dma_pusher.cpp", "dma_pusher_dev.cpp"):
     assert step.index('NativeGpuChannelRegistry::Instance().IsNative(&channel_state);') < step.index(
         'GpuGuestMemory<Tegra::CommandHeader,')
     assert 'target_compile_definitions(video_core PRIVATE EDEN_NS2_NATIVE_GPU_DISPATCH=1)' in cmake
+    assert (root / "tools/ns2/check_native_gpu_fence_policy_host.py").is_file()
     assert 'const bool use_safe =' not in step
+    assert 'const bool explicit_sync = command_list.command_lists[dma_pushbuffer_subindex].sync;' in step
+    assert 'signal_sync = explicit_sync &&' in step
+    assert 'signal_sync = explicit_sync && user_sync;' in step
+    assert step.index('signal_sync = explicit_sync &&') < step.index('rasterizer->SignalFence(')
     assert step.index("dma_state.dma_get = header.addr;") < step.index(
         "GpuGuestMemory<Tegra::CommandHeader,"
     ) < step.index("ProcessCommands(headers);")
