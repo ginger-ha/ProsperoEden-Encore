@@ -652,8 +652,14 @@ int main(int argc, char** argv) {
     assert(large_source->BytesRead() <= 2 * MiB + 1024);
     large_source->Corrupt("BLOCK-MUTATION-MARKER");
     small.fill(0x7f);
+    // Corruption is at 4.5 MiB. A read in the preceding independent
+    // 256-KiB block must remain valid; only the touched block is rejected.
     assert(large_file->Read(small.data(), small.size(),
-                            4 * MiB + 128) == 0);
+                            4 * MiB + 128) == small.size());
+    assert(small[0] == 'E');
+    small.fill(0x7f);
+    assert(large_file->Read(small.data(), small.size(),
+                            4 * MiB + MiB / 2 + 128) == 0);
     assert(std::all_of(small.begin(), small.end(),
                        [](u8 byte) { return byte == 0; }));
     assert(large_file->Read(small.data(), small.size(), 0) == small.size());

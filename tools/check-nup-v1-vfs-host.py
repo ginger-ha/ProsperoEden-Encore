@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import struct
 import tempfile
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -89,6 +90,16 @@ def main() -> None:
             str(ROOT / "tools/nup-v1-vfs-host.cpp"),
             "-lcrypto", "-lzstd", "-o", str(binary),
         ]
+        if sys.platform == "darwin":
+            # Homebrew installs both libraries keg-only; preserve Linux's
+            # original compiler and linker options without special cases.
+            for package in ("openssl@3", "zstd"):
+                prefix = Path("/opt/homebrew/opt") / package
+                if (prefix / "include").is_dir():
+                    command += ["-I", str(prefix / "include")]
+                if (prefix / "lib").is_dir():
+                    command += ["-L", str(prefix / "lib"),
+                                "-Wl,-rpath," + str(prefix / "lib")]
         subprocess.run(command, check=True)
         archive = base / "test.nup"
         valid = 0
@@ -136,6 +147,14 @@ def main() -> None:
             str(ROOT / "tools/nup-v1-mutable-block-host.cpp"),
             "-lcrypto", "-lzstd", "-o", str(mutable_binary),
         ]
+        if sys.platform == "darwin":
+            for package in ("openssl@3", "zstd"):
+                prefix = Path("/opt/homebrew/opt") / package
+                if (prefix / "include").is_dir():
+                    mutable_command += ["-I", str(prefix / "include")]
+                if (prefix / "lib").is_dir():
+                    mutable_command += ["-L", str(prefix / "lib"),
+                                        "-Wl,-rpath," + str(prefix / "lib")]
         subprocess.run(mutable_command, check=True)
         archive.write_bytes(fixtures.fixture(0, raw))
         subprocess.run([str(mutable_binary), str(archive)], check=True)

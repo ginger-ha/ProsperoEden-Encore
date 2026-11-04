@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 from urllib.request import Request, urlopen
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = (
@@ -52,14 +53,28 @@ def main() -> None:
     fixtures = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixtures)
 
+    # A locally mounted vendor submodule at the exact gitlink SHA is a
+    # stronger and much faster source of truth than repeated HTTP downloads.
+    # If absent in a CI sandbox, retain the original pinned-URL fallback.
+    local_vendor = ROOT / "vendor/sources/eden/src"
+    local_sha = subprocess.run(
+        ["git", "-C", str(ROOT / "vendor"), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=False)
+    local_verified = (
+        local_sha.returncode == 0 and local_sha.stdout.strip() == pinned)
+
     with tempfile.TemporaryDirectory() as tempdir:
         temp = Path(tempdir)
         vendor = temp / "pinned-vendor"
         for path in SOURCES:
-            with urlopen(Request(urlbase + path, headers={
-                "User-Agent": "EdenEncore-NUP-RomFS-Host"
-            }), timeout=20) as response:
-                source = response.read(128 * 1024 + 1)
+            local_path = local_vendor / path
+            if local_verified and local_path.is_file():
+                source = local_path.read_bytes()
+            else:
+                with urlopen(Request(urlbase + path, headers={
+                    "User-Agent": "EdenEncore-NUP-RomFS-Host"
+                }), timeout=20) as response:
+                    source = response.read(128 * 1024 + 1)
             if len(source) > 128 * 1024 or not source.startswith(b"// SPDX-"):
                 raise ValueError(f"invalid pinned RomFS vendor source: {path}")
             target = vendor / path
@@ -97,6 +112,16 @@ def main() -> None:
             str(ROOT / "tools/nup-v1-real-romfs-host.cpp"),
             "-lcrypto", "-lzstd", "-pthread", "-o", str(binary),
         ]
+        if sys.platform == "darwin":
+            # OpenSSL/zstd are keg-only under Homebrew. Keep Linux CI's
+            # original system linkage and flags unchanged.
+            for package in ("openssl@3", "zstd"):
+                prefix = Path("/opt/homebrew/opt") / package
+                if (prefix / "include").is_dir():
+                    cmd += ["-I", str(prefix / "include")]
+                if (prefix / "lib").is_dir():
+                    cmd += ["-L", str(prefix / "lib"),
+                            "-Wl,-rpath," + str(prefix / "lib")]
         subprocess.run(cmd, check=True)
         env = dict(os.environ,
                    ASAN_OPTIONS="halt_on_error=1:detect_leaks=0",

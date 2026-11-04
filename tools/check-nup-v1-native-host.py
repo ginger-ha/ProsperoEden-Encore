@@ -6,6 +6,7 @@ import importlib.util
 import os
 import subprocess
 import tempfile
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -22,7 +23,7 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         temp = Path(directory)
         binary = temp / "nup-native-host"
-        subprocess.run([
+        command = [
             os.environ.get("CXX", "g++"), "-std=c++20", "-O1",
             "-Wall", "-Wextra", "-Werror", "-pedantic",
             "-I", str(ROOT / "tools/nup-native-host-stub"),
@@ -35,7 +36,16 @@ def main():
             str(ROOT / "headless/nup_v1_loader_route.cpp"),
             str(ROOT / "tools/nup-v1-native-host.cpp"),
             "-lcrypto", "-lzstd", "-lz", "-pthread", "-o", str(binary)
-        ], check=True)
+        ]
+        if sys.platform == "darwin":
+            for package in ("openssl@3", "zstd"):
+                prefix = Path("/opt/homebrew/opt") / package
+                if (prefix / "include").is_dir():
+                    command += ["-I", str(prefix / "include")]
+                if (prefix / "lib").is_dir():
+                    command += ["-L", str(prefix / "lib"),
+                                "-Wl,-rpath," + str(prefix / "lib")]
+        subprocess.run(command, check=True)
         addon = temp / "addon.nup"
         addon.write_bytes(fixtures.layered_fixture(addon=True))
         standalone = temp / "standalone.nup"
