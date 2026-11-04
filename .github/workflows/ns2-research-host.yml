@@ -758,6 +758,8 @@ jobs:
               -o "build-ns2-a64/ns2-graphics-stage-${cxx//+/}"
             "build-ns2-a64/ns2-graphics-stage-${cxx//+/}"
           done
+      - name: P2.4 verify real native graphics CBUF 64 KiB/49-bit mapped limits
+        run: python3 -B tools/ns2/check_native_graphics_cbuf_bounds_host.py
       - name: Syntax-check optional PS5 Vulkan NS2 SPIR-V compiler source (Clang and GCC)
         shell: bash
         run: |

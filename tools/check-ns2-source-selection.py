@@ -472,7 +472,9 @@ def main() -> int:
                 "native_translation_cache.get(), &cbuf_context" in native_pipeline_source and
                 "native_translation_cache.get(),\n                &cbuf_context" in native_pipeline_source and
                 "const auto& buffers = owner->engine->state" in native_capture and
-                "if (!cbuf.enabled || !cbuf.address" in native_capture,
+                "NativeGraphicsCbufWordAdmissible(" in native_capture and
+                (ROOT / "vendor/encore-active/ns2-runtime/ampere/video_core/native_graphics_cbuf_bounds.h").is_file() and
+                (ROOT / "tools/ns2/check_native_graphics_cbuf_bounds_host.py").is_file(),
                 "NS2 graphics BRX requires real per-stage mapped CBUF admission at both pipeline paths")
         require("const auto checked_read = " in native_capture_core and
                 "checked_read(gpu_base, header.data(), header.size())" in native_capture_core and
