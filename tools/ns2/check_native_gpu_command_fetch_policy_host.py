@@ -108,3 +108,21 @@ with tempfile.TemporaryDirectory(prefix='encore-native-dma-fetch-') as scratch:
             print('P2_7_NATIVE_FETCH_POLICY_PASS',
                   'native' if native else 'shipping_NS1','O'+str(level),
                   'cases=16', 'asan=not_run', 'ubsan=pass')
+    # Compile the actual Eden Core::GuestMemory template with a simulated
+    # GPU-produced command list. Prove that SafeRead flushes GPU backing
+    # before returning direct spans AND non-contiguous copied words.
+    real_guest=ROOT/'tools/ns2/test_native_gpu_command_saferead.cpp'
+    assert real_guest.is_file()
+    for level in (0,2):
+        exe=Path(scratch)/f'guest-saferead-{level}'
+        args=[compiler,'-std=c++20',f'-O{level}','-Wall','-Wextra','-Werror',
+              '-fsanitize=address,undefined','-fno-sanitize-recover=all',
+              '-I'+str(ROOT/'vendor/sources/eden/src'),
+              '-I'+str(ROOT/'vendor/sources/fmt/include'),
+              str(real_guest),'-o',str(exe)]
+        built=subprocess.run(args,env=env,capture_output=True,text=True,timeout=45)
+        assert built.returncode==0,built.stderr[-3500:]
+        run=subprocess.run([str(exe)],env=env,capture_output=True,text=True,timeout=20)
+        assert run.returncode==0,run.stderr[-3500:]
+        print('P2_7_PRODUCTION_SAFE_GUEST_MEMORY_PASS', 'O'+str(level),
+              'contiguous=1', 'fallback=1', 'asan_ubsan=pass')
